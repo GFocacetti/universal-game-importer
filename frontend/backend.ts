@@ -38,6 +38,7 @@ export async function loadState(): Promise<UgiState> {
 			animated: settings.animated === true,
 			// WebP included unless the user turned it off
 			webp: settings.webp !== false,
+			theme: settings.theme === 'modern' ? 'modern' : 'steam',
 		},
 		collections: asRecord(state.collections),
 		sgdb_ids: asRecord(state.sgdb_ids),

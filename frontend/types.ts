@@ -56,6 +56,7 @@ export type UgiSettings = {
 	animated?: boolean;
 	// Include WebP images (on by default, can be turned off)
 	webp?: boolean;
+	theme?: 'steam' | 'modern';
 };
 
 export type CollectionInfo = {
