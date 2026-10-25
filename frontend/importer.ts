@@ -1,5 +1,6 @@
 import { Game, ImportedEntry, LauncherStatus, UgiState } from 'types';
 import { loadState, saveState } from 'backend';
+import { syncCollections, removeCollections } from 'collections';
 
 // Steam client store of all library apps (global in Steam's UI context)
 declare const appStore: { GetAppOverviewByAppID(appid: number): unknown };
@@ -98,6 +99,7 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 		removed++;
 	}
 
+	await syncCollections(state);
 	await saveState(state);
 	return { added, removed, updated };
 }
@@ -113,6 +115,7 @@ export async function removeAll(): Promise<number> {
 		}
 	}
 	state.imported = {};
+	await removeCollections(state);
 	await saveState(state);
 	return removed;
 }

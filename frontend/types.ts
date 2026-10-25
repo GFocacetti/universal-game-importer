@@ -40,4 +40,19 @@ export type UgiState = {
 	excluded: Record<string, boolean>;
 	// Microsoft Store classification cache: package family -> game / app
 	store_kinds: Record<string, 'game' | 'app'>;
+	settings: UgiSettings;
+	// Per launcher: the collection / Home shelf UGI created, or that the user deleted (declined)
+	collections: Record<string, CollectionInfo>;
+};
+
+export type UgiSettings = {
+	collections: boolean;
+	shelves: boolean;
+};
+
+export type CollectionInfo = {
+	collection_id?: string;
+	shelf_id?: number;
+	declined_collection?: boolean;
+	declined_shelf?: boolean;
 };

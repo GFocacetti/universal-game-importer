@@ -1,5 +1,5 @@
 import { callable } from '@steambrew/client';
-import { ScanResult, UgiState } from 'types';
+import { ScanResult, UgiSettings, UgiState } from 'types';
 
 const ugiScan = callable<[], string>('ugi_scan');
 const ugiGetState = callable<[], string>('ugi_get_state');
@@ -26,7 +26,14 @@ export async function scan(): Promise<ScanResult> {
 
 export async function loadState(): Promise<UgiState> {
 	const state = parse<Partial<UgiState>>(await ugiGetState(), {});
-	return { imported: asRecord(state.imported), excluded: asRecord(state.excluded), store_kinds: asRecord(state.store_kinds) };
+	const settings: Partial<UgiSettings> = asRecord(state.settings);
+	return {
+		imported: asRecord(state.imported),
+		excluded: asRecord(state.excluded),
+		store_kinds: asRecord(state.store_kinds),
+		settings: { collections: settings.collections === true, shelves: settings.shelves === true },
+		collections: asRecord(state.collections),
+	};
 }
 
 export async function saveState(state: UgiState): Promise<boolean> {
