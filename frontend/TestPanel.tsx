@@ -3,7 +3,7 @@ import { DialogButton, Field } from '@steambrew/client';
 import React, { useState } from 'react';
 import { scan, loadState } from 'backend';
 import { planSync, applySync, removeAll, SyncPlan } from 'importer';
-import { LauncherStatus } from 'types';
+import { Game, LauncherStatus } from 'types';
 
 export default function TestPanel() {
 	const [busy, setBusy] = useState(false);
@@ -29,7 +29,7 @@ export default function TestPanel() {
 			const next = planSync(result.games, result.launchers, await loadState());
 			setLaunchers(result.launchers);
 			setPlan(next);
-			setChosen(new Set(next.newGames.filter((g) => !g.uncertain).map((g) => g.id)));
+			setChosen(new Set(next.newGames.filter((g) => g.kind === 'game').map((g) => g.id)));
 			setStatus(`Found ${result.games.length} · new ${next.newGames.length} · excluded ${next.previouslyExcluded.length} · to update ${next.outdated.length} · uninstalled ${next.gone.length}`);
 		});
 
@@ -53,10 +53,10 @@ export default function TestPanel() {
 		setChosen(next);
 	};
 
-	const row = (g: { id: string; name: string; launcher: string; uncertain?: boolean }) => (
+	const row = (g: Game) => (
 		<label key={g.id} style={{ display: 'flex', gap: 8, padding: '3px 0', opacity: chosen.has(g.id) ? 1 : 0.6 }}>
 			<input type="checkbox" checked={chosen.has(g.id)} onChange={() => toggle(g.id)} />
-			{g.name} <span style={{ opacity: 0.6 }}>· {g.launcher}{g.uncertain ? ' · uncertain' : ''}</span>
+			{g.name} <span style={{ opacity: 0.6 }}>· {g.launcher}{g.kind === 'uncertain' ? ' · uncertain' : ''}</span>
 		</label>
 	);
 
@@ -76,7 +76,13 @@ export default function TestPanel() {
 			{plan && (
 				<div style={{ marginTop: 10 }}>
 					<b>New</b>
-					{plan.newGames.map(row)}
+					{plan.newGames.filter((g) => g.kind !== 'app').map(row)}
+					{plan.newGames.some((g) => g.kind === 'app') && (
+						<details>
+							<summary>Other apps · {plan.newGames.filter((g) => g.kind === 'app').length}</summary>
+							{plan.newGames.filter((g) => g.kind === 'app').map(row)}
+						</details>
+					)}
 					{plan.previouslyExcluded.length > 0 && (
 						<details>
 							<summary>Previously excluded · {plan.previouslyExcluded.length}</summary>

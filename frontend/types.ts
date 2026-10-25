@@ -6,7 +6,8 @@ export type Game = {
 	start_dir: string;
 	launch_options: string;
 	icon?: string | null;
-	uncertain?: boolean;
+	// game: imported by default · uncertain: shown unticked · app: listed under "other apps", unticked
+	kind?: 'game' | 'uncertain' | 'app';
 };
 
 export type LauncherStatus = {

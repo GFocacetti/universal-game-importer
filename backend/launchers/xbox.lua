@@ -5,6 +5,8 @@ local fs = require("fs")
 local utils = require("utils")
 local cjson = require("json")
 local logger = require("logger")
+local http = require("http")
+local millennium = require("millennium")
 local paths = require("paths")
 
 local M = {
@@ -131,6 +133,27 @@ local POWERSHELL = [[C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe]]
 -- so Steam still sees the game running (and counts playtime)
 local CONHOST = [[C:\Windows\System32\conhost.exe]]
 
+-- Microsoft Store classification, cached per package family: "game" or "app"
+local KINDS_KEY = "ugi_xbox_kinds"
+local STORE_LOOKUP = "https://displaycatalog.mp.microsoft.com/v7.0/products/lookup?market=US&languages=en-US&alternateId=PackageFamilyName&fieldsTemplate=details&value="
+
+local function load_kinds()
+    local ok, decoded = pcall(cjson.decode, millennium.config.get(KINDS_KEY) or "")
+    return (ok and type(decoded) == "table") and decoded or {}
+end
+
+-- Returns "game", "app", or nil when the Store can't tell (offline, not a Store product)
+local function store_kind(family, kinds)
+    if kinds[family] then return kinds[family] end
+    local res = http.get(STORE_LOOKUP .. family, { timeout = 10 })
+    if not res or res.status ~= 200 then return nil end
+    local ok, body = pcall(cjson.decode, res.body)
+    local product = ok and type(body) == "table" and type(body.Products) == "table" and body.Products[1]
+    if not product or not product.ProductKind then return nil end
+    kinds[family] = product.ProductKind == "Game" and "game" or "app"
+    return kinds[family]
+end
+
 local function launcher_script_path()
     return fs.join(paths.data_dir(), "uwp_launcher.ps1")
 end
@@ -164,10 +187,13 @@ function M.discover()
     end
     if decoded.aumid then decoded = { decoded } end
 
+    local kinds = load_kinds()
     local games = {}
     for _, app in ipairs(decoded) do
         local aumid = tostring(app.aumid or "")
         if aumid ~= "" and app.name and not HIDDEN[aumid] then
+            -- Packages with MicrosoftGame.config are games; for the others ask the Microsoft Store
+            local kind = app.is_game and "game" or store_kind(aumid:match("^([^!]+)") or aumid, kinds) or "uncertain"
             games[#games + 1] = {
                 id = "xbox:" .. aumid,
                 launcher = M.id,
@@ -176,11 +202,11 @@ function M.discover()
                 start_dir = dir,
                 launch_options = string.format([[--headless "%s" -NoProfile -ExecutionPolicy Bypass -File "%s" -Aumid "%s"]], POWERSHELL, launcher_script_path(), aumid),
                 icon = app.icon,
-                -- Packages with MicrosoftGame.config are games; other store apps may or may not be
-                uncertain = not app.is_game,
+                kind = kind,
             }
         end
     end
+    millennium.config.set(KINDS_KEY, cjson.encode(kinds))
     return games
 end
 
