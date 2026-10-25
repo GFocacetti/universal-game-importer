@@ -1,30 +1,38 @@
-export type ManagedShortcut = {
+export type Game = {
+	id: string;
+	launcher: string;
+	name: string;
+	exe: string;
+	start_dir: string;
+	launch_options: string;
+	icon?: string | null;
+	uncertain?: boolean;
+};
+
+export type LauncherStatus = {
 	id: string;
 	name: string;
 	enabled: boolean;
-	icon?: string | null;
-	source?: string | null;
+	count: number;
+	error?: string;
 };
 
-export type SettingsState = {
-	current_user?: {
-		steamid64: string;
-		steam3: string;
-		account_name?: string;
-		persona_name?: string;
-	};
-	default_disablelist_enabled: boolean;
-	auto_resync_on_startup: boolean;
-	disabled_shortcuts: string[];
-	managed_shortcuts: ManagedShortcut[];
-	last_sync_at?: string | null;
+export type ScanResult = {
+	launchers: LauncherStatus[];
+	games: Game[];
 };
 
-export type ResyncResult = {
-	success: boolean;
-	changed: boolean;
-	message?: string;
-	synced_at?: string;
+export type ImportedEntry = {
+	appid: number;
+	name: string;
+	launcher: string;
+	// How the shortcut was created, to detect when it needs updating
+	exe?: string;
+	start_dir?: string;
+	launch_options?: string;
 };
 
-export type FilterMode = 'all' | 'enabled' | 'disabled';
+export type UgiState = {
+	imported: Record<string, ImportedEntry>;
+	excluded: Record<string, boolean>;
+};

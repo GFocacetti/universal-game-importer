@@ -2,3 +2,4 @@ node_modules/
 .millennium/
 bun.lock
 .vscode
+data/
