@@ -3,6 +3,14 @@
 UGI – Universal Game Importer is licensed under the GNU General Public License v3.0 (see `LICENSE`).
 It includes or is derived from the following third-party works, used under their respective licenses.
 
+## Steam ROM Manager
+
+- Source: https://github.com/SteamGridDB/steam-rom-manager
+- Authors: SteamGridDB and contributors
+- License: GPL-3.0 (same as UGI)
+- Used for: reference for the launcher parsers (install locations, file formats, launch URIs). The Battle.net product code table in `backend/launchers/battlenet.lua` is taken from it (Steam ROM Manager credits steamgriddb-manager for it); the EA parser follows its `installerdata.xml` approach.
+- Changes: rewritten in Lua / PowerShell for a Millennium plugin.
+
 ## millennium-uwp-library-sync
 
 - Source: https://github.com/xwxfox/millennium-uwp-library-sync

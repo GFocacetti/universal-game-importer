@@ -1,9 +1,15 @@
 local logger = require("logger")
+local common = require("launchers.common")
 
 -- Every launcher module exposes: id, name, os ("windows" / "linux"), discover() and optionally prepare()
 local M = {
     list = {
         require("launchers.xbox"),
+        require("launchers.epic"),
+        require("launchers.gog"),
+        require("launchers.ea"),
+        require("launchers.battlenet"),
+        require("launchers.amazon"),
     },
 }
 
@@ -23,6 +29,10 @@ function M.available()
 end
 
 function M.prepare_all()
+    local ok, err = pcall(common.prepare)
+    if not ok then
+        logger:error("prepare common failed: " .. tostring(err))
+    end
     for _, launcher in ipairs(M.available()) do
         if launcher.prepare then
             local ok, err = pcall(launcher.prepare)
