@@ -1,0 +1,9 @@
+{
+	"$schema": "https://raw.githubusercontent.com/SteamClientHomebrew/Millennium/refs/heads/main/src/system/plugin-schema.json",
+	"name": "universal-game-importer",
+	"common_name": "UGI – Universal Game Importer",
+	"description": "Imports games from other launchers into your Steam library.",
+	"backendType": "lua",
+	"useBackend": true,
+	"version": "0.1.0"
+}
