@@ -31,8 +31,15 @@ export async function loadState(): Promise<UgiState> {
 		imported: asRecord(state.imported),
 		excluded: asRecord(state.excluded),
 		store_kinds: asRecord(state.store_kinds),
-		settings: { collections: settings.collections === true, shelves: settings.shelves === true },
+		settings: {
+			collections: settings.collections === true,
+			shelves: settings.shelves === true,
+			sgdb_key: typeof settings.sgdb_key === 'string' ? settings.sgdb_key : '',
+			animated: settings.animated === true,
+		},
 		collections: asRecord(state.collections),
+		sgdb_ids: asRecord(state.sgdb_ids),
+		custom_icons: asRecord(state.custom_icons),
 	};
 }
 

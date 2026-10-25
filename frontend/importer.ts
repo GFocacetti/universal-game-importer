@@ -1,6 +1,7 @@
 import { Game, ImportedEntry, LauncherStatus, UgiState } from 'types';
 import { loadState, saveState } from 'backend';
 import { syncCollections, removeCollections } from 'collections';
+import { fillMissing } from 'sgdb';
 
 // Steam client store of all library apps (global in Steam's UI context)
 declare const appStore: { GetAppOverviewByAppID(appid: number): unknown };
@@ -101,6 +102,17 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 
 	await syncCollections(state);
 	await saveState(state);
+
+	// New games get their images straight away when a SteamGridDB key is set
+	const newAppids = [...plan.newGames, ...plan.previouslyExcluded].filter((g) => chosen.has(g.id) && state.imported[g.id]).map((g) => state.imported[g.id]!.appid);
+	if (newAppids.length && state.settings.sgdb_key) {
+		try {
+			await fillMissing(state, newAppids, () => {}, { stop: false });
+			await saveState(state);
+		} catch (err) {
+			console.error('[UGI] automatic images failed', err);
+		}
+	}
 	return { added, removed, updated };
 }
 

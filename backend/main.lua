@@ -3,6 +3,7 @@ local millennium = require("millennium")
 local cjson = require("json")
 local launchers = require("launchers.registry")
 local state = require("state")
+require("images") -- registers the ugi_sgdb_* / ugi_download* / ugi_missing_images calls
 
 -- Frontend calls. Arguments arrive by name; JSON strings keep complex data intact.
 

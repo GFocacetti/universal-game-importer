@@ -1,10 +1,13 @@
 // Temporary test panel for development milestones; replaced by the real UGI page
-import { DialogButton, Field, Toggle } from '@steambrew/client';
+import { DialogButton, Field, TextField, Toggle } from '@steambrew/client';
 import React, { useState } from 'react';
 import { scan, loadState, saveState } from 'backend';
 import { classify } from 'classifier';
 import { planSync, applySync, removeAll, SyncPlan } from 'importer';
 import { syncCollections, removeCollections } from 'collections';
+import { checkMissing, fillMissing, replaceAll, resetImages, setTrace, IMAGE_TYPE_NAMES, ImageType, StopFlag } from 'sgdb';
+
+declare const collectionStore: { allAppsCollection: { allApps: { appid: number }[] } };
 import { Game, LauncherStatus, UgiSettings } from 'types';
 
 export default function TestPanel() {
@@ -18,7 +21,7 @@ export default function TestPanel() {
 	if (!settings) loadState().then((s) => setSettings(s.settings));
 
 	// Turning an option on also lifts the "deleted by the user" block, then syncs
-	const setOption = (key: keyof UgiSettings, value: boolean) =>
+	const setOption = (key: 'collections' | 'shelves', value: boolean) =>
 		run('Updating collections…', async () => {
 			const state = await loadState();
 			state.settings[key] = value;
@@ -32,6 +35,64 @@ export default function TestPanel() {
 			await saveState(state);
 			setSettings(state.settings);
 			setStatus('Collections updated');
+		});
+
+	const [keyDraft, setKeyDraft] = useState<string | null>(null);
+	const [scope, setScope] = useState<'imported' | 'library'>('imported');
+	const [flag, setFlag] = useState<StopFlag | null>(null);
+
+	const saveSetting = async (patch: Partial<UgiSettings>) => {
+		const state = await loadState();
+		Object.assign(state.settings, patch);
+		await saveState(state);
+		setSettings(state.settings);
+	};
+
+	const targetAppids = async () => {
+		const state = await loadState();
+		return scope === 'imported'
+			? Object.values(state.imported).map((e) => e.appid)
+			: collectionStore.allAppsCollection.allApps.map((a) => a.appid);
+	};
+
+	// Runs a bulk image tool with progress and Stop
+	const imageTool = (label: string, job: (appids: number[], progress: (d: number, t: number) => void, f: StopFlag) => Promise<string>) =>
+		run(label, async () => {
+			const f: StopFlag = { stop: false };
+			setFlag(f);
+			setTrace((msg) => setStatus(`${label} ${msg}`));
+			try {
+				const appids = await targetAppids();
+				const result = await job(appids, (d, t) => setStatus(`${label} ${d}/${t}`), f);
+				setStatus(f.stop ? `Stopped · ${result}` : result);
+			} finally {
+				setFlag(null);
+			}
+		});
+
+	const doCheck = () =>
+		imageTool('Checking…', async (appids) => {
+			const counts = await checkMissing(appids);
+			return `Missing in ${appids.length} apps: ` + (Object.keys(counts) as unknown as ImageType[]).map((t) => `${IMAGE_TYPE_NAMES[t]} ${counts[t]}`).join(' · ');
+		});
+	const doFill = () =>
+		imageTool('Filling missing…', async (appids, p, f) => {
+			const state = await loadState();
+			const n = await fillMissing(state, appids, p, f);
+			await saveState(state);
+			return `Applied ${n} images`;
+		});
+	const doReplace = () =>
+		imageTool('Replacing…', async (appids, p, f) => {
+			const state = await loadState();
+			const n = await replaceAll(state, appids, [0, 1, 2, 3, 4], p, f);
+			await saveState(state);
+			return `Applied ${n} images`;
+		});
+	const doReset = () =>
+		imageTool('Resetting…', async (appids, p, f) => {
+			await resetImages(appids, p, f);
+			return 'Back to the original images';
 		});
 
 	const doRemoveCollections = () =>
@@ -111,6 +172,23 @@ export default function TestPanel() {
 						<Toggle value={settings.shelves} disabled={busy || !settings.collections} onChange={(v: boolean) => setOption('shelves', v)} />
 					</Field>
 					<DialogButton disabled={busy} onClick={doRemoveCollections}>Remove UGI collections and shelves</DialogButton>
+					<Field label="SteamGridDB API key" bottomSeparator="none">
+						<TextField value={keyDraft ?? settings.sgdb_key ?? ''} onChange={(e: any) => setKeyDraft(e.target.value)} />
+					</Field>
+					<DialogButton disabled={busy || keyDraft === null} onClick={() => saveSetting({ sgdb_key: (keyDraft ?? '').trim() }).then(() => setKeyDraft(null))}>Save key</DialogButton>
+					<Field label="Prefer animated images" bottomSeparator="none">
+						<Toggle value={!!settings.animated} disabled={busy} onChange={(v: boolean) => saveSetting({ animated: v })} />
+					</Field>
+					<Field label="Image tools apply to" bottomSeparator="none">
+						<DialogButton onClick={() => setScope(scope === 'imported' ? 'library' : 'imported')}>{scope === 'imported' ? 'Imported games' : 'Whole library'}</DialogButton>
+					</Field>
+					<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+						<DialogButton disabled={busy} onClick={doCheck}>Check missing</DialogButton>
+						<DialogButton disabled={busy || !settings.sgdb_key} onClick={doFill}>Fill missing</DialogButton>
+						<DialogButton disabled={busy || !settings.sgdb_key} onClick={doReplace}>Replace all</DialogButton>
+						<DialogButton disabled={busy} onClick={doReset}>Reset</DialogButton>
+					</div>
+					{flag && <DialogButton onClick={() => { flag.stop = true; setStatus('Stopping…'); }}>Stop</DialogButton>}
 				</>
 			)}
 			<div style={{ padding: '8px 0' }}>{status}</div>

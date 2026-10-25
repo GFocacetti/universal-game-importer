@@ -43,11 +43,17 @@ export type UgiState = {
 	settings: UgiSettings;
 	// Per launcher: the collection / Home shelf UGI created, or that the user deleted (declined)
 	collections: Record<string, CollectionInfo>;
+	// SteamGridDB game id per appid, and shortcuts whose icon UGI already set
+	sgdb_ids: Record<string, number>;
+	custom_icons: Record<string, boolean>;
 };
 
 export type UgiSettings = {
 	collections: boolean;
 	shelves: boolean;
+	sgdb_key?: string;
+	// Prefer animated images when SteamGridDB has them
+	animated?: boolean;
 };
 
 export type CollectionInfo = {
