@@ -9,7 +9,9 @@ local state = require("state")
 function ugi_scan()
     local result = launchers.scan({})
     logger:info("scan: " .. #result.games .. " games")
-    return cjson.encode(result)
+    local json = cjson.encode(result)
+    logger:info("scan: result encoded, " .. #json .. " bytes")
+    return json
 end
 
 function ugi_get_state()
@@ -30,6 +32,8 @@ local function on_load()
     logger:info("UGI backend loading, Millennium " .. tostring(millennium.version()))
     -- Ready first: nothing slow may run before this, or Steam's startup waits for it
     millennium.ready()
+    -- Leftover from an earlier build that cached Store lookups in the plugin config
+    if millennium.config.get("ugi_xbox_kinds") ~= nil then millennium.config.delete("ugi_xbox_kinds") end
     launchers.prepare_all()
 end
 

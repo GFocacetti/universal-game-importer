@@ -26,7 +26,7 @@ export async function scan(): Promise<ScanResult> {
 
 export async function loadState(): Promise<UgiState> {
 	const state = parse<Partial<UgiState>>(await ugiGetState(), {});
-	return { imported: asRecord(state.imported), excluded: asRecord(state.excluded) };
+	return { imported: asRecord(state.imported), excluded: asRecord(state.excluded), store_kinds: asRecord(state.store_kinds) };
 }
 
 export async function saveState(state: UgiState): Promise<boolean> {

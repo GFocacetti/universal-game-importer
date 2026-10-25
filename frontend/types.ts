@@ -8,6 +8,8 @@ export type Game = {
 	icon?: string | null;
 	// game: imported by default · uncertain: shown unticked · app: listed under "other apps", unticked
 	kind?: 'game' | 'uncertain' | 'app';
+	// Microsoft Store package family, used to classify Xbox entries
+	store_family?: string;
 };
 
 export type LauncherStatus = {
@@ -36,4 +38,6 @@ export type ImportedEntry = {
 export type UgiState = {
 	imported: Record<string, ImportedEntry>;
 	excluded: Record<string, boolean>;
+	// Microsoft Store classification cache: package family -> game / app
+	store_kinds: Record<string, 'game' | 'app'>;
 };

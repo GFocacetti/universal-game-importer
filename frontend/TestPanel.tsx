@@ -1,7 +1,8 @@
 // Temporary test panel for development milestones; replaced by the real UGI page
 import { DialogButton, Field } from '@steambrew/client';
 import React, { useState } from 'react';
-import { scan, loadState } from 'backend';
+import { scan, loadState, saveState } from 'backend';
+import { classify } from 'classifier';
 import { planSync, applySync, removeAll, SyncPlan } from 'importer';
 import { Game, LauncherStatus } from 'types';
 
@@ -26,7 +27,9 @@ export default function TestPanel() {
 	const doScan = () =>
 		run('Scanning…', async () => {
 			const result = await scan();
-			const next = planSync(result.games, result.launchers, await loadState());
+			const state = await loadState();
+			if (await classify(result.games, state)) await saveState(state);
+			const next = planSync(result.games, result.launchers, state);
 			setLaunchers(result.launchers);
 			setPlan(next);
 			setChosen(new Set(next.newGames.filter((g) => g.kind === 'game').map((g) => g.id)));
