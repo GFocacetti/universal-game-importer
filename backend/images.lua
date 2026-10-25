@@ -72,6 +72,18 @@ function ugi_download_save(a_url, b_name)
     return path
 end
 
+-- Steam games: the icon is written as files where Steam reads it (original kept for reset)
+function ugi_icon_apply(a_url, b_appid)
+    local data = downloads[a_url]
+    if not data then return false end
+    local ext = tostring(a_url):lower():match("%.(%w+)$") or "png"
+    return require("icons").write_icon(b_appid, data, ext)
+end
+
+function ugi_icon_reset(a_appid)
+    return require("icons").clear_icon(a_appid)
+end
+
 -- ---------- Missing images ----------
 
 -- Image types: 0 = grid, 1 = hero, 2 = logo, 3 = wide grid, 4 = icon

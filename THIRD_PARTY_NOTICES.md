@@ -3,6 +3,13 @@
 UGI – Universal Game Importer is licensed under the GNU General Public License v3.0 (see `LICENSE`).
 It includes or is derived from the following third-party works, used under their respective licenses.
 
+## steam-easygrid (Easy SteamGrid)
+
+- Source: https://github.com/luthor112/steam-easygrid
+- Author: luthor112 and contributors
+- License: MIT — full text in `LICENSES/MIT-steam-easygrid.txt`
+- Used for: `backend/icons.lua` (icon files for Steam apps, unchanged); the SteamGridDB approach (one request per backend call, chunked image transfer, default filters per image type).
+
 ## Steam ROM Manager
 
 - Source: https://github.com/SteamGridDB/steam-rom-manager

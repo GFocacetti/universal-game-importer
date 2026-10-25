@@ -179,6 +179,9 @@ export default function TestPanel() {
 					<Field label="Prefer animated images" bottomSeparator="none">
 						<Toggle value={!!settings.animated} disabled={busy} onChange={(v: boolean) => saveSetting({ animated: v })} />
 					</Field>
+					<Field label="Include WebP images" bottomSeparator="none">
+						<Toggle value={!!settings.webp} disabled={busy} onChange={(v: boolean) => saveSetting({ webp: v })} />
+					</Field>
 					<Field label="Image tools apply to" bottomSeparator="none">
 						<DialogButton onClick={() => setScope(scope === 'imported' ? 'library' : 'imported')}>{scope === 'imported' ? 'Imported games' : 'Whole library'}</DialogButton>
 					</Field>

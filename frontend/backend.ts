@@ -36,6 +36,8 @@ export async function loadState(): Promise<UgiState> {
 			shelves: settings.shelves === true,
 			sgdb_key: typeof settings.sgdb_key === 'string' ? settings.sgdb_key : '',
 			animated: settings.animated === true,
+			// WebP included unless the user turned it off
+			webp: settings.webp !== false,
 		},
 		collections: asRecord(state.collections),
 		sgdb_ids: asRecord(state.sgdb_ids),

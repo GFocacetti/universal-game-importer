@@ -54,6 +54,8 @@ export type UgiSettings = {
 	sgdb_key?: string;
 	// Prefer animated images when SteamGridDB has them
 	animated?: boolean;
+	// Include WebP images (on by default, can be turned off)
+	webp?: boolean;
 };
 
 export type CollectionInfo = {
