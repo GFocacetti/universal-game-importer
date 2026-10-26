@@ -33,6 +33,16 @@ const LAUNCHER_NAMES: Record<string, string> = {
 
 const shelfExists = (id: number) => showcaseStore.showcases.some((s) => s.nShowcaseId === id);
 
+// A shortcut just added may take a moment to show up in Steam's app list
+async function overviewOf(appid: number) {
+	for (let i = 0; i < 20; i++) {
+		const overview = appStore.GetAppOverviewByAppID(appid);
+		if (overview) return overview;
+		await new Promise((r) => setTimeout(r, 250));
+	}
+	return null;
+}
+
 // Keeps one collection (and optionally one Home shelf) per launcher in line with the imported games.
 // Collections or shelves the user deleted by hand are not recreated.
 export async function syncCollections(state: UgiState): Promise<void> {
@@ -60,7 +70,7 @@ export async function syncCollections(state: UgiState): Promise<void> {
 
 		const wanted = new Set(appids);
 		const present = new Set(collection.allApps.map((a) => a.appid));
-		const toAdd = appids.filter((id) => !present.has(id)).map((id) => appStore.GetAppOverviewByAppID(id)).filter(Boolean);
+		const toAdd = (await Promise.all(appids.filter((id) => !present.has(id)).map(overviewOf))).filter(Boolean);
 		const toRemove = [...present].filter((id) => !wanted.has(id)).map((id) => appStore.GetAppOverviewByAppID(id)).filter(Boolean);
 		if (toAdd.length || toRemove.length) {
 			const editable = collection.AsEditableCollection();
