@@ -149,7 +149,8 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 					missing={missingOf(open)}
 					onClose={() => setOpen(null)}
 					onImages={() => {
-						setVersion((v) => v + 1);
+						// Steam writes the new images in the background: load the covers again once they are there
+						for (const ms of [0, 2000, 5000]) setTimeout(() => setVersion((v) => v + 1), ms);
 						setTimeout(() => missingFor(rows.map((r) => r.appid)).then(setMissing), 2000);
 					}}
 					onRemoved={() => {
