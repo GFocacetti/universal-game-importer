@@ -36,12 +36,11 @@ export default function ReviewDialog({ plan, onClose, onDone }: { plan: SyncPlan
 		onDone(result.added);
 	};
 
-	const nothingNew = !plan.newGames.length && !plan.previouslyExcluded.length;
 
 	return (
 		<div className="ugi-overlay" onClick={busy ? undefined : onClose}>
 			<div className="ugi-dialog ugi-review" onClick={(e) => e.stopPropagation()}>
-				<h2>{nothingNew ? t('review.nothingNew') : t('review.title', { n: plan.newGames.length })}</h2>
+				<h2>{plan.newGames.length ? t('review.title', { n: plan.newGames.length }) : plan.gone.length || plan.outdated.length ? t('review.nothingNewChanges') : t('review.nothingNew')}</h2>
 				<p>{t('review.intro')}</p>
 				{(plan.gone.length > 0 || plan.outdated.length > 0) && (
 					<p className="ugi-muted">{t('review.changes', { gone: plan.gone.length, updated: plan.outdated.length })}</p>
