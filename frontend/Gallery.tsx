@@ -7,6 +7,7 @@ import { ImageKind } from 'steamApps';
 import { SteamImage } from 'SteamImage';
 import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
+import { libraryVisible } from 'location';
 
 const TYPES: { type: ImageType; kind: ImageKind; label: () => string }[] = [
 	{ type: 0, kind: 'grid', label: () => t('image.grid') },
@@ -31,6 +32,11 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 			setState(s);
 			setAnimated(!!s.settings.animated);
 		});
+		// Leaving the library (e.g. to the store) would hide the gallery while it still catches clicks
+		const timer = setInterval(() => {
+			if (!libraryVisible()) onClose();
+		}, 1000);
+		return () => clearInterval(timer);
 	}, []);
 
 	// Loads the lists for all five types (the counts are shown on the left)

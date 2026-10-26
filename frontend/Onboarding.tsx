@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
-import { mountOverlay } from 'overlay';
 import ReviewDialog from 'ReviewDialog';
 import { runScan, ScanOutcome } from 'scanner';
 import { LAUNCHER_NAMES } from 'steamApps';
@@ -9,7 +8,7 @@ import { LAUNCHER_NAMES } from 'steamApps';
 type Step = 'welcome' | 'key' | 'keyWarning' | 'collections' | 'shelves' | 'scan' | 'review' | 'done';
 const DOTS: Step[] = ['welcome', 'key', 'collections', 'scan', 'done'];
 
-function Onboarding({ onClose }: { onClose: () => void }) {
+export default function Onboarding({ onClose }: { onClose: () => void }) {
 	const [step, setStep] = useState<Step>('welcome');
 	const [key, setKey] = useState('');
 	const [collections, setCollections] = useState(true);
@@ -167,6 +166,3 @@ function Onboarding({ onClose }: { onClose: () => void }) {
 	);
 }
 
-export function openOnboarding(doc: Document, onClosed?: () => void) {
-	return mountOverlay(doc, (close) => <Onboarding onClose={close} />, onClosed);
-}

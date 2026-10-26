@@ -8,8 +8,8 @@ import { ImagesSection, LaunchersSection, SettingsSection } from 'Sections';
 import ReviewDialog from 'ReviewDialog';
 import { runScan } from 'scanner';
 import { SyncPlan } from 'importer';
-import { openOnboarding } from 'Onboarding';
-import { mainDocument } from 'overlay';
+import Onboarding from 'Onboarding';
+import { takePendingReview } from 'pending';
 
 type Section = 'games' | 'launchers' | 'images' | 'settings';
 
@@ -58,10 +58,18 @@ export default function UgiPage() {
 	const [scanning, setScanning] = useState(false);
 	const [plan, setPlan] = useState<SyncPlan | null>(null);
 	const [message, setMessage] = useState('');
+	const [setup, setSetup] = useState(false);
 
 	const reload = () => loadState().then(setState);
 	useEffect(() => {
-		reload();
+		// First install: the setup opens inside this page
+		loadState().then((s) => {
+			setState(s);
+			if (!s.onboarded) setSetup(true);
+		});
+		// New games announced by the notice
+		const pending = takePendingReview();
+		if (pending) setPlan(pending);
 	}, []);
 
 	const scanNow = async () => {
@@ -120,10 +128,7 @@ export default function UgiPage() {
 						<SettingsSection
 							state={state}
 							onChanged={reload}
-							onRedoSetup={() => {
-								const doc = mainDocument();
-								if (doc) openOnboarding(doc, reload);
-							}}
+							onRedoSetup={() => setSetup(true)}
 						/>
 					)}
 				</div>
@@ -133,6 +138,14 @@ export default function UgiPage() {
 					onClose={() => setKeyDialog(false)}
 					onSaved={() => {
 						setKeyDialog(false);
+						reload();
+					}}
+				/>
+			)}
+			{setup && (
+				<Onboarding
+					onClose={() => {
+						setSetup(false);
 						reload();
 					}}
 				/>

@@ -5,8 +5,7 @@ import { initLanguage, t } from 'i18n';
 import { setupLibraryMenu, UGI_ROUTE } from 'menu';
 import { patchLibraryContextMenu } from 'contextMenu';
 import { loadState } from 'backend';
-import { openOnboarding } from 'Onboarding';
-import { waitForMainDocument } from 'overlay';
+import { mainDocument, waitForMainDocument } from 'overlay';
 import { startPeriodicCheck } from 'checker';
 
 declare global {
@@ -50,6 +49,17 @@ async function loadStateWhenReady() {
 	return loadState();
 }
 
+async function waitForStableMainWindow() {
+	let last = mainDocument();
+	let stableFor = 0;
+	for (let i = 0; i < 120 && stableFor < 5; i++) {
+		await new Promise((r) => setTimeout(r, 1000));
+		const now = mainDocument();
+		stableFor = now && now === last ? stableFor + 1 : 0;
+		last = now;
+	}
+}
+
 async function onStartup() {
 	trace('startup: waiting for the main window');
 	const doc = await waitForMainDocument();
@@ -57,20 +67,11 @@ async function onStartup() {
 	const state = await loadStateWhenReady();
 	trace(`startup: state loaded, onboarded=${state.onboarded}`);
 	if (!state.onboarded && doc) {
-		// Steam may replace its main window while it finishes starting: keep the setup on screen
-		let current = await openOnboarding(doc);
-		trace('startup: onboarding opened');
-		for (let i = 0; i < 40; i++) {
-			await new Promise((r) => setTimeout(r, 3000));
-			if (current.isAlive()) continue;
-			const now = (await loadState()).onboarded;
-			if (now) break;
-			const fresh = await waitForMainDocument();
-			if (!fresh) break;
-			current.dispose();
-			current = await openOnboarding(fresh);
-			trace('startup: onboarding reopened in the new main window');
-		}
+		// Steam replaces its first window a few seconds after startup: wait for the final one,
+		// then open the UGI page, where the setup is shown
+		await waitForStableMainWindow();
+		Navigation.Navigate(UGI_ROUTE);
+		trace('startup: UGI page opened for the setup');
 	}
 	startPeriodicCheck().catch((err) => console.error('[UGI] periodic check failed', err));
 }

@@ -3,7 +3,10 @@ import { loadState } from 'backend';
 import { t } from 'i18n';
 import { applySync, SyncPlan } from 'importer';
 import { mountOverlay, waitForMainDocument } from 'overlay';
-import ReviewDialog from 'ReviewDialog';
+import { Navigation } from '@steambrew/client';
+import { UGI_ROUTE } from 'menu';
+import { setPendingReview } from 'pending';
+import { libraryVisible, waitForLibrary } from 'location';
 import { runScan } from 'scanner';
 import { LAUNCHER_NAMES } from 'steamApps';
 
@@ -15,7 +18,14 @@ const TOAST_MS = 12000;
 function Toast({ plan, onOpen, onClose }: { plan: SyncPlan; onOpen: () => void; onClose: () => void }) {
 	useEffect(() => {
 		const timer = setTimeout(onClose, TOAST_MS);
-		return () => clearTimeout(timer);
+		// Leaving the library would hide it while it still catches clicks in its corner
+		const watch = setInterval(() => {
+			if (!libraryVisible()) onClose();
+		}, 1000);
+		return () => {
+			clearTimeout(timer);
+			clearInterval(watch);
+		};
 	}, []);
 	const counts: Record<string, number> = {};
 	plan.newGames.filter((g) => g.kind !== 'app').forEach((g) => (counts[g.launcher] = (counts[g.launcher] ?? 0) + 1));
@@ -32,10 +42,10 @@ function Toast({ plan, onOpen, onClose }: { plan: SyncPlan; onOpen: () => void; 
 	);
 }
 
-// Opens the review list for the new games found by a check
-export async function showReview(plan: SyncPlan) {
-	const doc = await waitForMainDocument();
-	if (doc) mountOverlay(doc, (close) => <ReviewDialog plan={plan} onClose={close} onDone={close} />);
+// Opens the review list for the new games inside the UGI page
+export function showReview(plan: SyncPlan) {
+	setPendingReview(plan);
+	Navigation.Navigate(UGI_ROUTE);
 }
 
 // Periodic check: runs a while after startup when due. Uninstalled or changed games are handled
@@ -53,6 +63,7 @@ export async function startPeriodicCheck() {
 		await applySync({ ...plan, newGames: [], previouslyExcluded: [] }, new Set());
 	}
 	if (!plan.newGames.some((g) => g.kind !== 'app')) return;
+	await waitForLibrary();
 	const doc = await waitForMainDocument();
 	if (!doc) return;
 	mountOverlay(
