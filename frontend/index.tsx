@@ -7,12 +7,14 @@ import { patchLibraryContextMenu } from 'contextMenu';
 import { loadState } from 'backend';
 import { mainDocument, waitForMainDocument } from 'overlay';
 import { startPeriodicCheck } from 'checker';
+import { startGameInfo } from 'GameInfoSection';
 
 declare global {
 	interface Window {
 		__ugi_route_registered__?: boolean;
 		__ugi_context_menu__?: { unpatch: () => void };
 		__ugi_started__?: boolean;
+		__ugi_game_info__?: boolean;
 	}
 }
 
@@ -85,6 +87,10 @@ export default definePlugin(async () => {
 	}
 	setupLibraryMenu();
 	if (!window.__ugi_context_menu__) window.__ugi_context_menu__ = patchLibraryContextMenu();
+	if (!window.__ugi_game_info__) {
+		window.__ugi_game_info__ = true;
+		startGameInfo();
+	}
 	if (!window.__ugi_started__) {
 		window.__ugi_started__ = true;
 		onStartup().catch((err) => console.error('[UGI] startup failed', err));

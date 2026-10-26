@@ -191,6 +191,7 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 
 export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiState; onChanged: () => void; onRedoSetup: () => void }) {
 	const [key, setKey] = useState<string | null>(null);
+	const [rawgKey, setRawgKey] = useState<string | null>(null);
 	const set = (patch: Partial<UgiState['settings']>) => update((s) => void Object.assign(s.settings, patch), onChanged);
 
 	return (
@@ -209,6 +210,13 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 				<div className="ugi-field">
 					<input type="password" value={key ?? state.settings.sgdb_key ?? ''} placeholder={t('apikey.placeholder')} onChange={(e) => setKey(e.target.value)} />
 					<button className="ugi-btn secondary" disabled={key === null} onClick={() => set({ sgdb_key: (key ?? '').trim() }).then(() => setKey(null))}>{t('settings.save')}</button>
+				</div>
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.rawg')}</strong><small>{t('settings.rawgText')}</small></div>
+				<div className="ugi-field">
+					<input type="password" value={rawgKey ?? state.settings.rawg_key ?? ''} placeholder={t('apikey.placeholder')} onChange={(e) => setRawgKey(e.target.value)} />
+					<button className="ugi-btn secondary" disabled={rawgKey === null} onClick={() => set({ rawg_key: (rawgKey ?? '').trim() }).then(() => setRawgKey(null))}>{t('settings.save')}</button>
 				</div>
 			</div>
 			<div className="ugi-set">

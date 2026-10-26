@@ -133,6 +133,17 @@ const en = {
 	'settings.intervalWeekly': "Every week",
 	'settings.intervalMonthly': "Every month",
 	'settings.keyText': "Needed to download the images.",
+	'settings.rawg': "RAWG API key (optional)",
+	'settings.rawgText': "For the description of games not found on Steam, GOG or Epic. Free key from rawg.io/apidocs (texts in English).",
+	'info.title': "About this game",
+	'info.loading': "Looking for the game's information…",
+	'info.more': "Read more",
+	'info.less': "Show less",
+	'info.developer': "Developer",
+	'info.publisher': "Publisher",
+	'info.genres': "Genres",
+	'info.released': "Release date",
+	'info.source': "Information from",
 	'settings.save': "Save",
 	'settings.animated': "Prefer animated images",
 	'settings.animatedText': "When available, automatic downloads pick animated images instead of static ones.",
@@ -327,6 +338,17 @@ const it: Strings = {
 	'settings.intervalWeekly': "Ogni settimana",
 	'settings.intervalMonthly': "Ogni mese",
 	'settings.keyText': "Necessaria per scaricare le immagini.",
+	'settings.rawg': "API key di RAWG (facoltativa)",
+	'settings.rawgText': "Per la descrizione dei giochi che non si trovano su Steam, GOG o Epic. Key gratuita da rawg.io/apidocs (testi in inglese).",
+	'info.title': "Informazioni sul gioco",
+	'info.loading': "Cerco le informazioni del gioco…",
+	'info.more': "Leggi tutto",
+	'info.less': "Mostra meno",
+	'info.developer': "Sviluppatore",
+	'info.publisher': "Editore",
+	'info.genres': "Generi",
+	'info.released': "Data di uscita",
+	'info.source': "Informazioni da",
 	'settings.save': "Salva",
 	'settings.animated': "Preferisci immagini animate",
 	'settings.animatedText': "Se disponibili, i download automatici scelgono le animate invece delle statiche.",
@@ -411,6 +433,9 @@ export function setLanguage(choice: LanguageChoice | undefined) {
 	strings = LANGUAGES[language] ?? en;
 	locale = strings === it ? 'it' : 'en';
 }
+
+// 'it' or 'en': the UI language
+export const uiLocale = () => locale;
 
 // "3 days ago", in the UI language
 export function relativeTime(iso: string): string {
