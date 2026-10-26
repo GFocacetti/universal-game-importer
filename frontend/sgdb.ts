@@ -83,7 +83,8 @@ const importedKey = (state: UgiState, appid: number) => Object.entries(state.imp
 // Key of the cached SteamGridDB id: the UGI key for imported games (it survives a re-import), else the appid
 export const sgdbCacheKey = (state: UgiState, appid: number) => importedKey(state, appid) ?? String(appid);
 
-const simplify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+// Same words, ignoring case and punctuation ("DungeonKeeper" is not "Dungeon Keeper")
+const simplify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 // SteamGridDB game id for a Steam app or shortcut (cached in the state)
 export async function gameIdFor(state: UgiState, appid: number): Promise<number | null> {
@@ -262,9 +263,11 @@ export async function replaceAll(state: UgiState, appids: number[], types: Image
 	return applied;
 }
 
-// Picks every image of one game again, the icon included (gallery and detail panel)
+// Picks every image of one game again, the icon included (gallery and detail panel).
+// The game is looked up again too, in case the saved match was wrong.
 export async function replaceGame(state: UgiState, appid: number): Promise<number> {
 	delete state.custom_icons[String(appid)];
+	delete state.sgdb_ids[sgdbCacheKey(state, appid)];
 	return replaceAll(state, [appid], [...IMAGE_TYPES], () => {}, { stop: false });
 }
 
