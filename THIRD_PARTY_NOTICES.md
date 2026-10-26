@@ -8,7 +8,7 @@ It includes or is derived from the following third-party works, used under their
 - Source: https://github.com/luthor112/steam-easygrid
 - Author: luthor112 and contributors
 - License: MIT — full text in `LICENSES/MIT-steam-easygrid.txt`
-- Used for: `backend/icons.lua` (icon files for Steam apps, unchanged); the SteamGridDB approach (one request per backend call, chunked image transfer, default filters per image type).
+- Used for: `backend/icons.lua` (icon files for Steam apps, unchanged); the library right-click menu hook in `frontend/contextMenu.tsx`; the SteamGridDB approach (one request per backend call, chunked image transfer, default filters per image type).
 
 ## Steam ROM Manager
 

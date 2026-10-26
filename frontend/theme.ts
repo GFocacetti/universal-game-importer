@@ -113,4 +113,34 @@ export const UGI_CSS = `
 .ugi-im.logo img, .ugi-im.icon img { object-fit: contain; }
 .ugi-kv { font-size: 13px; color: var(--ugi-muted); line-height: 1.8; }
 .ugi-kv code { color: var(--ugi-text); font-size: 12px; word-break: break-all; }
+.ugi-im.clickable { cursor: pointer; }
+.ugi-im.clickable:hover { outline: 2px solid var(--ugi-accent); }
+.ugi-win { width: 1020px; max-width: calc(100% - 32px); height: 620px; max-height: calc(100% - 32px); background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius-lg); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.ugi-win header, .ugi-win footer { display: flex; align-items: center; gap: 12px; padding: 12px 18px; }
+.ugi-win header { border-bottom: 1px solid var(--ugi-panel-border); }
+.ugi-win footer { border-top: 1px solid var(--ugi-panel-border); }
+.ugi-win header h2 { margin: 0; font-size: 18px; font-weight: 500; color: var(--ugi-head); }
+.ugi-sp { flex: 1; }
+.ugi-switch { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; user-select: none; }
+.ugi-tog { width: 40px; height: 22px; border-radius: 11px; background: #3a4350; position: relative; flex: none; }
+.ugi-tog::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.ugi-switch.on .ugi-tog { background: var(--ugi-accent); }
+.ugi-switch.on .ugi-tog::after { left: 21px; }
+.ugi-win-body { flex: 1; display: flex; min-height: 0; }
+.ugi-types { width: 200px; flex: none; padding: 12px 8px; border-right: 1px solid var(--ugi-panel-border); display: flex; flex-direction: column; gap: 4px; }
+.ugi-current { margin-top: auto; padding: 10px 12px; font-size: 12px; color: var(--ugi-muted); }
+.ugi-current .ugi-im { margin-top: 6px; width: 100%; }
+.ugi-current .ugi-im.grid { width: 110px; grid-row: auto; }
+.ugi-pick { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.ugi-filters { padding: 10px 16px; border-bottom: 1px solid var(--ugi-panel-border); font-size: 13px; }
+.ugi-filters summary { cursor: pointer; color: var(--ugi-muted); }
+.ugi-filter-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ugi-filter-row select { background: var(--ugi-bg2); color: var(--ugi-text); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius); padding: 5px 8px; font: inherit; }
+.ugi-thumbs { flex: 1; overflow: auto; padding: 14px 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; align-content: start; }
+.ugi-thumbs.wide, .ugi-thumbs.hero { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.ugi-thumbs.logo, .ugi-thumbs.icon { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.ugi-thumb { width: 100%; border-radius: var(--ugi-radius); cursor: pointer; background: var(--ugi-panel); border: 2px solid transparent; object-fit: contain; }
+.ugi-thumbs.grid .ugi-thumb { aspect-ratio: 2/3; object-fit: cover; }
+.ugi-thumb:hover { border-color: var(--ugi-accent); }
+.ugi-link { background: none; border: 0; color: var(--ugi-muted); cursor: pointer; font: inherit; text-decoration: underline; padding: 0; }
 `;

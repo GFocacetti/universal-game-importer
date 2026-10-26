@@ -1,21 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { SteamImage } from 'SteamImage';
+import { openGallery } from 'Gallery';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
 import { missingFor } from 'sgdb';
-import { imageUrls, ImageKind, LAUNCHER_NAMES, launchShortcut } from 'steamApps';
+import { ImageKind, LAUNCHER_NAMES, launchShortcut } from 'steamApps';
 import { ImportedEntry, UgiState } from 'types';
 
 type Row = ImportedEntry & { id: string };
 
-// Shows the first URL that loads; falls back to a placeholder
-export function SteamImage({ appid, kind, className, label }: { appid: number; kind: ImageKind; className?: string; label?: string }) {
-	const urls = useMemo(() => imageUrls(appid, kind), [appid, kind]);
-	const [index, setIndex] = useState(0);
-	if (index >= urls.length) return <div className={`${className ?? ''} ugi-noimg`}>{label}</div>;
-	return <img className={className} src={urls[index]} onError={() => setIndex(index + 1)} />;
-}
-
 function Detail({ row, missing, onClose, onRemoved }: { row: Row; missing: number[]; onClose: () => void; onRemoved: () => void }) {
+	const [version, setVersion] = useState(0);
 	const remove = async () => {
 		const state = await loadState();
 		SteamClient.Apps.RemoveShortcut(row.appid);
@@ -26,7 +21,8 @@ function Detail({ row, missing, onClose, onRemoved }: { row: Row; missing: numbe
 		onRemoved();
 	};
 	const tile = (kind: ImageKind, label: string) => (
-		<div className={`ugi-im ${kind}`} title={t('detail.changeSoon')}>
+		<div className={`ugi-im ${kind} clickable`} title={t('detail.changeImage')} key={`${kind}-${version}`}
+			onClick={(e) => openGallery(row.appid, row.name, e.currentTarget.ownerDocument, () => setVersion((v) => v + 1))}>
 			<SteamImage appid={row.appid} kind={kind} />
 			<span>{label}</span>
 		</div>

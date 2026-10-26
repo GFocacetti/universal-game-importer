@@ -39,6 +39,7 @@ export async function loadState(): Promise<UgiState> {
 			// WebP included unless the user turned it off
 			webp: settings.webp !== false,
 			theme: settings.theme === 'modern' ? 'modern' : 'steam',
+			filters: asRecord(settings.filters),
 		},
 		collections: asRecord(state.collections),
 		sgdb_ids: asRecord(state.sgdb_ids),

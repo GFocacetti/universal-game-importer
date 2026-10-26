@@ -57,6 +57,8 @@ export type UgiSettings = {
 	// Include WebP images (on by default, can be turned off)
 	webp?: boolean;
 	theme?: 'steam' | 'modern';
+	// Gallery filters per image type ("0".. "4")
+	filters?: Record<string, { style?: string; dimension?: string; webp?: boolean; nsfw?: string; humor?: string }>;
 };
 
 export type CollectionInfo = {

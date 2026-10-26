@@ -29,6 +29,33 @@ const FILTERS: Record<ImageType, Filter> = {
 	4: { endpoint: 'icons', styles: 'official,custom', mimes: 'image/png,image/vnd.microsoft.icon', nsfw: 'false', humor: 'any' },
 };
 
+// Choices offered by the gallery filters, per image type
+export const FILTER_OPTIONS: Record<ImageType, { styles: string[]; dimensions: string[] }> = {
+	0: { styles: ['alternate', 'blurred', 'white_logo', 'material', 'no_logo'], dimensions: ['600x900', '342x482', '660x930', '512x512', '1024x1024'] },
+	1: { styles: ['alternate', 'blurred', 'material'], dimensions: ['1920x620', '3840x1240', '1600x650'] },
+	2: { styles: ['official', 'white', 'black', 'custom'], dimensions: [] },
+	3: { styles: ['alternate', 'blurred', 'white_logo', 'material', 'no_logo'], dimensions: ['460x215', '920x430'] },
+	4: { styles: ['official', 'custom'], dimensions: [] },
+};
+
+// What the user picked in the gallery for one image type ("" = all)
+export type UserFilter = { style?: string; dimension?: string; webp?: boolean; nsfw?: string; humor?: string };
+
+function effectiveFilter(state: UgiState, type: ImageType): Filter {
+	const base = FILTERS[type];
+	const user: UserFilter = state.settings.filters?.[String(type)] ?? {};
+	// WebP can be turned off: it crashed Steam on some systems with Easy SteamGrid
+	const webp = user.webp ?? state.settings.webp;
+	return {
+		endpoint: base.endpoint,
+		styles: user.style || base.styles,
+		dimensions: user.dimension === undefined ? base.dimensions : user.dimension || undefined,
+		mimes: webp && type !== 4 ? `${base.mimes},image/webp` : base.mimes,
+		nsfw: user.nsfw || base.nsfw,
+		humor: user.humor || base.humor,
+	};
+}
+
 export type SgdbImage = { id: number; url: string; thumb: string; mime?: string };
 
 // Optional step-by-step reporting (shown by the test panel while debugging)
@@ -75,18 +102,18 @@ export async function gameIdFor(state: UgiState, appid: number): Promise<number 
 	return id;
 }
 
-// Images for one type, in SteamGridDB's order (animated first when preferred)
-export async function imagesFor(state: UgiState, gameId: number, type: ImageType): Promise<SgdbImage[]> {
-	const f = FILTERS[type];
-	// WebP can be turned off: it crashed Steam on some systems with Easy SteamGrid
-	const mimes = state.settings.webp && type !== 4 ? `${f.mimes},image/webp` : f.mimes;
+// Images for one type, in SteamGridDB's order. "auto" puts animated first when preferred;
+// the gallery asks for only static or only animated images.
+export async function imagesFor(state: UgiState, gameId: number, type: ImageType, mode: 'auto' | 'static' | 'animated' = 'auto'): Promise<SgdbImage[]> {
+	const f = effectiveFilter(state, type);
 	const query = (types: string) =>
-		`${f.endpoint}/game/${gameId}?styles=${f.styles}&mimes=${mimes}&nsfw=${f.nsfw}&humor=${f.humor}&epilepsy=any&types=${types}` +
+		`${f.endpoint}/game/${gameId}?styles=${f.styles}&mimes=${f.mimes}&nsfw=${f.nsfw}&humor=${f.humor}&epilepsy=any&types=${types}` +
 		(f.dimensions ? `&dimensions=${f.dimensions}` : '');
 	const get = async (types: string): Promise<SgdbImage[]> => {
 		const res = await api(state, query(types));
 		return res?.success && Array.isArray(res.data) ? res.data : [];
 	};
+	if (mode !== 'auto') return get(mode);
 	if (state.settings.animated) return [...(await get('animated')), ...(await get('static'))];
 	return get('static');
 }
@@ -220,6 +247,15 @@ export async function replaceAll(state: UgiState, appids: number[], types: Image
 	}
 	progress(appids.length, appids.length);
 	return applied;
+}
+
+// One image type back to Steam's original
+export async function resetImage(appid: number, type: ImageType): Promise<void> {
+	if (type === 4) {
+		if (appStore.GetAppOverviewByAppID(appid)?.app_type !== SHORTCUT_APP_TYPE) await iconReset({ a_appid: appid });
+		return;
+	}
+	SteamClient.Apps.ClearCustomArtworkForApp(appid, type);
 }
 
 // Back to Steam's original artwork (custom grid, hero, logo, wide grid and Steam game icons)
