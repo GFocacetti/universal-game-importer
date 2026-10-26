@@ -103,17 +103,24 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 	await syncCollections(state);
 	await saveState(state);
 
-	// New games get their images straight away when a SteamGridDB key is set
+	// New games get their images when a SteamGridDB key is set, in the background:
+	// downloads can take a while and the import shouldn't wait for them
 	const newAppids = [...plan.newGames, ...plan.previouslyExcluded].filter((g) => chosen.has(g.id) && state.imported[g.id]).map((g) => state.imported[g.id]!.appid);
-	if (newAppids.length && state.settings.sgdb_key) {
-		try {
-			await fillMissing(state, newAppids, () => {}, { stop: false });
-			await saveState(state);
-		} catch (err) {
-			console.error('[UGI] automatic images failed', err);
-		}
-	}
+	if (newAppids.length && state.settings.sgdb_key) fillInBackground(state, newAppids);
 	return { added, removed, updated };
+}
+
+async function fillInBackground(state: UgiState, appids: number[]) {
+	try {
+		await fillMissing(state, appids, () => {}, { stop: false });
+		// The state may have changed meanwhile: keep it and add only what the images step learned
+		const current = await loadState();
+		Object.assign(current.sgdb_ids, state.sgdb_ids);
+		Object.assign(current.custom_icons, state.custom_icons);
+		await saveState(current);
+	} catch (err) {
+		console.error('[UGI] automatic images failed', err);
+	}
 }
 
 // Removes every shortcut UGI created (used by the test panel)
