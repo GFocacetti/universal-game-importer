@@ -9,13 +9,16 @@ import { ImportedEntry, UgiState } from 'types';
 
 type Row = ImportedEntry & { id: string };
 
-function Detail({ row, missing, onClose, onRemoved }: { row: Row; missing: number[]; onClose: () => void; onRemoved: () => void }) {
+function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; missing: number[]; onClose: () => void; onRemoved: () => void; onImages: () => void }) {
 	const [version, setVersion] = useState(0);
 	const [missingNow, setMissingNow] = useState(missing);
 	const [status, setStatus] = useState('');
 	const [busy, setBusy] = useState(false);
 	const refresh = async () => {
 		setVersion((v) => v + 1);
+		onImages();
+		// Steam writes the new images in the background: count the missing ones once they are there
+		await new Promise((r) => setTimeout(r, 2000));
 		setMissingNow((await missingFor([row.appid]))[String(row.appid)] ?? []);
 	};
 	const autoPick = async () => {
@@ -87,6 +90,8 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 	const [view, setView] = useState<'grid' | 'list'>('grid');
 	const [missing, setMissing] = useState<Record<string, number[]>>({});
 	const [open, setOpen] = useState<Row | null>(null);
+	// Bumped when images change, so the covers load again
+	const [version, setVersion] = useState(0);
 
 	const rows: Row[] = useMemo(
 		() => Object.entries(state.imported).map(([id, e]) => ({ ...e, id })).sort((a, b) => a.name.localeCompare(b.name)),
@@ -120,7 +125,7 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 			{view === 'grid' ? (
 				<div className="ugi-grid">
 					{visible.map((r) => (
-						<div key={r.id} className="ugi-game" onClick={() => setOpen(r)}>
+						<div key={`${r.id}-${version}`} className="ugi-game" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-cover" label={r.name} />
 							<span className="ugi-badge">{LAUNCHER_NAMES[r.launcher] ?? r.launcher}</span>
 						</div>
@@ -129,7 +134,7 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 			) : (
 				<div>
 					{visible.map((r) => (
-						<div key={r.id} className="ugi-row" onClick={() => setOpen(r)}>
+						<div key={`${r.id}-${version}`} className="ugi-row" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-mini" />
 							<span>{r.name}</span>
 							<span className="ugi-muted">{LAUNCHER_NAMES[r.launcher] ?? r.launcher}</span>
@@ -143,6 +148,10 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 					row={open}
 					missing={missingOf(open)}
 					onClose={() => setOpen(null)}
+					onImages={() => {
+						setVersion((v) => v + 1);
+						setTimeout(() => missingFor(rows.map((r) => r.appid)).then(setMissing), 2000);
+					}}
 					onRemoved={() => {
 						setOpen(null);
 						onChanged();
