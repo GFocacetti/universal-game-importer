@@ -18,6 +18,7 @@ export const LAUNCHER_NAMES: Record<string, string> = {
 	ea: 'EA',
 	battlenet: 'Battle.net',
 	amazon: 'Amazon Games',
+	ubisoft: 'Ubisoft Connect',
 };
 
 export type ImageKind = 'grid' | 'wide' | 'hero' | 'logo' | 'icon';

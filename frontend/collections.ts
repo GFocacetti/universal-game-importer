@@ -28,6 +28,7 @@ const LAUNCHER_NAMES: Record<string, string> = {
 	ea: 'EA',
 	battlenet: 'Battle.net',
 	amazon: 'Amazon Games',
+	ubisoft: 'Ubisoft Connect',
 };
 
 const shelfExists = (id: number) => showcaseStore.showcases.some((s) => s.nShowcaseId === id);

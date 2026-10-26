@@ -10,6 +10,7 @@ local M = {
         require("launchers.ea"),
         require("launchers.battlenet"),
         require("launchers.amazon"),
+        require("launchers.ubisoft"),
     },
 }
 
