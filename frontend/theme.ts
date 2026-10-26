@@ -95,6 +95,9 @@ export const UGI_CSS = `
 .ugi-game { position: relative; cursor: pointer; }
 .ugi-cover { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: var(--ugi-radius); display: block; }
 .ugi-noimg { display: flex; align-items: flex-end; padding: 8px; box-sizing: border-box; font-size: 13px; color: var(--ugi-muted); background: repeating-linear-gradient(45deg, var(--ugi-panel), var(--ugi-panel) 8px, transparent 8px, transparent 16px); border: 1px dashed var(--ugi-panel-border); border-radius: var(--ugi-radius); }
+.ugi-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-radius: var(--ugi-radius); background: rgba(0,0,0,.6); color: #fff; font-size: 12px; text-align: center; padding: 8px; }
+.ugi-loading .ugi-spinner { width: 28px; height: 28px; margin: 0; }
+.ugi-loading.waiting .ugi-spinner { animation-play-state: paused; opacity: .4; }
 .ugi-badge { position: absolute; top: 6px; left: 6px; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,.65); color: #fff; }
 .ugi-row { display: grid; grid-template-columns: 40px 1fr 140px 150px; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--ugi-radius); background: var(--ugi-panel); margin-bottom: 6px; font-size: 14px; cursor: pointer; }
 .ugi-mini { width: 40px; height: 56px; object-fit: cover; border-radius: 2px; }

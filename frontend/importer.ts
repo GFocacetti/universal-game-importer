@@ -2,6 +2,7 @@ import { Game, ImportedEntry, LauncherStatus, UgiState } from 'types';
 import { loadState, saveState } from 'backend';
 import { syncCollections, removeCollections } from 'collections';
 import { fillMissing } from 'sgdb';
+import { finishImages, startImages } from 'imagesProgress';
 
 // Steam client store of all library apps (global in Steam's UI context)
 declare const appStore: { GetAppOverviewByAppID(appid: number): unknown };
@@ -111,8 +112,10 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 }
 
 async function fillInBackground(state: UgiState, appids: number[]) {
+	startImages(appids);
 	try {
-		await fillMissing(state, appids, () => {}, { stop: false });
+		// fillMissing reports how many games are done before starting the next one
+		await fillMissing(state, appids, (done) => done > 0 && finishImages(appids[done - 1]!), { stop: false });
 		// The state may have changed meanwhile: keep it and add only what the images step learned
 		const current = await loadState();
 		Object.assign(current.sgdb_ids, state.sgdb_ids);
@@ -120,6 +123,8 @@ async function fillInBackground(state: UgiState, appids: number[]) {
 		await saveState(current);
 	} catch (err) {
 		console.error('[UGI] automatic images failed', err);
+	} finally {
+		appids.forEach(finishImages);
 	}
 }
 

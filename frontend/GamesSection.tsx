@@ -6,6 +6,7 @@ import { t } from 'i18n';
 import { missingFor, replaceGame } from 'sgdb';
 import { ImageKind, LAUNCHER_NAMES, launchShortcut } from 'steamApps';
 import { ImportedEntry, UgiState } from 'types';
+import { ImagesProgress, watchImages } from 'imagesProgress';
 
 type Row = ImportedEntry & { id: string };
 
@@ -97,9 +98,22 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 		() => Object.entries(state.imported).map(([id, e]) => ({ ...e, id })).sort((a, b) => a.name.localeCompare(b.name)),
 		[state],
 	);
+	// Games still getting their images after an import
+	const [images, setImages] = useState<ImagesProgress>({ pending: [], round: 0 });
+	useEffect(() => watchImages(setImages), []);
 	useEffect(() => {
 		missingFor(rows.map((r) => r.appid)).then(setMissing);
-	}, [rows]);
+	}, [rows, images.round]);
+	const loading = (r: Row) => {
+		const index = images.pending.indexOf(r.appid);
+		if (index < 0) return null;
+		return (
+			<div className={`ugi-loading${index ? ' waiting' : ''}`}>
+				<div className="ugi-spinner" />
+				<span>{index ? t('cover.waiting') : t('cover.downloading')}</span>
+			</div>
+		);
+	};
 
 	const launchers = [...new Set(rows.map((r) => r.launcher))];
 	const visible = rows.filter((r) => (filter === 'all' || r.launcher === filter) && r.name.toLowerCase().includes(search.toLowerCase()));
@@ -125,8 +139,9 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 			{view === 'grid' ? (
 				<div className="ugi-grid">
 					{visible.map((r) => (
-						<div key={`${r.id}-${version}`} className="ugi-game" onClick={() => setOpen(r)}>
+						<div key={`${r.id}-${version}-${images.round}`} className="ugi-game" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-cover" label={r.name} />
+							{loading(r)}
 							<span className="ugi-badge">{LAUNCHER_NAMES[r.launcher] ?? r.launcher}</span>
 						</div>
 					))}
@@ -134,11 +149,11 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 			) : (
 				<div>
 					{visible.map((r) => (
-						<div key={`${r.id}-${version}`} className="ugi-row" onClick={() => setOpen(r)}>
+						<div key={`${r.id}-${version}-${images.round}`} className="ugi-row" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-mini" />
 							<span>{r.name}</span>
 							<span className="ugi-muted">{LAUNCHER_NAMES[r.launcher] ?? r.launcher}</span>
-							<span className="ugi-muted">{missingOf(r).length ? t('games.imagesMissing') : t('games.imagesComplete')}</span>
+							<span className="ugi-muted">{images.pending.includes(r.appid) ? t('cover.downloading') : missingOf(r).length ? t('games.imagesMissing') : t('games.imagesComplete')}</span>
 						</div>
 					))}
 				</div>
