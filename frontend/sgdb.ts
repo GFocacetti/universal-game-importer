@@ -77,9 +77,17 @@ async function api(state: UgiState, endpoint: string): Promise<any> {
 	return body;
 }
 
+// UGI key of an imported shortcut ("gog:1207658754"), if the app is one
+const importedKey = (state: UgiState, appid: number) => Object.entries(state.imported).find(([, e]) => e.appid === appid)?.[0];
+
+// Key of the cached SteamGridDB id: the UGI key for imported games (it survives a re-import), else the appid
+export const sgdbCacheKey = (state: UgiState, appid: number) => importedKey(state, appid) ?? String(appid);
+
+const simplify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
 // SteamGridDB game id for a Steam app or shortcut (cached in the state)
 export async function gameIdFor(state: UgiState, appid: number): Promise<number | null> {
-	const key = String(appid);
+	const key = sgdbCacheKey(state, appid);
 	if (state.sgdb_ids[key]) return state.sgdb_ids[key];
 	const overview = appStore.GetAppOverviewByAppID(appid);
 	let id: number | null = null;
@@ -87,16 +95,21 @@ export async function gameIdFor(state: UgiState, appid: number): Promise<number 
 		const res = await api(state, `games/steam/${appid}`);
 		id = res?.success ? res.data?.id ?? null : null;
 	} else {
-		// Imported Epic games: SteamGridDB knows them by their Epic app name (more precise than the title)
-		const imported = Object.entries(state.imported).find(([, e]) => e.appid === appid)?.[0];
-		if (imported?.startsWith('epic:')) {
-			const res = await api(state, `games/egs/${encodeURIComponent(imported.slice('epic:'.length))}`);
+		// Epic and GOG games: SteamGridDB knows them by their store id (more precise than the title).
+		// Battle.net codes aren't used: SteamGridDB maps some to an older edition (S1 -> the original StarCraft).
+		const imported = importedKey(state, appid);
+		const platform = imported?.startsWith('epic:') ? 'egs' : imported?.startsWith('gog:') ? 'gog' : null;
+		if (platform && imported) {
+			const res = await api(state, `games/${platform}/${encodeURIComponent(imported.slice(imported.indexOf(':') + 1))}`);
 			id = res?.success ? res.data?.id ?? null : null;
 		}
 	}
-	if (!id && overview?.display_name) {
-		const res = await api(state, `search/autocomplete/${encodeURIComponent(overview.display_name)}`);
-		id = res?.success && res.data?.length ? res.data[0].id : null;
+	const name = overview?.display_name;
+	if (!id && name) {
+		// Prefer a result with the same name, else SteamGridDB's best match
+		const res = await api(state, `search/autocomplete/${encodeURIComponent(name)}`);
+		const results: { id: number; name: string }[] = res?.success && Array.isArray(res.data) ? res.data : [];
+		id = (results.find((r) => simplify(r.name) === simplify(name)) ?? results[0])?.id ?? null;
 	}
 	if (id) state.sgdb_ids[key] = id;
 	return id;

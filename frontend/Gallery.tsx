@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
-import { applyImage, FILTER_OPTIONS, gameIdFor, imagesFor, ImageType, resetImage, SgdbImage, UserFilter } from 'sgdb';
+import { applyImage, FILTER_OPTIONS, gameIdFor, imagesFor, ImageType, resetImage, SgdbImage, sgdbCacheKey, UserFilter } from 'sgdb';
 import { ImageKind } from 'steamApps';
 import { SteamImage } from 'SteamImage';
 import { themeStyle, UGI_CSS } from 'theme';
@@ -87,7 +87,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 
 	const clearCache = async () => {
 		const s = await loadState();
-		delete s.sgdb_ids[String(appid)];
+		delete s.sgdb_ids[sgdbCacheKey(s, appid)];
 		await saveState(s);
 		setState(s);
 	};
