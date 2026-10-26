@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { loadState, saveState } from 'backend';
 import { removeCollections, removeLauncherCollection, syncCollections } from 'collections';
-import { t } from 'i18n';
+import { LanguageChoice, setLanguage, t } from 'i18n';
 import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag } from 'sgdb';
 import { LAUNCHER_NAMES } from 'steamApps';
 import { UgiState } from 'types';
@@ -239,6 +239,22 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 					if (v) await syncCollections(s);
 					else for (const id of Object.keys(s.collections)) await removeLauncherCollection(s, id, 'shelf');
 				}, onChanged)} />
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.language')}</strong><small>{t('settings.languageText')}</small></div>
+				<select
+					className="ugi-select"
+					value={state.settings.language ?? 'auto'}
+					onChange={(e) => {
+						const language = e.target.value as LanguageChoice;
+						setLanguage(language);
+						set({ language });
+					}}
+				>
+					<option value="auto">{t('settings.languageAuto')}</option>
+					<option value="en">English</option>
+					<option value="it">Italiano</option>
+				</select>
 			</div>
 			<div className="ugi-set">
 				<div><strong>{t('settings.theme')}</strong><small>{t('settings.themeText')}</small></div>

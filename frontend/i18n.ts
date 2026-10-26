@@ -1,4 +1,5 @@
-// UI strings. The language follows Steam's: Italian when Steam is in Italian, English otherwise.
+// UI strings. By default the language follows Steam's (Italian when Steam is in Italian, English
+// otherwise); the user can pick one in the settings.
 // To add a language, add a table with the same keys and map Steam's language name in LANGUAGES.
 
 const en = {
@@ -141,6 +142,9 @@ const en = {
 	'settings.collectionsText': "One collection per launcher. Turning it off removes the UGI collections; the games stay in the library.",
 	'settings.shelves': "Home shelves",
 	'settings.shelvesText': "A shelf on the Home page for each launcher collection.",
+	'settings.language': "Language",
+	'settings.languageText': "Language of the UGI pages and menus.",
+	'settings.languageAuto': "Automatic (same as Steam)",
 	'settings.theme': "Theme",
 	'settings.themeText': "Look of the UGI pages.",
 	'settings.themeSteam': "Steam",
@@ -332,6 +336,9 @@ const it: Strings = {
 	'settings.collectionsText': "Una collezione per ogni launcher. Disattivandolo le collezioni di UGI vengono tolte; i giochi restano in libreria.",
 	'settings.shelves': "Scaffali nella Home",
 	'settings.shelvesText': "Uno scaffale nella Pagina iniziale per ogni collezione dei launcher.",
+	'settings.language': "Lingua",
+	'settings.languageText': "Lingua delle pagine e dei menu di UGI.",
+	'settings.languageAuto': "Automatica (come Steam)",
 	'settings.theme': "Tema",
 	'settings.themeText': "Aspetto delle pagine di UGI.",
 	'settings.themeSteam': "Steam nativo",
@@ -385,15 +392,24 @@ const LANGUAGES: Record<string, Strings> = { english: en, italian: it };
 
 let strings: Strings = en;
 let locale = 'en';
+let steamLanguage = 'english';
+
+export type LanguageChoice = 'auto' | 'en' | 'it';
 
 export async function initLanguage(): Promise<void> {
 	try {
-		const language = await SteamClient.Settings.GetCurrentLanguage();
-		strings = LANGUAGES[language] ?? en;
-		locale = language === 'italian' ? 'it' : 'en';
+		steamLanguage = await SteamClient.Settings.GetCurrentLanguage();
 	} catch {
-		strings = en;
+		steamLanguage = 'english';
 	}
+	setLanguage('auto');
+}
+
+// "auto" follows Steam; the others are the user's choice in the settings
+export function setLanguage(choice: LanguageChoice | undefined) {
+	const language = choice === 'it' ? 'italian' : choice === 'en' ? 'english' : steamLanguage;
+	strings = LANGUAGES[language] ?? en;
+	locale = strings === it ? 'it' : 'en';
 }
 
 // "3 days ago", in the UI language

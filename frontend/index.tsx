@@ -1,7 +1,7 @@
 import { callable, definePlugin, DialogButton, IconsModule, Navigation, routerHook } from '@steambrew/client';
 import React from 'react';
 import UgiPage from 'UgiPage';
-import { initLanguage, t } from 'i18n';
+import { initLanguage, setLanguage, t } from 'i18n';
 import { setupLibraryMenu, UGI_ROUTE } from 'menu';
 import { patchLibraryContextMenu } from 'contextMenu';
 import { loadState } from 'backend';
@@ -65,6 +65,7 @@ async function onStartup() {
 	const doc = await waitForMainDocument();
 	trace(`startup: main window ${doc ? 'found' : 'not found'}`);
 	const state = await loadStateWhenReady();
+	setLanguage(state.settings.language);
 	trace(`startup: state loaded, onboarded=${state.onboarded}`);
 	if (!state.onboarded && doc) {
 		// Steam replaces its first window a few seconds after startup: wait for the final one,

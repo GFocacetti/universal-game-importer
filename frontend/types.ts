@@ -65,6 +65,8 @@ export type UgiSettings = {
 	// Include WebP images (on by default, can be turned off)
 	webp?: boolean;
 	theme?: 'steam' | 'modern';
+	// 'auto' follows Steam's language
+	language?: 'auto' | 'en' | 'it';
 	// How often to look for new games
 	check_interval?: 'off' | 'daily' | 'weekly' | 'monthly';
 	// Per launcher: turned off, or a custom folder
