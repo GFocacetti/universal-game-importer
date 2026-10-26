@@ -15,16 +15,21 @@ export type GameInfo = {
 	// Page of the game on the source site
 	url: string;
 	summary: string;
-	// Plain text, paragraphs separated by an empty line
+	// Plain text, paragraphs separated by an empty line; headings start with "# "
 	description: string;
 	developers: string[];
 	publishers: string[];
 	genres: string[];
 	released?: string;
-	screenshots: string[];
+	screenshots: Screenshot[];
 };
 
-type CacheEntry = { fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
+export type Screenshot = { thumb: string; full: string };
+
+// Bumped when the stored text changes shape: older entries are read again
+const CACHE_VERSION = 3;
+
+type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
 
 const DAY = 24 * 60 * 60 * 1000;
 // Found: refreshed after a month; not found: tried again after a week (or when a RAWG key is added)
@@ -48,6 +53,11 @@ const decode = (text: string) => new DOMParser().parseFromString(text, 'text/htm
 // Store pages are HTML: kept as plain text, one paragraph per block
 function htmlToText(html: string): string {
 	const marked = html
+		// Line breaks in the HTML source are just spaces
+		.replace(/\s*\n\s*/g, ' ')
+		// Headings, and paragraphs that are all bold, become "# " lines
+		.replace(/<h\d[^>]*>/gi, '\n\n# ')
+		.replace(/<p[^>]*>\s*<(strong|b)>([^<]*)<\/\1>\s*<\/p>/gi, '\n\n# $2\n\n')
 		.replace(/<br\s*\/?>/gi, '\n')
 		.replace(/<\/(p|div|h\d|li|ul|ol)>/gi, '\n\n')
 		.replace(/<li[^>]*>/gi, '• ');
@@ -60,7 +70,7 @@ function markdownToText(md: string): string {
 		md
 			.replace(/!\[[^\]]*\]\([^)]*\)/g, '')
 			.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-			.replace(/^#+\s*/gm, '')
+			.replace(/^#+\s*/gm, '# ')
 			.replace(/^\s*[-*]\s+/gm, '• ')
 			.replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1'),
 	);
@@ -73,10 +83,17 @@ function tidy(text: string): string {
 		.map((line) => line.trim())
 		.join('\n')
 		.replace(/\n{3,}/g, '\n\n')
-		.trim();
+		.trim()
+		.replace(/^# \s*$/gm, '')
+		.replace(/\n{3,}/g, '\n\n')
+		.replace(CONTINUES, '$1 ');
 }
 
-const firstParagraph = (text: string) => text.split('\n\n').find((p) => p.length > 40) ?? text.split('\n\n')[0] ?? '';
+// Some texts are wrapped by hand, even one paragraph per line: a line that doesn't end a sentence,
+// followed by one starting in lowercase, belongs to the same paragraph
+const CONTINUES = /([^.!?:;…"»)\n])\n\n?(?=\p{Ll})/gu;
+
+const firstParagraph = (text: string) => text.split('\n\n').find((p) => p.length > 40 && !p.startsWith('# ')) ?? '';
 
 const names = (list: any): string[] => (Array.isArray(list) ? list.map((x) => (typeof x === 'string' ? x : x?.name ?? x?.description)).filter(Boolean) : []);
 
@@ -101,7 +118,7 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 		publishers: names(d.publishers),
 		genres: names(d.genres),
 		released: d.release_date?.date || undefined,
-		screenshots: (d.screenshots ?? []).map((s: any) => s.path_thumbnail).filter(Boolean),
+		screenshots: (d.screenshots ?? []).filter((s: any) => s.path_full).map((s: any) => ({ thumb: s.path_thumbnail || s.path_full, full: s.path_full })),
 	};
 }
 
@@ -120,7 +137,10 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 		publishers: names(e.publishers?.length ? e.publishers : e.publisher ? [e.publisher] : []),
 		genres: names(e.tags).slice(0, 5),
 		released: e.product?.globalReleaseDate ? new Date(e.product.globalReleaseDate).toLocaleDateString(locale) : undefined,
-		screenshots: (e.screenshots ?? []).map((s: any) => String(s?._links?.self?.href ?? '').replace('{formatter}', 'product_card_v2_mobile_slider_639')).filter(Boolean),
+		screenshots: (e.screenshots ?? [])
+			.map((s: any) => String(s?._links?.self?.href ?? ''))
+			.filter(Boolean)
+			.map((href: string) => ({ thumb: href.replace('{formatter}', 'product_card_v2_mobile_slider_639'), full: href.replace('{formatter}', '1600') })),
 	};
 }
 
@@ -145,7 +165,7 @@ async function fromEpic(appName: string, dir: string, locale: string): Promise<G
 		developers: d.about.developerAttribution ? [d.about.developerAttribution] : [],
 		publishers: d.about.publisherAttribution ? [d.about.publisherAttribution] : [],
 		genres: [],
-		screenshots: (d.carousel?.items ?? []).map((item: any) => item?.image?.src).filter(Boolean),
+		screenshots: (d.carousel?.items ?? []).map((item: any) => item?.image?.src).filter(Boolean).map((src: string) => ({ thumb: src, full: src })),
 	};
 }
 
@@ -165,7 +185,7 @@ async function fromRawg(name: string, key: string): Promise<GameInfo | null> {
 		publishers: names(d.publishers),
 		genres: names(d.genres),
 		released: d.released || undefined,
-		screenshots: (match.short_screenshots ?? []).map((s: any) => s.image).filter(Boolean).slice(1),
+		screenshots: (match.short_screenshots ?? []).map((s: any) => s.image).filter(Boolean).slice(1).map((src: string) => ({ thumb: src, full: src })),
 	};
 }
 
@@ -195,6 +215,7 @@ export async function gameInfo(state: UgiState, key: string): Promise<GameInfo |
 	try {
 		cached = JSON.parse((await cacheLoad({ a_key: key })) || 'null');
 	} catch {}
+	if (cached && cached.version !== CACHE_VERSION) cached = null;
 	if (cached && cached.locale === locale) {
 		const age = Date.now() - cached.fetched;
 		if (cached.info ? age < KEEP_FOUND : age < KEEP_MISSING && cached.rawg === rawg) return cached.info;
@@ -210,7 +231,7 @@ export async function gameInfo(state: UgiState, key: string): Promise<GameInfo |
 				.then(async (info) => {
 					// Nothing found this time but something before: keep the old one
 					const kept = info ?? cached?.info ?? null;
-					const entry: CacheEntry = { fetched: Date.now(), locale, rawg, info: kept };
+					const entry: CacheEntry = { version: CACHE_VERSION, fetched: Date.now(), locale, rawg, info: kept };
 					await cacheSave({ a_key: key, b_json: JSON.stringify(entry) }).catch(() => false);
 					return kept;
 				})
