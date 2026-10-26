@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
-import { applyImage, FILTER_OPTIONS, gameIdFor, imagesFor, ImageType, resetImage, SgdbImage, sgdbCacheKey, UserFilter } from 'sgdb';
+import { applyImage, FILTER_OPTIONS, gameIdFor, imagesFor, ImageType, replaceGame, resetImage, SgdbImage, sgdbCacheKey, UserFilter } from 'sgdb';
 import { ImageKind } from 'steamApps';
 import { SteamImage } from 'SteamImage';
 import { themeStyle, UGI_CSS } from 'theme';
@@ -83,6 +83,23 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 	const reset = async () => {
 		await resetImage(appid, type);
 		setVersion(version + 1);
+	};
+
+	// Every type at once, with the images UGI would pick by itself
+	const autoPick = async () => {
+		setBusy(true);
+		setStatus(t('auto.busy'));
+		try {
+			const s = await loadState();
+			const n = await replaceGame(s, appid);
+			await saveState(s);
+			setState(s);
+			setStatus(t('auto.done', { n }));
+		} catch (err) {
+			setStatus(String(err).includes('API key') ? t('gallery.keyError') : t('gallery.error'));
+		}
+		setVersion(version + 1);
+		setBusy(false);
 	};
 
 	const clearCache = async () => {
@@ -179,6 +196,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 					<span className="ugi-muted">{status || t('gallery.hint')}</span>
 					<span className="ugi-sp" />
 					<button className="ugi-link" onClick={clearCache}>{t('gallery.clearCache')}</button>
+					<button className="ugi-btn secondary" disabled={busy} onClick={autoPick}>{t('auto.button')}</button>
 					<button className="ugi-btn secondary" onClick={reset}>{t('gallery.reset')}</button>
 				</footer>
 			</div>

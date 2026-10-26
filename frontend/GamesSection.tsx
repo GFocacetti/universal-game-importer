@@ -3,7 +3,7 @@ import { SteamImage } from 'SteamImage';
 import { openGallery } from 'Gallery';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
-import { missingFor } from 'sgdb';
+import { missingFor, replaceGame } from 'sgdb';
 import { ImageKind, LAUNCHER_NAMES, launchShortcut } from 'steamApps';
 import { ImportedEntry, UgiState } from 'types';
 
@@ -11,6 +11,27 @@ type Row = ImportedEntry & { id: string };
 
 function Detail({ row, missing, onClose, onRemoved }: { row: Row; missing: number[]; onClose: () => void; onRemoved: () => void }) {
 	const [version, setVersion] = useState(0);
+	const [missingNow, setMissingNow] = useState(missing);
+	const [status, setStatus] = useState('');
+	const [busy, setBusy] = useState(false);
+	const refresh = async () => {
+		setVersion((v) => v + 1);
+		setMissingNow((await missingFor([row.appid]))[String(row.appid)] ?? []);
+	};
+	const autoPick = async () => {
+		setBusy(true);
+		setStatus(t('auto.busy'));
+		try {
+			const state = await loadState();
+			const n = await replaceGame(state, row.appid);
+			await saveState(state);
+			setStatus(t('auto.done', { n }));
+		} catch (err) {
+			setStatus(String(err).includes('API key') ? t('gallery.keyError') : t('gallery.error'));
+		}
+		await refresh();
+		setBusy(false);
+	};
 	const remove = async () => {
 		const state = await loadState();
 		SteamClient.Apps.RemoveShortcut(row.appid);
@@ -22,7 +43,7 @@ function Detail({ row, missing, onClose, onRemoved }: { row: Row; missing: numbe
 	};
 	const tile = (kind: ImageKind, label: string) => (
 		<div className={`ugi-im ${kind} clickable`} title={t('detail.changeImage')} key={`${kind}-${version}`}
-			onClick={(e) => openGallery(row.appid, row.name, e.currentTarget.ownerDocument, () => setVersion((v) => v + 1))}>
+			onClick={(e) => openGallery(row.appid, row.name, e.currentTarget.ownerDocument, refresh)}>
 			<SteamImage appid={row.appid} kind={kind} />
 			<span>{label}</span>
 		</div>
@@ -44,7 +65,7 @@ function Detail({ row, missing, onClose, onRemoved }: { row: Row; missing: numbe
 					{tile('hero', t('image.hero'))}
 					{tile('icon', t('image.icon'))}
 				</div>
-				<p className="ugi-muted">{missing.length ? t('detail.missing', { n: missing.length }) : t('detail.complete')}</p>
+				<p className="ugi-muted">{status || (missingNow.length ? t('detail.missing', { n: missingNow.length }) : t('detail.complete'))}</p>
 				<div className="ugi-kv">
 					{t('detail.launcher')}: <code>{LAUNCHER_NAMES[row.launcher] ?? row.launcher}</code>
 					<br />
@@ -52,6 +73,7 @@ function Detail({ row, missing, onClose, onRemoved }: { row: Row; missing: numbe
 				</div>
 				<div className="ugi-foot left">
 					<button className="ugi-btn primary" onClick={() => launchShortcut(row.appid)}>{t('detail.play')}</button>
+					<button className="ugi-btn secondary" disabled={busy} onClick={autoPick}>{t('auto.button')}</button>
 					<button className="ugi-btn danger" onClick={remove}>{t('detail.remove')}</button>
 				</div>
 			</div>

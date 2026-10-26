@@ -262,6 +262,12 @@ export async function replaceAll(state: UgiState, appids: number[], types: Image
 	return applied;
 }
 
+// Picks every image of one game again, the icon included (gallery and detail panel)
+export async function replaceGame(state: UgiState, appid: number): Promise<number> {
+	delete state.custom_icons[String(appid)];
+	return replaceAll(state, [appid], [...IMAGE_TYPES], () => {}, { stop: false });
+}
+
 // One image type back to Steam's original
 export async function resetImage(appid: number, type: ImageType): Promise<void> {
 	if (type === 4) {
