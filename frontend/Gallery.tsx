@@ -163,9 +163,14 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 							</div>
 						</details>
 						<div className={`ugi-thumbs ${current.kind}`}>
-							{list.map((image) => (
-								<img key={image.id} className="ugi-thumb" src={image.thumb} onClick={() => !busy && apply(image)} />
-							))}
+							{list.map((image) =>
+								// Animated images come with a video preview
+								/\.(webm|mp4)(\?|$)/i.test(image.thumb) ? (
+									<video key={image.id} className="ugi-thumb" src={image.thumb} autoPlay loop muted playsInline onClick={() => !busy && apply(image)} />
+								) : (
+									<img key={image.id} className="ugi-thumb" src={image.thumb} onClick={() => !busy && apply(image)} />
+								),
+							)}
 							{!list.length && !status && <p className="ugi-muted">{t('gallery.empty')}</p>}
 						</div>
 					</div>
