@@ -43,12 +43,12 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 			if (on) {
 				if (what === 'collection') {
 					s.settings.collections = true;
-					delete info.declined_collection;
+					delete info.off_collection;
 				} else {
 					s.settings.collections = true;
 					s.settings.shelves = true;
-					delete info.declined_collection;
-					delete info.declined_shelf;
+					delete info.off_collection;
+					delete info.off_shelf;
 				}
 				await syncCollections(s);
 			} else {
@@ -61,8 +61,8 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 			{launchers.map((l) => {
 				const cfg = state.settings.launchers?.[l.id] ?? {};
 				const info = state.collections[l.id] ?? {};
-				const hasCollection = state.settings.collections && !info.declined_collection;
-				const hasShelf = hasCollection && state.settings.shelves && !info.declined_shelf;
+				const hasCollection = state.settings.collections && !info.off_collection;
+				const hasShelf = hasCollection && state.settings.shelves && !info.off_shelf;
 				const meta = l.error
 					? t('launchers.error')
 					: !l.installed
@@ -223,7 +223,7 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 				<div><strong>{t('settings.collections')}</strong><small>{t('settings.collectionsText')}</small></div>
 				<Toggle on={state.settings.collections} onChange={(v) => update(async (s) => {
 					s.settings.collections = v;
-					if (v) Object.values(s.collections).forEach((i) => delete i.declined_collection);
+					if (v) Object.values(s.collections).forEach((i) => delete i.off_collection);
 					if (v) await syncCollections(s);
 					else await removeCollections(s);
 				}, onChanged)} />
@@ -234,7 +234,7 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 					s.settings.shelves = v;
 					Object.keys(s.collections).forEach((id) => {
 						const info = s.collections[id]!;
-						if (v) delete info.declined_shelf;
+						if (v) delete info.off_shelf;
 					});
 					if (v) await syncCollections(s);
 					else for (const id of Object.keys(s.collections)) await removeLauncherCollection(s, id, 'shelf');

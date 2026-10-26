@@ -44,7 +44,7 @@ export type UgiState = {
 	// Microsoft Store classification cache: package family -> game / app
 	store_kinds: Record<string, 'game' | 'app'>;
 	settings: UgiSettings;
-	// Per launcher: the collection / Home shelf UGI created, or that the user deleted (declined)
+	// Per launcher: the collection / Home shelf UGI created, or that the user turned off in the Launcher section
 	collections: Record<string, CollectionInfo>;
 	// SteamGridDB game id per appid, and shortcuts whose icon UGI already set
 	sgdb_ids: Record<string, number>;
@@ -76,6 +76,6 @@ export type UgiSettings = {
 export type CollectionInfo = {
 	collection_id?: string;
 	shelf_id?: number;
-	declined_collection?: boolean;
-	declined_shelf?: boolean;
+	off_collection?: boolean;
+	off_shelf?: boolean;
 };

@@ -44,7 +44,8 @@ async function overviewOf(appid: number) {
 }
 
 // Keeps one collection (and optionally one Home shelf) per launcher in line with the imported games.
-// Collections or shelves the user deleted by hand are not recreated.
+// A collection or shelf deleted by hand in Steam is created again; one turned off in the
+// Launcher section (off_collection / off_shelf) is not.
 export async function syncCollections(state: UgiState): Promise<void> {
 	const byLauncher: Record<string, number[]> = {};
 	for (const entry of Object.values(state.imported)) {
@@ -53,14 +54,13 @@ export async function syncCollections(state: UgiState): Promise<void> {
 
 	for (const [launcher, appids] of Object.entries(byLauncher)) {
 		const info = (state.collections[launcher] ??= {});
-		if (!state.settings.collections || info.declined_collection) continue;
+		if (!state.settings.collections || info.off_collection) continue;
 
 		let collection = info.collection_id ? collectionStore.GetCollection(info.collection_id) : undefined;
 		if (info.collection_id && !collection) {
-			// Deleted by the user: respect it
-			info.declined_collection = true;
+			// Deleted in Steam: create it again (its shelf went with it)
 			delete info.collection_id;
-			continue;
+			delete info.shelf_id;
 		}
 		if (!collection) {
 			collection = collectionStore.NewUnsavedCollection(LAUNCHER_NAMES[launcher] ?? launcher, undefined, []);
@@ -79,12 +79,9 @@ export async function syncCollections(state: UgiState): Promise<void> {
 			await collection.Save();
 		}
 
-		if (!state.settings.shelves || info.declined_shelf) continue;
-		if (info.shelf_id !== undefined && !shelfExists(info.shelf_id)) {
-			info.declined_shelf = true;
-			delete info.shelf_id;
-			continue;
-		}
+		if (!state.settings.shelves || info.off_shelf) continue;
+		// Deleted in Steam: create it again
+		if (info.shelf_id !== undefined && !shelfExists(info.shelf_id)) delete info.shelf_id;
 		if (info.shelf_id === undefined) {
 			if (showcaseStore.showcases.length >= showcaseStore.maxShowcases) {
 				console.warn('[UGI] shelf limit reached, no shelf for', launcher);
@@ -102,12 +99,12 @@ export async function removeLauncherCollection(state: UgiState, launcher: string
 	const info = (state.collections[launcher] ??= {});
 	if (info.shelf_id !== undefined && shelfExists(info.shelf_id)) showcaseStore.DeleteShowcase(info.shelf_id);
 	delete info.shelf_id;
-	info.declined_shelf = true;
+	info.off_shelf = true;
 	if (what === 'collection') {
 		const collection = info.collection_id ? collectionStore.GetCollection(info.collection_id) : undefined;
 		if (collection) await collection.Delete();
 		delete info.collection_id;
-		info.declined_collection = true;
+		info.off_collection = true;
 	}
 }
 
