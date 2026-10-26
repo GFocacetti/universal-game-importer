@@ -4,13 +4,9 @@ import UgiPage from 'UgiPage';
 import { initLanguage, t } from 'i18n';
 import { setupLibraryMenu, UGI_ROUTE } from 'menu';
 import { patchLibraryContextMenu } from 'contextMenu';
-import { loadState, saveState } from 'backend';
+import { loadState } from 'backend';
 import { mainDocument, waitForMainDocument } from 'overlay';
 import { startPeriodicCheck } from 'checker';
-import { syncCollections } from 'collections';
-
-declare const collectionStore: { userCollections: unknown[] };
-declare const showcaseStore: { showcases: unknown[] };
 
 declare global {
 	interface Window {
@@ -64,21 +60,6 @@ async function waitForStableMainWindow() {
 	}
 }
 
-// Puts back in their collections the games Steam left out (e.g. a game added again right after removing it)
-async function syncCollectionsAtStartup() {
-	const state = await loadState();
-	if (!state.onboarded || !state.settings.collections) return;
-	const wantsShelves = Object.values(state.collections).some((c) => c.shelf_id !== undefined);
-	// Steam loads collections and shelves a while after startup: a store not loaded yet would look like
-	// collections the user deleted, so wait for both and give up if they don't come
-	const loaded = () => collectionStore.userCollections.length > 0 && (!wantsShelves || showcaseStore.showcases.length > 0);
-	for (let i = 0; i < 60 && !loaded(); i++) await new Promise((r) => setTimeout(r, 1000));
-	if (!loaded()) return;
-	await new Promise((r) => setTimeout(r, 5000));
-	await syncCollections(state);
-	await saveState(state);
-}
-
 async function onStartup() {
 	trace('startup: waiting for the main window');
 	const doc = await waitForMainDocument();
@@ -92,7 +73,6 @@ async function onStartup() {
 		Navigation.Navigate(UGI_ROUTE);
 		trace('startup: UGI page opened for the setup');
 	}
-	syncCollectionsAtStartup().catch((err) => console.error('[UGI] collection sync failed', err));
 	startPeriodicCheck().catch((err) => console.error('[UGI] periodic check failed', err));
 }
 

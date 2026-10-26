@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { loadState } from 'backend';
+import { loadState, saveState } from 'backend';
+import { syncCollections } from 'collections';
 import { t } from 'i18n';
 import { applySync, SyncPlan } from 'importer';
 import { mountOverlay, waitForMainDocument } from 'overlay';
@@ -52,6 +53,17 @@ export function showReview(plan: SyncPlan) {
 // right away; new games are only announced (imported after the user confirms).
 export async function startPeriodicCheck() {
 	await new Promise((r) => setTimeout(r, STARTUP_DELAY_MS));
+	// Puts back in their collections the games Steam left out (e.g. a game added again right after
+	// removing it). Not earlier: reading Steam's collections while it is still loading breaks its library.
+	try {
+		const current = await loadState();
+		if (current.onboarded && current.settings.collections) {
+			await syncCollections(current);
+			await saveState(current);
+		}
+	} catch (err) {
+		console.error('[UGI] collection sync failed', err);
+	}
 	const state = await loadState();
 	const interval = state.settings.check_interval ?? 'weekly';
 	if (!state.onboarded || interval === 'off') return;
