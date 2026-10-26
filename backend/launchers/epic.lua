@@ -9,6 +9,7 @@ local M = {
     id = "epic",
     name = "Epic Games",
     os = "windows",
+    supports_path = true,
 }
 
 local function manifests_dir()
@@ -23,8 +24,13 @@ local function has_category(item, category)
     return false
 end
 
-function M.discover()
-    local dir = manifests_dir()
+function M.is_installed(custom)
+    return fs.exists(custom or manifests_dir())
+end
+
+-- custom: another manifests folder
+function M.discover(custom)
+    local dir = custom or manifests_dir()
     if not fs.exists(dir) then return {} end
 
     local games, seen = {}, {}

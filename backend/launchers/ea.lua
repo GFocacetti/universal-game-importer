@@ -6,11 +6,12 @@ local M = {
     id = "ea",
     name = "EA",
     os = "windows",
+    supports_path = true,
 }
 
 local SCAN_SCRIPT = [==[
 $ErrorActionPreference = 'SilentlyContinue'
-$roots = @("$env:ProgramFiles\EA Games", "${env:ProgramFiles(x86)}\EA Games", "${env:ProgramFiles(x86)}\Origin Games") |
+$roots = @(__ROOTS__) |
   Where-Object { Test-Path $_ } | Select-Object -Unique
 $out = foreach ($root in $roots) {
   foreach ($dir in (Get-ChildItem -LiteralPath $root -Directory)) {
@@ -31,9 +32,22 @@ $out = foreach ($root in $roots) {
 @($out) | ConvertTo-Json -Depth 3 -Compress
 ]==]
 
-function M.discover()
+local DEFAULT_ROOTS = [["$env:ProgramFiles\EA Games", "${env:ProgramFiles(x86)}\EA Games", "${env:ProgramFiles(x86)}\Origin Games"]]
+
+function M.is_installed(custom)
+    local fs = require("fs")
+    if custom then return fs.exists(custom) end
+    local pf = require("utils").getenv("ProgramFiles") or [[C:\Program Files]]
+    local pf86 = require("utils").getenv("ProgramFiles(x86)") or [[C:\Program Files (x86)]]
+    return fs.exists(fs.join(pf, "EA Games")) or fs.exists(fs.join(pf86, "EA Games")) or fs.exists(fs.join(pf86, "Origin Games"))
+end
+
+-- custom: another folder that contains the EA game folders
+function M.discover(custom)
+    local roots = custom and ("'" .. custom:gsub("'", "''") .. "'") or DEFAULT_ROOTS
+    local script = SCAN_SCRIPT:gsub("__ROOTS__", function() return roots end)
     local games = {}
-    for _, g in ipairs(common.run_powershell_json("ea", SCAN_SCRIPT)) do
+    for _, g in ipairs(common.run_powershell_json("ea", script)) do
         games[#games + 1] = common.with_launch({
             id = "ea:" .. g.content,
             launcher = M.id,

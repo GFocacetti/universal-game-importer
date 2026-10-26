@@ -5,11 +5,12 @@ local M = {
     id = "amazon",
     name = "Amazon Games",
     os = "windows",
+    supports_path = true,
 }
 
 local SCAN_SCRIPT = [==[
 $ErrorActionPreference = 'Stop'
-$db = Join-Path $env:LOCALAPPDATA 'Amazon Games\Data\Games\Sql\GameInstallInfo.sqlite'
+$db = Join-Path '__DATA__' 'Games\Sql\GameInstallInfo.sqlite'
 if (-not (Test-Path $db)) { '[]'; return }
 Add-Type -TypeDefinition @"
 using System;
@@ -51,9 +52,21 @@ $out = foreach ($r in $rows) { if ($r[0] -and $r[1] -and $r[2]) { [PSCustomObjec
 @($out) | ConvertTo-Json -Depth 3 -Compress
 ]==]
 
-function M.discover()
+local function data_dir(custom)
+    local fs = require("fs")
+    return custom or fs.join(require("utils").getenv("LOCALAPPDATA") or "", "Amazon Games", "Data")
+end
+
+function M.is_installed(custom)
+    return require("fs").exists(require("fs").join(data_dir(custom), "Games", "Sql", "GameInstallInfo.sqlite"))
+end
+
+-- custom: another Amazon Games "Data" folder
+function M.discover(custom)
+    local dir = data_dir(custom):gsub("'", "''")
+    local script = SCAN_SCRIPT:gsub("__DATA__", function() return dir end)
     local games = {}
-    for _, g in ipairs(common.run_powershell_json("amazon", SCAN_SCRIPT)) do
+    for _, g in ipairs(common.run_powershell_json("amazon", script)) do
         games[#games + 1] = common.with_launch({
             id = "amazon:" .. g.id,
             launcher = M.id,

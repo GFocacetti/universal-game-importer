@@ -28,6 +28,11 @@ $out = foreach ($key in (Get-ChildItem $root)) {
 @($out) | ConvertTo-Json -Depth 3 -Compress
 ]==]
 
+function M.is_installed()
+    local out = require("utils").exec('reg query "HKLM\\SOFTWARE\\WOW6432Node\\GOG.com" /ve')
+    return out ~= nil and not out:find("ERROR")
+end
+
 function M.discover()
     local games = {}
     for _, g in ipairs(common.run_powershell_json("gog", SCAN_SCRIPT)) do

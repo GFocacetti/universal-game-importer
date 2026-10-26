@@ -1,7 +1,7 @@
 import { callable } from '@steambrew/client';
 import { ScanResult, UgiSettings, UgiState } from 'types';
 
-const ugiScan = callable<[], string>('ugi_scan');
+const ugiScan = callable<[{ a_options: string }], string>('ugi_scan');
 const ugiGetState = callable<[], string>('ugi_get_state');
 const ugiSaveState = callable<[{ json: string }], boolean>('ugi_save_state');
 
@@ -19,8 +19,8 @@ function asRecord<T>(value: unknown): Record<string, T> {
 	return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, T>) : {};
 }
 
-export async function scan(): Promise<ScanResult> {
-	const result = parse<ScanResult>(await ugiScan(), { launchers: [], games: [] });
+export async function scan(options: { enabled?: Record<string, boolean>; paths?: Record<string, string> } = {}): Promise<ScanResult> {
+	const result = parse<ScanResult>(await ugiScan({ a_options: JSON.stringify(options) }), { launchers: [], games: [] });
 	return { launchers: result.launchers ?? [], games: Array.isArray(result.games) ? result.games : [] };
 }
 
@@ -40,10 +40,15 @@ export async function loadState(): Promise<UgiState> {
 			webp: settings.webp !== false,
 			theme: settings.theme === 'modern' ? 'modern' : 'steam',
 			filters: asRecord(settings.filters),
+			check_interval: (['off', 'daily', 'weekly', 'monthly'] as const).includes(settings.check_interval as any) ? settings.check_interval : 'weekly',
+			launchers: asRecord(settings.launchers),
 		},
 		collections: asRecord(state.collections),
 		sgdb_ids: asRecord(state.sgdb_ids),
 		custom_icons: asRecord(state.custom_icons),
+		last_check: typeof state.last_check === 'string' ? state.last_check : undefined,
+		last_launchers: Array.isArray(state.last_launchers) ? state.last_launchers : [],
+		onboarded: state.onboarded === true,
 	};
 }
 

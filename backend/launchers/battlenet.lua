@@ -7,7 +7,16 @@ local M = {
     id = "battlenet",
     name = "Battle.net",
     os = "windows",
+    supports_path = true,
 }
+
+local function agent_dir(custom)
+    return custom or fs.join(utils.getenv("ProgramData") or [[C:\ProgramData]], "Battle.net", "Agent")
+end
+
+function M.is_installed(custom)
+    return fs.exists(fs.join(agent_dir(custom), "product.db"))
+end
 
 -- Product code -> name and launch id. Table from Steam ROM Manager (GPL-3.0),
 -- which credits steamgriddb-manager.
@@ -75,9 +84,9 @@ local function text(data, span)
     return span and data:sub(span.from, span.to) or nil
 end
 
-function M.discover()
-    local program_data = utils.getenv("ProgramData") or [[C:\ProgramData]]
-    local db = fs.join(program_data, "Battle.net", "Agent", "product.db")
+-- custom: another Battle.net Agent folder (the one with product.db)
+function M.discover(custom)
+    local db = fs.join(agent_dir(custom), "product.db")
     if not fs.exists(db) then return {} end
     local data = utils.read_file(db)
     if not data or data == "" then return {} end

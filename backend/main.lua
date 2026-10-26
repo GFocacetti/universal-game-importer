@@ -7,8 +7,12 @@ require("images") -- registers the ugi_sgdb_* / ugi_download* / ugi_missing_imag
 
 -- Frontend calls. Arguments arrive by name; JSON strings keep complex data intact.
 
-function ugi_scan()
-    local result = launchers.scan({})
+-- a_options: JSON { enabled = { [id] = bool }, paths = { [id] = "custom folder" } }
+function ugi_scan(a_options)
+    local ok, options = pcall(cjson.decode, a_options or "{}")
+    if not ok or type(options) ~= "table" then options = {} end
+    local result = launchers.scan(type(options.enabled) == "table" and options.enabled or {},
+        type(options.paths) == "table" and options.paths or {})
     logger:info("scan: " .. #result.games .. " games")
     local json = cjson.encode(result)
     logger:info("scan: result encoded, " .. #json .. " bytes")
@@ -26,6 +30,16 @@ function ugi_save_state(json)
         return false
     end
     state.save(decoded)
+    return true
+end
+
+-- Startup diagnostics from the frontend, appended to data/frontend.log
+function ugi_log(a_message)
+    local f = io.open(require("fs").join(require("paths").data_dir(), "frontend.log"), "a")
+    if f then
+        f:write(os.date("%Y-%m-%d %H:%M:%S "), tostring(a_message), "\n")
+        f:close()
+    end
     return true
 end
 

@@ -18,6 +18,9 @@ export type LauncherStatus = {
 	enabled: boolean;
 	count: number;
 	error?: string;
+	// The launcher accepts a custom folder, and whether it was found on this PC
+	supports_path?: boolean;
+	installed?: boolean;
 };
 
 export type ScanResult = {
@@ -46,6 +49,11 @@ export type UgiState = {
 	// SteamGridDB game id per appid, and shortcuts whose icon UGI already set
 	sgdb_ids: Record<string, number>;
 	custom_icons: Record<string, boolean>;
+	// Last check (ISO date) and what each launcher reported
+	last_check?: string;
+	last_launchers?: LauncherStatus[];
+	// First-install setup completed
+	onboarded?: boolean;
 };
 
 export type UgiSettings = {
@@ -57,6 +65,10 @@ export type UgiSettings = {
 	// Include WebP images (on by default, can be turned off)
 	webp?: boolean;
 	theme?: 'steam' | 'modern';
+	// How often to look for new games
+	check_interval?: 'off' | 'daily' | 'weekly' | 'monthly';
+	// Per launcher: turned off, or a custom folder
+	launchers?: Record<string, { enabled?: boolean; path?: string }>;
 	// Gallery filters per image type ("0".. "4")
 	filters?: Record<string, { style?: string; dimension?: string; webp?: boolean; nsfw?: string; humor?: string }>;
 };

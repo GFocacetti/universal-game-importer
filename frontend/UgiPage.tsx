@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { loadState, saveState } from 'backend';
-import { t } from 'i18n';
+import { relativeTime, t } from 'i18n';
 import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
 import GamesSection from 'GamesSection';
+import { ImagesSection, LaunchersSection, SettingsSection } from 'Sections';
+import ReviewDialog from 'ReviewDialog';
+import { runScan } from 'scanner';
+import { SyncPlan } from 'importer';
+import { openOnboarding } from 'Onboarding';
+import { mainDocument } from 'overlay';
 
 type Section = 'games' | 'launchers' | 'images' | 'settings';
 
@@ -49,14 +55,33 @@ export default function UgiPage() {
 	const [state, setState] = useState<UgiState | null>(null);
 	const [section, setSection] = useState<Section>('games');
 	const [keyDialog, setKeyDialog] = useState(false);
+	const [scanning, setScanning] = useState(false);
+	const [plan, setPlan] = useState<SyncPlan | null>(null);
+	const [message, setMessage] = useState('');
 
 	const reload = () => loadState().then(setState);
 	useEffect(() => {
 		reload();
 	}, []);
 
+	const scanNow = async () => {
+		setScanning(true);
+		setMessage('');
+		try {
+			const outcome = await runScan();
+			setPlan(outcome.plan);
+		} catch {
+			setMessage(t('header.scanError'));
+		}
+		setScanning(false);
+		reload();
+	};
+
 	const theme = state?.settings.theme ?? 'steam';
 	const gameCount = state ? Object.keys(state.imported).length : 0;
+	const launcherInfo = state?.last_launchers?.length
+		? `${state.last_launchers.filter((l) => l.enabled !== false && l.installed !== false).length}/${state.last_launchers.length}`
+		: '';
 
 	return (
 		<div className="ugi-root" style={themeStyle(theme) as React.CSSProperties}>
@@ -70,6 +95,7 @@ export default function UgiPage() {
 					<div key={s.id} className={`ugi-nav${section === s.id ? ' on' : ''}`} onClick={() => setSection(s.id)}>
 						<span>{s.label()}</span>
 						{s.id === 'games' && <small>{gameCount}</small>}
+						{s.id === 'launchers' && <small>{launcherInfo}</small>}
 					</div>
 				))}
 			</nav>
@@ -77,8 +103,8 @@ export default function UgiPage() {
 				<div className="ugi-head">
 					<h1>{SECTIONS.find((s) => s.id === section)?.label()}</h1>
 					<span className="ugi-sp" />
-					<span className="ugi-muted">{t('header.never')}</span>
-					<button className="ugi-btn primary">{t('header.scan')}</button>
+					<span className="ugi-muted">{message || (state?.last_check ? t('header.lastCheck', { when: relativeTime(state.last_check) }) : t('header.never'))}</span>
+					<button className="ugi-btn primary" disabled={scanning} onClick={scanNow}>{scanning ? t('header.scanning') : t('header.scan')}</button>
 				</div>
 				{state && !state.settings.sgdb_key && (
 					<div className="ugi-apibar" onClick={() => setKeyDialog(true)}>
@@ -87,7 +113,19 @@ export default function UgiPage() {
 					</div>
 				)}
 				<div className="ugi-content">
-					{state && section === 'games' ? <GamesSection state={state} onChanged={reload} /> : <p className="ugi-muted">{t('placeholder.soon')}</p>}
+					{state && section === 'games' && <GamesSection state={state} onChanged={reload} />}
+					{state && section === 'launchers' && <LaunchersSection state={state} onChanged={reload} />}
+					{state && section === 'images' && <ImagesSection state={state} onChanged={reload} />}
+					{state && section === 'settings' && (
+						<SettingsSection
+							state={state}
+							onChanged={reload}
+							onRedoSetup={() => {
+								const doc = mainDocument();
+								if (doc) openOnboarding(doc, reload);
+							}}
+						/>
+					)}
 				</div>
 			</section>
 			{keyDialog && (
@@ -95,6 +133,16 @@ export default function UgiPage() {
 					onClose={() => setKeyDialog(false)}
 					onSaved={() => {
 						setKeyDialog(false);
+						reload();
+					}}
+				/>
+			)}
+			{plan && (
+				<ReviewDialog
+					plan={plan}
+					onClose={() => setPlan(null)}
+					onDone={() => {
+						setPlan(null);
 						reload();
 					}}
 				/>

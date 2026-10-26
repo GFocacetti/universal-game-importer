@@ -1,0 +1,256 @@
+import React, { useState } from 'react';
+import { loadState, saveState } from 'backend';
+import { removeCollections, removeLauncherCollection, syncCollections } from 'collections';
+import { t } from 'i18n';
+import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag } from 'sgdb';
+import { LAUNCHER_NAMES } from 'steamApps';
+import { UgiState } from 'types';
+
+declare const collectionStore: {
+	allAppsCollection: { allApps: { appid: number }[] };
+	userCollections: { id: string; displayName: string; allApps: { appid: number }[] }[];
+};
+
+function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+	return <span className={`ugi-switch${on ? ' on' : ''}${disabled ? ' disabled' : ''}`} onClick={() => !disabled && onChange(!on)}><span className="ugi-tog" /></span>;
+}
+
+async function update(change: (s: UgiState) => void | Promise<void>, onChanged: () => void) {
+	const s = await loadState();
+	await change(s);
+	await saveState(s);
+	onChanged();
+}
+
+// ---------- Launchers ----------
+
+export function LaunchersSection({ state, onChanged }: { state: UgiState; onChanged: () => void }) {
+	const launchers = state.last_launchers ?? [];
+	const [paths, setPaths] = useState<Record<string, string>>({});
+	if (!launchers.length) return <p className="ugi-muted">{t('launchers.empty')}</p>;
+
+	const setEnabled = (id: string, on: boolean) =>
+		update((s) => {
+			s.settings.launchers = { ...(s.settings.launchers ?? {}), [id]: { ...(s.settings.launchers?.[id] ?? {}), enabled: on } };
+		}, onChanged);
+	const savePath = (id: string) =>
+		update((s) => {
+			s.settings.launchers = { ...(s.settings.launchers ?? {}), [id]: { ...(s.settings.launchers?.[id] ?? {}), path: (paths[id] ?? '').trim() } };
+		}, onChanged);
+	const setCollection = (id: string, what: 'collection' | 'shelf', on: boolean) =>
+		update(async (s) => {
+			const info = (s.collections[id] ??= {});
+			if (on) {
+				if (what === 'collection') {
+					s.settings.collections = true;
+					delete info.declined_collection;
+				} else {
+					s.settings.collections = true;
+					s.settings.shelves = true;
+					delete info.declined_collection;
+					delete info.declined_shelf;
+				}
+				await syncCollections(s);
+			} else {
+				await removeLauncherCollection(s, id, what);
+			}
+		}, onChanged);
+
+	return (
+		<>
+			{launchers.map((l) => {
+				const cfg = state.settings.launchers?.[l.id] ?? {};
+				const info = state.collections[l.id] ?? {};
+				const hasCollection = state.settings.collections && !info.declined_collection;
+				const hasShelf = hasCollection && state.settings.shelves && !info.declined_shelf;
+				const meta = l.error
+					? t('launchers.error')
+					: !l.installed
+						? t('launchers.notFound')
+						: t('launchers.found', { n: l.count });
+				return (
+					<div key={l.id} className="ugi-card ugi-lrow">
+						<div>
+							<h3>{LAUNCHER_NAMES[l.id] ?? l.name}</h3>
+							<div className="ugi-muted">{cfg.enabled === false ? t('launchers.disabled') : meta}</div>
+						</div>
+						<Toggle on={cfg.enabled !== false} onChange={(v) => setEnabled(l.id, v)} />
+						<div className="ugi-opts">
+							<label><input type="checkbox" checked={hasCollection} onChange={(e) => setCollection(l.id, 'collection', e.target.checked)} /> {t('launchers.collection')}</label>
+							<label><input type="checkbox" checked={hasShelf} onChange={(e) => setCollection(l.id, 'shelf', e.target.checked)} /> {t('launchers.shelf')}</label>
+							{l.supports_path && (
+								<label>
+									{t('launchers.path')}
+									<input
+										type="text"
+										placeholder={t('launchers.pathAuto')}
+										value={paths[l.id] ?? cfg.path ?? ''}
+										onChange={(e) => setPaths({ ...paths, [l.id]: e.target.value })}
+										onBlur={() => paths[l.id] !== undefined && savePath(l.id)}
+									/>
+								</label>
+							)}
+						</div>
+					</div>
+				);
+			})}
+			<p className="ugi-muted">{t('launchers.hint')}</p>
+		</>
+	);
+}
+
+// ---------- Images ----------
+
+export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged: () => void }) {
+	const [scope, setScope] = useState('all');
+	const [flag, setFlag] = useState<StopFlag | null>(null);
+	const [progress, setProgress] = useState<{ label: string; done: number; total: number } | null>(null);
+	const [result, setResult] = useState('');
+
+	const appids = (): number[] => {
+		if (scope === 'imported') return Object.values(state.imported).map((e) => e.appid);
+		if (scope.startsWith('coll:')) return collectionStore.userCollections.find((c) => c.id === scope.slice(5))?.allApps.map((a) => a.appid) ?? [];
+		return collectionStore.allAppsCollection.allApps.map((a) => a.appid);
+	};
+
+	const run = async (label: string, job: (ids: number[], p: (d: number, tt: number) => void, f: StopFlag, s: UgiState) => Promise<string>) => {
+		const f: StopFlag = { stop: false };
+		setFlag(f);
+		setResult('');
+		const s = await loadState();
+		const ids = appids();
+		try {
+			const text = await job(ids, (done, total) => setProgress({ label, done, total }), f, s);
+			await saveState(s);
+			setResult(f.stop ? t('images.stopped', { result: text }) : text);
+		} catch (err) {
+			setResult(String(err).includes('API key') ? t('gallery.keyError') : t('gallery.error'));
+		}
+		setFlag(null);
+		setProgress(null);
+		onChanged();
+	};
+
+	const names: Record<ImageType, string> = { 0: t('image.grid'), 1: t('image.hero'), 2: t('image.logo'), 3: t('image.wide'), 4: t('image.icon') };
+	const noKey = !state.settings.sgdb_key;
+
+	return (
+		<>
+			<div className="ugi-toolbar">
+				<span className="ugi-muted">{t('images.scope')}</span>
+				<select className="ugi-select" value={scope} disabled={!!flag} onChange={(e) => setScope(e.target.value)}>
+					<option value="all">{t('images.scopeAll')}</option>
+					<option value="imported">{t('images.scopeImported')}</option>
+					{collectionStore.userCollections.map((c) => <option key={c.id} value={`coll:${c.id}`}>{t('images.scopeCollection', { name: c.displayName })}</option>)}
+				</select>
+			</div>
+			{progress && (
+				<div className="ugi-card">
+					<div className="ugi-row-between">
+						<strong>{progress.label}</strong>
+						<button className="ugi-btn secondary" onClick={() => flag && (flag.stop = true)}>{t('images.stop')}</button>
+					</div>
+					<div className="ugi-progress"><b style={{ width: `${progress.total ? (100 * progress.done) / progress.total : 0}%` }} /></div>
+					<span className="ugi-muted">{t('images.progress', { done: progress.done, total: progress.total })}</span>
+				</div>
+			)}
+			{result && <div className="ugi-card">{result}</div>}
+			<div className="ugi-tools">
+				<div className="ugi-card">
+					<h3>{t('images.check')}</h3>
+					<p>{t('images.checkText')}</p>
+					<button className="ugi-btn secondary" disabled={!!flag} onClick={() => run(t('images.check'), async (ids) => {
+						const counts = await checkMissing(ids);
+						return t('images.checkResult', { n: ids.length }) + ' ' + (Object.keys(counts) as unknown as ImageType[]).map((ty) => `${names[ty]} ${counts[ty]}`).join(' · ');
+					})}>{t('images.checkButton')}</button>
+				</div>
+				<div className="ugi-card">
+					<h3>{t('images.fill')}</h3>
+					<p>{t('images.fillText')}</p>
+					<button className="ugi-btn primary" disabled={!!flag || noKey} onClick={() => run(t('images.fill'), async (ids, p, f, s) => t('images.applied', { n: await fillMissing(s, ids, p, f) }))}>{t('images.fillButton')}</button>
+				</div>
+				<div className="ugi-card">
+					<h3>{t('images.replace')}</h3>
+					<p>{t('images.replaceText')}</p>
+					<button className="ugi-btn secondary" disabled={!!flag || noKey} onClick={() => run(t('images.replace'), async (ids, p, f, s) => t('images.applied', { n: await replaceAll(s, ids, [0, 1, 2, 3, 4], p, f) }))}>{t('images.replaceButton')}</button>
+				</div>
+				<div className="ugi-card">
+					<h3>{t('images.reset')}</h3>
+					<p>{t('images.resetText')}</p>
+					<button className="ugi-btn secondary" disabled={!!flag} onClick={() => run(t('images.reset'), async (ids, p, f) => {
+						await resetImages(ids, p, f);
+						return t('images.resetDone');
+					})}>{t('images.resetButton')}</button>
+				</div>
+			</div>
+		</>
+	);
+}
+
+// ---------- Settings ----------
+
+export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiState; onChanged: () => void; onRedoSetup: () => void }) {
+	const [key, setKey] = useState<string | null>(null);
+	const set = (patch: Partial<UgiState['settings']>) => update((s) => void Object.assign(s.settings, patch), onChanged);
+
+	return (
+		<div className="ugi-settings">
+			<div className="ugi-set">
+				<div><strong>{t('settings.interval')}</strong><small>{t('settings.intervalText')}</small></div>
+				<select className="ugi-select" value={state.settings.check_interval ?? 'weekly'} onChange={(e) => set({ check_interval: e.target.value as any })}>
+					<option value="off">{t('settings.intervalOff')}</option>
+					<option value="daily">{t('settings.intervalDaily')}</option>
+					<option value="weekly">{t('settings.intervalWeekly')}</option>
+					<option value="monthly">{t('settings.intervalMonthly')}</option>
+				</select>
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('apikey.title')}</strong><small>{t('settings.keyText')}</small></div>
+				<div className="ugi-field">
+					<input type="password" value={key ?? state.settings.sgdb_key ?? ''} placeholder={t('apikey.placeholder')} onChange={(e) => setKey(e.target.value)} />
+					<button className="ugi-btn secondary" disabled={key === null} onClick={() => set({ sgdb_key: (key ?? '').trim() }).then(() => setKey(null))}>{t('settings.save')}</button>
+				</div>
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.animated')}</strong><small>{t('settings.animatedText')}</small></div>
+				<Toggle on={!!state.settings.animated} onChange={(v) => set({ animated: v })} />
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.webp')}</strong><small>{t('settings.webpText')}</small></div>
+				<Toggle on={state.settings.webp !== false} onChange={(v) => set({ webp: v })} />
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.collections')}</strong><small>{t('settings.collectionsText')}</small></div>
+				<Toggle on={state.settings.collections} onChange={(v) => update(async (s) => {
+					s.settings.collections = v;
+					if (v) Object.values(s.collections).forEach((i) => delete i.declined_collection);
+					if (v) await syncCollections(s);
+					else await removeCollections(s);
+				}, onChanged)} />
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.shelves')}</strong><small>{t('settings.shelvesText')}</small></div>
+				<Toggle on={state.settings.collections && state.settings.shelves} disabled={!state.settings.collections} onChange={(v) => update(async (s) => {
+					s.settings.shelves = v;
+					Object.keys(s.collections).forEach((id) => {
+						const info = s.collections[id]!;
+						if (v) delete info.declined_shelf;
+					});
+					if (v) await syncCollections(s);
+					else for (const id of Object.keys(s.collections)) await removeLauncherCollection(s, id, 'shelf');
+				}, onChanged)} />
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.theme')}</strong><small>{t('settings.themeText')}</small></div>
+				<select className="ugi-select" value={state.settings.theme ?? 'steam'} onChange={(e) => set({ theme: e.target.value as any })}>
+					<option value="steam">{t('settings.themeSteam')}</option>
+					<option value="modern">{t('settings.themeModern')}</option>
+				</select>
+			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.setup')}</strong><small>{t('settings.setupText')}</small></div>
+				<button className="ugi-btn secondary" onClick={onRedoSetup}>{t('settings.setupButton')}</button>
+			</div>
+		</div>
+	);
+}

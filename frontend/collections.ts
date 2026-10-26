@@ -86,6 +86,20 @@ export async function syncCollections(state: UgiState): Promise<void> {
 	}
 }
 
+// Removes one launcher's shelf (or collection and shelf) and remembers the choice
+export async function removeLauncherCollection(state: UgiState, launcher: string, what: 'collection' | 'shelf'): Promise<void> {
+	const info = (state.collections[launcher] ??= {});
+	if (info.shelf_id !== undefined && shelfExists(info.shelf_id)) showcaseStore.DeleteShowcase(info.shelf_id);
+	delete info.shelf_id;
+	info.declined_shelf = true;
+	if (what === 'collection') {
+		const collection = info.collection_id ? collectionStore.GetCollection(info.collection_id) : undefined;
+		if (collection) await collection.Delete();
+		delete info.collection_id;
+		info.declined_collection = true;
+	}
+}
+
 // Removes every collection and shelf UGI created; the games stay in the library
 export async function removeCollections(state: UgiState): Promise<number> {
 	let removed = 0;

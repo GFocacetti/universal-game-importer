@@ -143,4 +143,53 @@ export const UGI_CSS = `
 .ugi-thumbs.grid .ugi-thumb { aspect-ratio: 2/3; object-fit: cover; }
 .ugi-thumb:hover { border-color: var(--ugi-accent); }
 .ugi-link { background: none; border: 0; color: var(--ugi-muted); cursor: pointer; font: inherit; text-decoration: underline; padding: 0; }
+.ugi-check { display: flex; align-items: center; gap: 10px; padding: 7px 10px; margin-bottom: 4px; font-size: 14px; background: var(--ugi-panel); border-radius: var(--ugi-radius); cursor: pointer; }
+.ugi-check.off { opacity: .6; }
+.ugi-check input { accent-color: var(--ugi-accent); }
+.ugi-check small { margin-left: auto; color: var(--ugi-muted); font-size: 12px; }
+.ugi-review { max-height: calc(100% - 48px); display: flex; flex-direction: column; }
+.ugi-review-list { overflow: auto; flex: 1; min-height: 0; }
+.ugi-review-list h3 { font-size: 13px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .5px; color: var(--ugi-muted); }
+.ugi-excl { margin-top: 14px; border-top: 1px solid var(--ugi-panel-border); padding-top: 10px; }
+.ugi-excl summary { cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--ugi-muted); }
+.ugi-card { background: var(--ugi-panel); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius-lg); padding: 14px 16px; margin-bottom: 10px; }
+.ugi-card h3 { margin: 0 0 4px; font-size: 15px; color: var(--ugi-head); font-weight: 600; }
+.ugi-card p { margin: 0 0 10px; color: var(--ugi-muted); font-size: 13px; line-height: 1.45; }
+.ugi-lrow { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; }
+.ugi-opts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--ugi-muted); margin-top: 6px; align-items: center; }
+.ugi-opts label { display: flex; gap: 6px; align-items: center; }
+.ugi-opts input[type=text] { background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 4px 8px; font: inherit; width: 280px; }
+.ugi-select { background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 7px 8px; font: inherit; }
+.ugi-tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.ugi-row-between { display: flex; justify-content: space-between; align-items: center; }
+.ugi-progress { height: 8px; border-radius: 4px; background: var(--ugi-bg2); overflow: hidden; margin: 8px 0; }
+.ugi-progress b { display: block; height: 100%; background: var(--ugi-accent); transition: width .2s; }
+.ugi-set { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--ugi-panel-border); }
+.ugi-set strong { display: block; color: var(--ugi-head); font-weight: 500; }
+.ugi-set small { color: var(--ugi-muted); }
+.ugi-set > :last-child { justify-self: end; }
+.ugi-set .ugi-field { width: 100%; margin: 0; }
+.ugi-switch.disabled { opacity: .4; cursor: default; }
+.ugi-onboarding { position: relative; min-height: 440px; display: flex; flex-direction: column; }
+.ugi-ob-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.ugi-dots { display: flex; gap: 6px; }
+.ugi-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--ugi-side-on); display: block; }
+.ugi-dots i.on { background: var(--ugi-accent); }
+.ugi-tag { display: inline-block; font-size: 12px; padding: 2px 8px; margin: 2px 4px 2px 0; border-radius: 10px; background: var(--ugi-chip); color: var(--ugi-text); }
+.ugi-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+.ugi-choice div { padding: 16px; cursor: pointer; background: var(--ugi-panel); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius); color: var(--ugi-muted); font-size: 13px; }
+.ugi-choice div.sel { border-color: var(--ugi-accent); }
+.ugi-choice strong { display: block; margin-bottom: 4px; color: var(--ugi-head); font-size: 14px; }
+.ugi-warn-layer { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; border-radius: var(--ugi-radius-lg); }
+.ugi-warn-box { width: 440px; max-width: calc(100% - 32px); padding: 22px; background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-top: 3px solid var(--ugi-warn); border-radius: var(--ugi-radius); }
+.ugi-spinner { width: 34px; height: 34px; border: 3px solid var(--ugi-side-on); border-top-color: var(--ugi-accent); border-radius: 50%; animation: ugi-spin 1s linear infinite; margin: 24px auto; }
+@keyframes ugi-spin { to { transform: rotate(360deg); } }
+.ugi-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+.ugi-summary div { padding: 14px; text-align: center; background: var(--ugi-panel); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius); color: var(--ugi-muted); font-size: 13px; }
+.ugi-summary strong { display: block; font-size: 26px; color: var(--ugi-head); }
+.ugi-toast { width: 330px; display: flex; overflow: hidden; cursor: pointer; background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius); box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+.ugi-toast-icon { width: 64px; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: #fff; background: var(--ugi-logo); }
+.ugi-toast-text { padding: 12px 14px; font-size: 13px; line-height: 1.4; }
+.ugi-toast-text strong { display: block; color: var(--ugi-head); font-size: 14px; margin-bottom: 2px; }
+.ugi-toast-text span { color: var(--ugi-muted); }
 `;
