@@ -82,4 +82,35 @@ export const UGI_CSS = `
 .ugi-field { display: flex; gap: 8px; margin-top: 8px; }
 .ugi-field input { flex: 1; background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 9px 10px; font: inherit; }
 .ugi-foot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.ugi-foot.left { justify-content: flex-start; }
+.ugi-btn.danger { background: #6b2b2b; }
+.ugi-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.ugi-chip { padding: 6px 12px; border-radius: 999px; background: var(--ugi-chip); font-size: 13px; cursor: pointer; }
+.ugi-chip.on { background: var(--ugi-accent); color: #fff; }
+.ugi-search { flex: 1; min-width: 160px; max-width: 260px; margin-left: auto; padding: 7px 10px; border-radius: var(--ugi-radius); border: 1px solid var(--ugi-panel-border); background: var(--ugi-bg2); color: var(--ugi-text); font: inherit; }
+.ugi-seg { display: flex; border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius); overflow: hidden; }
+.ugi-seg span { padding: 6px 10px; font-size: 13px; cursor: pointer; }
+.ugi-seg span.on { background: var(--ugi-side-on); color: var(--ugi-head); }
+.ugi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; }
+.ugi-game { position: relative; cursor: pointer; }
+.ugi-cover { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: var(--ugi-radius); display: block; }
+.ugi-noimg { display: flex; align-items: flex-end; padding: 8px; box-sizing: border-box; font-size: 13px; color: var(--ugi-muted); background: repeating-linear-gradient(45deg, var(--ugi-panel), var(--ugi-panel) 8px, transparent 8px, transparent 16px); border: 1px dashed var(--ugi-panel-border); border-radius: var(--ugi-radius); }
+.ugi-badge { position: absolute; top: 6px; left: 6px; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,.65); color: #fff; }
+.ugi-row { display: grid; grid-template-columns: 40px 1fr 140px 150px; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--ugi-radius); background: var(--ugi-panel); margin-bottom: 6px; font-size: 14px; cursor: pointer; }
+.ugi-mini { width: 40px; height: 56px; object-fit: cover; border-radius: 2px; }
+.ugi-overlay.right { justify-content: flex-end; align-items: stretch; }
+.ugi-drawer { width: 460px; max-width: 100%; height: 100%; box-sizing: border-box; background: var(--ugi-bg2); border-left: 1px solid var(--ugi-panel-border); padding: 20px 22px; overflow: auto; }
+.ugi-drawer-head { display: flex; justify-content: space-between; align-items: flex-start; }
+.ugi-drawer h2 { margin: 0 0 4px; color: var(--ugi-head); font-weight: 500; }
+.ugi-imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.ugi-im { position: relative; border-radius: var(--ugi-radius); overflow: hidden; background: var(--ugi-panel); }
+.ugi-im img, .ugi-im .ugi-noimg { width: 100%; height: 100%; object-fit: cover; display: block; border: 0; }
+.ugi-im span { position: absolute; left: 6px; bottom: 6px; font-size: 11px; background: rgba(0,0,0,.6); padding: 2px 6px; border-radius: 4px; color: #fff; }
+.ugi-im.grid { aspect-ratio: 2/3; grid-row: span 2; }
+.ugi-im.wide { aspect-ratio: 92/43; }
+.ugi-im.hero { aspect-ratio: 96/31; grid-column: 1 / -1; }
+.ugi-im.logo, .ugi-im.icon { aspect-ratio: 2/1; }
+.ugi-im.logo img, .ugi-im.icon img { object-fit: contain; }
+.ugi-kv { font-size: 13px; color: var(--ugi-muted); line-height: 1.8; }
+.ugi-kv code { color: var(--ugi-text); font-size: 12px; word-break: break-all; }
 `;

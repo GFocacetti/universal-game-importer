@@ -1,0 +1,136 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { loadState, saveState } from 'backend';
+import { t } from 'i18n';
+import { missingFor } from 'sgdb';
+import { imageUrls, ImageKind, LAUNCHER_NAMES, launchShortcut } from 'steamApps';
+import { ImportedEntry, UgiState } from 'types';
+
+type Row = ImportedEntry & { id: string };
+
+// Shows the first URL that loads; falls back to a placeholder
+export function SteamImage({ appid, kind, className, label }: { appid: number; kind: ImageKind; className?: string; label?: string }) {
+	const urls = useMemo(() => imageUrls(appid, kind), [appid, kind]);
+	const [index, setIndex] = useState(0);
+	if (index >= urls.length) return <div className={`${className ?? ''} ugi-noimg`}>{label}</div>;
+	return <img className={className} src={urls[index]} onError={() => setIndex(index + 1)} />;
+}
+
+function Detail({ row, missing, onClose, onRemoved }: { row: Row; missing: number[]; onClose: () => void; onRemoved: () => void }) {
+	const remove = async () => {
+		const state = await loadState();
+		SteamClient.Apps.RemoveShortcut(row.appid);
+		delete state.imported[row.id];
+		// Removed on purpose: don't offer it again as a new game
+		state.excluded[row.id] = true;
+		await saveState(state);
+		onRemoved();
+	};
+	const tile = (kind: ImageKind, label: string) => (
+		<div className={`ugi-im ${kind}`} title={t('detail.changeSoon')}>
+			<SteamImage appid={row.appid} kind={kind} />
+			<span>{label}</span>
+		</div>
+	);
+	return (
+		<div className="ugi-overlay right" onClick={onClose}>
+			<div className="ugi-drawer" onClick={(e) => e.stopPropagation()}>
+				<div className="ugi-drawer-head">
+					<div>
+						<h2>{row.name}</h2>
+						<span className="ugi-muted">{LAUNCHER_NAMES[row.launcher] ?? row.launcher}</span>
+					</div>
+					<button className="ugi-btn secondary" onClick={onClose}>✕</button>
+				</div>
+				<div className="ugi-imgs">
+					{tile('grid', t('image.grid'))}
+					{tile('wide', t('image.wide'))}
+					{tile('logo', t('image.logo'))}
+					{tile('hero', t('image.hero'))}
+					{tile('icon', t('image.icon'))}
+				</div>
+				<p className="ugi-muted">{missing.length ? t('detail.missing', { n: missing.length }) : t('detail.complete')}</p>
+				<div className="ugi-kv">
+					{t('detail.launcher')}: <code>{LAUNCHER_NAMES[row.launcher] ?? row.launcher}</code>
+					<br />
+					{t('detail.command')}: <code>{row.launch_options ?? ''}</code>
+				</div>
+				<div className="ugi-foot left">
+					<button className="ugi-btn primary" onClick={() => launchShortcut(row.appid)}>{t('detail.play')}</button>
+					<button className="ugi-btn danger" onClick={remove}>{t('detail.remove')}</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+export default function GamesSection({ state, onChanged }: { state: UgiState; onChanged: () => void }) {
+	const [filter, setFilter] = useState<string>('all');
+	const [search, setSearch] = useState('');
+	const [view, setView] = useState<'grid' | 'list'>('grid');
+	const [missing, setMissing] = useState<Record<string, number[]>>({});
+	const [open, setOpen] = useState<Row | null>(null);
+
+	const rows: Row[] = useMemo(
+		() => Object.entries(state.imported).map(([id, e]) => ({ ...e, id })).sort((a, b) => a.name.localeCompare(b.name)),
+		[state],
+	);
+	useEffect(() => {
+		missingFor(rows.map((r) => r.appid)).then(setMissing);
+	}, [rows]);
+
+	const launchers = [...new Set(rows.map((r) => r.launcher))];
+	const visible = rows.filter((r) => (filter === 'all' || r.launcher === filter) && r.name.toLowerCase().includes(search.toLowerCase()));
+	const missingOf = (r: Row) => missing[String(r.appid)] ?? [];
+
+	if (!rows.length) return <p className="ugi-muted">{t('games.empty')}</p>;
+
+	return (
+		<>
+			<div className="ugi-toolbar">
+				<span className={`ugi-chip${filter === 'all' ? ' on' : ''}`} onClick={() => setFilter('all')}>{t('games.all')} {rows.length}</span>
+				{launchers.map((l) => (
+					<span key={l} className={`ugi-chip${filter === l ? ' on' : ''}`} onClick={() => setFilter(l)}>
+						{LAUNCHER_NAMES[l] ?? l} {rows.filter((r) => r.launcher === l).length}
+					</span>
+				))}
+				<input className="ugi-search" placeholder={t('games.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+				<div className="ugi-seg">
+					<span className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')}>{t('games.grid')}</span>
+					<span className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>{t('games.list')}</span>
+				</div>
+			</div>
+			{view === 'grid' ? (
+				<div className="ugi-grid">
+					{visible.map((r) => (
+						<div key={r.id} className="ugi-game" onClick={() => setOpen(r)}>
+							<SteamImage appid={r.appid} kind="grid" className="ugi-cover" label={r.name} />
+							<span className="ugi-badge">{LAUNCHER_NAMES[r.launcher] ?? r.launcher}</span>
+						</div>
+					))}
+				</div>
+			) : (
+				<div>
+					{visible.map((r) => (
+						<div key={r.id} className="ugi-row" onClick={() => setOpen(r)}>
+							<SteamImage appid={r.appid} kind="grid" className="ugi-mini" />
+							<span>{r.name}</span>
+							<span className="ugi-muted">{LAUNCHER_NAMES[r.launcher] ?? r.launcher}</span>
+							<span className="ugi-muted">{missingOf(r).length ? t('games.imagesMissing') : t('games.imagesComplete')}</span>
+						</div>
+					))}
+				</div>
+			)}
+			{open && (
+				<Detail
+					row={open}
+					missing={missingOf(open)}
+					onClose={() => setOpen(null)}
+					onRemoved={() => {
+						setOpen(null);
+						onChanged();
+					}}
+				/>
+			)}
+		</>
+	);
+}

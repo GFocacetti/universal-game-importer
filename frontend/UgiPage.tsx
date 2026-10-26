@@ -3,6 +3,7 @@ import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
 import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
+import GamesSection from 'GamesSection';
 
 type Section = 'games' | 'launchers' | 'images' | 'settings';
 
@@ -86,7 +87,7 @@ export default function UgiPage() {
 					</div>
 				)}
 				<div className="ugi-content">
-					<p className="ugi-muted">{t('placeholder.soon')}</p>
+					{state && section === 'games' ? <GamesSection state={state} onChanged={reload} /> : <p className="ugi-muted">{t('placeholder.soon')}</p>}
 				</div>
 			</section>
 			{keyDialog && (
