@@ -20,6 +20,8 @@ const CSS = `
 .ugi-info-text h3 { margin: 16px 0 6px; font-size: 14px; font-weight: 700; color: #ffffff; }
 .ugi-info-side { margin: 0 0 16px; padding: 14px 16px 6px; background: rgba(0,0,0,.2); border-radius: 3px; color: #dcdedf; font-family: "Motiva Sans", Arial, sans-serif; font-size: 13px; line-height: 1.4; }
 .ugi-info-side div { margin-bottom: 10px; }
+.ugi-info-side a { color: #dcdedf; cursor: pointer; }
+.ugi-info-side a:hover { color: #1a9fff; }
 .ugi-info-side span { display: block; color: #8f98a0; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .ugi-info-source { margin-top: 10px; color: #8f98a0; font-size: 12px; }
 .ugi-info-source a { color: #8f98a0; text-decoration: underline; cursor: pointer; }
@@ -46,8 +48,10 @@ const CSS = `
 .ugi-full-count { position: absolute; bottom: 20px; left: 0; right: 0; text-align: center; color: #8f98a0; font-size: 13px; }
 `;
 
+// Steam store pages open in Steam's own store; other sites in the web browser
 function openUrl(url: string) {
-	(SteamClient as any).System?.OpenInSystemBrowser?.(url);
+	if (url.startsWith('https://store.steampowered.com/')) (SteamClient as any).URL.ExecuteSteamURL(`steam://openurl/${url}`);
+	else (SteamClient as any).System?.OpenInSystemBrowser?.(url);
 }
 
 const Chevron = ({ left }: { left?: boolean }) => (
@@ -146,10 +150,20 @@ function InfoBlock({ appid, sideHost }: { appid: number; sideHost: HTMLElement |
 		);
 	}
 
-	const side: [string, string | undefined][] = [
-		[t('info.developer'), info.developers.join(', ')],
-		[t('info.publisher'), info.publishers.join(', ')],
-		[t('info.genres'), info.genres.join(', ')],
+	// Names with a store page are links
+	const linked = (list: string[]) =>
+		list.length
+			? list.map((name, i) => (
+					<React.Fragment key={name}>
+						{i > 0 && ', '}
+						{info.links?.[name] ? <a onClick={() => openUrl(info.links![name]!)}>{name}</a> : name}
+					</React.Fragment>
+				))
+			: undefined;
+	const side: [string, React.ReactNode][] = [
+		[t('info.developer'), linked(info.developers)],
+		[t('info.publisher'), linked(info.publishers)],
+		[t('info.genres'), linked(info.genres)],
 		[t('info.released'), info.released],
 	];
 
@@ -180,7 +194,7 @@ function InfoBlock({ appid, sideHost }: { appid: number; sideHost: HTMLElement |
 
 // ---------- Placing the block in Steam's page ----------
 
-type Mounted = { host: HTMLElement; root: Root; appid: number; notice: HTMLElement; side: HTMLElement | null; column: HTMLElement | null };
+type Mounted = { host: HTMLElement; root: Root; appid: number; notice: HTMLElement; side: HTMLElement | null; column: HTMLElement | null; observer?: ResizeObserver };
 let mounted: Mounted | null = null;
 let importedAppids = new Set<number>();
 let lastStateLoad = 0;
@@ -190,6 +204,7 @@ function unmount() {
 	try {
 		mounted.root.unmount();
 	} catch {}
+	mounted.observer?.disconnect();
 	mounted.host.remove();
 	mounted.side?.remove();
 	showNotice(mounted.notice);
@@ -227,6 +242,15 @@ function rightColumn(notice: HTMLElement): HTMLElement | null {
 	return null;
 }
 
+// The side box starts level with the "About this game" block
+function alignSide(m: Mounted) {
+	const anchor = m.host.querySelector('.ugi-info');
+	if (!m.side || !anchor) return;
+	const delta = anchor.getBoundingClientRect().top - m.side.getBoundingClientRect().top;
+	if (Math.abs(delta) < 1) return;
+	m.side.style.marginTop = `${Math.max(0, (parseFloat(m.side.style.marginTop) || 0) + delta)}px`;
+}
+
 async function refreshImported() {
 	// The list changes only on imports: reloaded at most every 10 seconds
 	if (Date.now() - lastStateLoad < 10000) return;
@@ -251,8 +275,10 @@ async function tick() {
 		mounted.host.nextElementSibling === mounted.notice &&
 		mounted.notice.dataset.ugiStyle !== undefined &&
 		(!mounted.side || (mounted.side.isConnected && mounted.column?.firstElementChild === mounted.side))
-	)
+	) {
+		alignSide(mounted);
 		return;
+	}
 	const name = appStore.GetAppOverviewByAppID(appid)?.display_name;
 	const notice = doc && name ? shortcutNotice(doc, name) : null;
 	if (!doc || !notice) return unmount();
@@ -275,6 +301,13 @@ async function tick() {
 		</>,
 	);
 	mounted = { host, root, appid, notice, side, column };
+	// Realigned as soon as the block changes size (text and pictures loading)
+	const view = doc.defaultView as (Window & typeof globalThis) | null;
+	if (view?.ResizeObserver) {
+		const current = mounted;
+		current.observer = new view.ResizeObserver(() => alignSide(current));
+		current.observer.observe(host);
+	}
 }
 
 export function startGameInfo() {

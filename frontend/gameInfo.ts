@@ -22,12 +22,14 @@ export type GameInfo = {
 	genres: string[];
 	released?: string;
 	screenshots: Screenshot[];
+	// Store pages for developers, publishers and genres, by name (Steam only)
+	links?: Record<string, string>;
 };
 
 export type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
 
@@ -99,6 +101,24 @@ const names = (list: any): string[] => (Array.isArray(list) ? list.map((x) => (t
 
 // ---------- Sources ----------
 
+// Steam's genre ids and their store pages (the page names are in English)
+const STEAM_GENRES: Record<string, string> = {
+	1: 'Action', 2: 'Strategy', 3: 'RPG', 4: 'Casual', 9: 'Racing', 18: 'Sports', 23: 'Indie', 25: 'Adventure',
+	28: 'Simulation', 29: 'Massively Multiplayer', 37: 'Free to Play', 70: 'Early Access',
+};
+
+function steamLinks(d: any): Record<string, string> {
+	const links: Record<string, string> = {};
+	const search = 'https://store.steampowered.com/search/?';
+	for (const dev of names(d.developers)) links[dev] = `${search}developer=${encodeURIComponent(dev)}`;
+	for (const pub of names(d.publishers)) links[pub] ??= `${search}publisher=${encodeURIComponent(pub)}`;
+	for (const genre of d.genres ?? []) {
+		const page = STEAM_GENRES[String(genre?.id)];
+		if (page && genre.description) links[genre.description] = `https://store.steampowered.com/genre/${encodeURIComponent(page)}/`;
+	}
+	return links;
+}
+
 async function fromSteam(name: string, locale: string): Promise<GameInfo | null> {
 	const lang = locale === 'it' ? 'italian' : 'english';
 	const cc = locale === 'it' ? 'IT' : 'US';
@@ -119,6 +139,7 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 		genres: names(d.genres),
 		released: d.release_date?.date || undefined,
 		screenshots: (d.screenshots ?? []).filter((s: any) => s.path_full).map((s: any) => ({ thumb: s.path_thumbnail || s.path_full, full: s.path_full })),
+		links: steamLinks(d),
 	};
 }
 
