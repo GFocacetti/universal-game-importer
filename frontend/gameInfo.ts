@@ -27,14 +27,28 @@ export type GameInfo = {
 	links?: Record<string, string>;
 	// Where the game is sold: its launcher's store (when the page is known exactly) and Steam
 	stores?: StoreLink[];
+	// Trailers: played here when the stream format is supported, otherwise opened on their page
+	videos?: Video[];
+	// Wide picture at the top of the summary, like the store's header capsule
+	header?: string;
+	reviews?: Reviews;
+	metacritic?: { score: number; url?: string };
+	features?: { name: string; icon?: string }[];
+	languages?: Language[];
+	age?: { label: string; descriptors?: string };
+	requirements?: { minimum: Requirement[]; recommended: Requirement[] };
 };
 
 export type StoreLink = { name: string; url: string };
+export type Video = { thumb: string; hls?: string; page?: string; name?: string };
+export type Reviews = { percent: number; total: number };
+export type Language = { name: string; interface: boolean; audio: boolean };
+export type Requirement = { label: string; value: string };
 
 export type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
-const CACHE_VERSION = 9;
+const CACHE_VERSION = 11;
 
 type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
 
@@ -118,6 +132,27 @@ const STEAM_GENRES: Record<string, string> = {
 	28: 'Simulation', 29: 'Massively Multiplayer', 37: 'Free to Play', 70: 'Early Access',
 };
 
+// Steam's feature ids and the store's own icons for them
+const STEAM_FEATURE_ICONS: Record<string, string> = {
+	2: 'singlePlayer', 1: 'multiPlayer', 20: 'multiPlayer', 27: 'multiPlayer', 36: 'multiPlayer', 37: 'multiPlayer', 47: 'multiPlayer', 49: 'multiPlayer',
+	9: 'coop', 24: 'coop', 38: 'coop', 39: 'coop', 48: 'coop', 22: 'achievements', 23: 'cloud', 28: 'controller', 18: 'partial_controller',
+	29: 'cards', 30: 'workshop', 35: 'cart', 13: 'cc', 8: 'vac', 17: 'editor', 15: 'stats', 14: 'commentary',
+	41: 'remote_play', 42: 'remote_play', 43: 'remote_play', 44: 'remote_play_together', 61: 'hdr',
+};
+const STEAM_ICONS = 'https://store.akamai.steamstatic.com/public/images/v6/ico/ico_';
+
+// GOG's feature names, drawn with the same Steam icons
+const GOG_FEATURE_ICONS: Record<string, string> = {
+	'single-player': 'singlePlayer', 'multi-player': 'multiPlayer', 'co-op': 'coop', achievements: 'achievements',
+	'cloud saves': 'cloud', 'controller support': 'controller', leaderboards: 'stats',
+};
+
+// Dates written like the Steam store's ("27 ago 2020")
+function storeDate(value: string | undefined, locale: string): string | undefined {
+	const date = value ? new Date(value) : null;
+	return date && !isNaN(date.getTime()) ? date.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : undefined;
+}
+
 function steamLinks(d: any): Record<string, string> {
 	const links: Record<string, string> = {};
 	const search = 'https://store.steampowered.com/search/?';
@@ -130,6 +165,42 @@ function steamLinks(d: any): Record<string, string> {
 	return links;
 }
 
+// Steam's requirement lists: "<li><strong>Memory:</strong> 8 GB RAM</li>"
+function steamRequirements(html: string | undefined): Requirement[] {
+	if (!html) return [];
+	const doc = new DOMParser().parseFromString(html, 'text/html');
+	return Array.from(doc.querySelectorAll('li'))
+		.map((li) => {
+			const label = (li.querySelector('strong')?.textContent ?? '').replace(/[\s*]*:\s*$/, '').trim();
+			const all = (li.textContent ?? '').trim();
+			const value = label ? all.slice(all.indexOf(':') + 1).trim() : all;
+			return { label, value };
+		})
+		.filter((r) => r.value);
+}
+
+// "Inglese<strong>*</strong>, Italiano<br><strong>*</strong>languages with full audio support"
+function steamLanguages(html: string | undefined): Language[] {
+	if (!html) return [];
+	return html
+		.split(/<br\s*\/?>/i)[0]!
+		.split(',')
+		.map((part) => ({ name: decode(part.replace(/<[^>]*>/g, '').replace(/\*/g, '')).trim(), interface: true, audio: part.includes('*') }))
+		.filter((l) => l.name);
+}
+
+// Steam's verdict comes from the review histogram (the reviews API now redirects to the store)
+async function steamReviews(appid: number): Promise<Reviews | undefined> {
+	const results = (await getJson(`https://store.steampowered.com/appreviewhistogram/${appid}?review_score_preference=0`))?.results;
+	let up = 0;
+	let down = 0;
+	for (const r of results?.rollups ?? []) {
+		up += Number(r.recommendations_up) || 0;
+		down += Number(r.recommendations_down) || 0;
+	}
+	return up + down ? { percent: Math.round((100 * up) / (up + down)), total: up + down } : undefined;
+}
+
 async function fromSteam(name: string, locale: string): Promise<GameInfo | null> {
 	const lang = locale === 'it' ? 'italian' : 'english';
 	const cc = locale === 'it' ? 'IT' : 'US';
@@ -140,9 +211,12 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 	const d = details?.success ? details.data : null;
 	if (!d || d.type !== 'game') return null;
 	const description = htmlToText(d.about_the_game || d.detailed_description || '');
+	const pegi = d.ratings?.pegi;
+	const age = Number(d.required_age) || 0;
+	const url = `https://store.steampowered.com/app/${match.id}/`;
 	return {
 		source: 'steam',
-		url: `https://store.steampowered.com/app/${match.id}/`,
+		url,
 		summary: decode(d.short_description || '') || firstParagraph(description),
 		description,
 		developers: names(d.developers),
@@ -150,7 +224,19 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 		genres: names(d.genres),
 		released: d.release_date?.date || undefined,
 		screenshots: (d.screenshots ?? []).filter((s: any) => s.path_full).map((s: any) => ({ thumb: s.path_thumbnail || s.path_full, full: s.path_full })),
+		videos: (d.movies ?? []).filter((m: any) => m.thumbnail).map((m: any) => ({ thumb: m.thumbnail, hls: m.hls_h264, page: url, name: m.name })),
 		links: steamLinks(d),
+		header: d.header_image || undefined,
+		reviews: await steamReviews(match.id).catch(() => undefined),
+		metacritic: d.metacritic?.score ? { score: d.metacritic.score, url: d.metacritic.url } : undefined,
+		features: (d.categories ?? []).map((c: any) => ({ name: c.description, icon: STEAM_FEATURE_ICONS[String(c.id)] ? `${STEAM_ICONS}${STEAM_FEATURE_ICONS[String(c.id)]}.png` : undefined })),
+		languages: steamLanguages(d.supported_languages),
+		age: pegi?.rating
+			? { label: `PEGI ${pegi.rating}`, descriptors: String(pegi.descriptors ?? '').split(/\r?\n/).filter(Boolean).join(', ') || undefined }
+			: age
+				? { label: `${age}+` }
+				: undefined,
+		requirements: { minimum: steamRequirements(d.pc_requirements?.minimum), recommended: steamRequirements(d.pc_requirements?.recommended) },
 	};
 }
 
@@ -160,6 +246,22 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 	const e = d._embedded;
 	const description = htmlToText(d.description || '');
 	if (!description) return null;
+	// One entry per language and scope (text / audio)
+	const languages = new Map<string, Language>();
+	for (const l of e.localizations ?? []) {
+		const name = l?._embedded?.language?.name;
+		if (!name) continue;
+		const entry = languages.get(name) ?? { name, interface: false, audio: false };
+		if (l._embedded.localizationScope?.type === 'audio') entry.audio = true;
+		else entry.interface = true;
+		languages.set(name, entry);
+	}
+	const windows = (e.supportedOperatingSystems ?? []).find((os: any) => os?.operatingSystem?.name === 'windows');
+	const gogRequirements = (type: string): Requirement[] =>
+		(windows?.systemRequirements ?? [])
+			.find((r: any) => r?.type === type)
+			?.requirements?.map((r: any) => ({ label: String(r.name ?? '').replace(/:\s*$/, ''), value: String(r.description ?? '') }))
+			.filter((r: Requirement) => r.value) ?? [];
 	return {
 		source: 'gog',
 		url: d._links?.store?.href || `https://www.gog.com/game/${encodeURIComponent(id)}`,
@@ -168,11 +270,23 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 		developers: names(e.developers),
 		publishers: names(e.publishers?.length ? e.publishers : e.publisher ? [e.publisher] : []),
 		genres: names(e.tags).slice(0, 5),
-		released: e.product?.globalReleaseDate ? new Date(e.product.globalReleaseDate).toLocaleDateString(locale) : undefined,
+		released: storeDate(e.product?.globalReleaseDate, locale),
 		screenshots: (e.screenshots ?? [])
 			.map((s: any) => String(s?._links?.self?.href ?? ''))
 			.filter(Boolean)
 			.map((href: string) => ({ thumb: href.replace('{formatter}', 'product_card_v2_mobile_slider_639'), full: href.replace('{formatter}', '1600') })),
+		videos: (e.videos ?? [])
+			.filter((v: any) => v?.provider === 'youtube' && v.videoId)
+			.map((v: any) => ({ thumb: v._links?.thumbnail?.href ?? `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`, page: `https://www.youtube.com/watch?v=${v.videoId}` })),
+		features: names(e.features).map((name) => {
+			const icon = GOG_FEATURE_ICONS[name.toLowerCase()];
+			return { name, icon: icon ? `${STEAM_ICONS}${icon}.png` : undefined };
+		}),
+		languages: [...languages.values()],
+		age: e.pegiRating?.ageRating
+			? { label: `PEGI ${e.pegiRating.ageRating}`, descriptors: (e.pegiRating.contentDescriptors ?? []).map((c: any) => c.descriptor).join(', ') || undefined }
+			: undefined,
+		requirements: { minimum: gogRequirements('minimum'), recommended: gogRequirements('recommended') },
 	};
 }
 
@@ -195,6 +309,9 @@ async function fromEpic(appName: string, dir: string, locale: string): Promise<G
 	const d = (pages.find((p) => p?.type === 'productHome') ?? pages[0])?.data;
 	const description = markdownToText(d?.about?.description || '');
 	if (!description) return null;
+	const windows = (d.requirements?.systems ?? []).find((s: any) => s?.systemType === 'Windows');
+	const epicRequirements = (field: 'minimum' | 'recommended'): Requirement[] =>
+		(windows?.details ?? []).map((r: any) => ({ label: String(r.title ?? ''), value: String(r[field] ?? '') })).filter((r: Requirement) => r.value);
 	return {
 		source: 'epic',
 		url: `https://store.epicgames.com/p/${slug}`,
@@ -204,10 +321,24 @@ async function fromEpic(appName: string, dir: string, locale: string): Promise<G
 		publishers: d.about.publisherAttribution ? [d.about.publisherAttribution] : [],
 		genres: [],
 		screenshots: (d.carousel?.items ?? []).map((item: any) => item?.image?.src).filter(Boolean).map((src: string) => ({ thumb: src, full: src })),
+		requirements: { minimum: epicRequirements('minimum'), recommended: epicRequirements('recommended') },
 	};
 }
 
-async function fromRawg(name: string, key: string): Promise<GameInfo | null> {
+// RAWG's requirements are plain text: "Minimum:\nOS: Windows 7\nMemory: 4 GB RAM"
+function rawgRequirements(text: string | undefined): Requirement[] {
+	return String(text ?? '')
+		.split('\n')
+		.map((line) => line.trim())
+		.filter((line) => line && !/^(minimum|recommended):?$/i.test(line))
+		.map((line) => {
+			const at = line.indexOf(':');
+			return at > 0 && at < 30 ? { label: line.slice(0, at).trim(), value: line.slice(at + 1).trim() } : { label: '', value: line };
+		})
+		.filter((r) => r.value);
+}
+
+async function fromRawg(name: string, key: string, locale: string): Promise<GameInfo | null> {
 	const search = await getJson(`https://api.rawg.io/api/games?key=${encodeURIComponent(key)}&search=${encodeURIComponent(name)}&page_size=10`);
 	// Several entries can share the name (fan-made pages too): the one most users added
 	const match = (search?.results ?? [])
@@ -217,6 +348,7 @@ async function fromRawg(name: string, key: string): Promise<GameInfo | null> {
 	const d = await getJson(`https://api.rawg.io/api/games/${match.id}?key=${encodeURIComponent(key)}`);
 	const description = tidy(d?.description_raw || '');
 	if (!d || !description) return null;
+	const pc = (d.platforms ?? []).find((p: any) => p?.platform?.slug === 'pc')?.requirements;
 	return {
 		source: 'rawg',
 		url: `https://rawg.io/games/${d.slug ?? match.slug}`,
@@ -225,8 +357,12 @@ async function fromRawg(name: string, key: string): Promise<GameInfo | null> {
 		developers: names(d.developers),
 		publishers: names(d.publishers),
 		genres: names(d.genres),
-		released: d.released || undefined,
+		released: storeDate(d.released, locale),
 		screenshots: (match.short_screenshots ?? []).map((s: any) => s.image).filter(Boolean).slice(1).map((src: string) => ({ thumb: src, full: src })),
+		header: d.background_image || undefined,
+		metacritic: d.metacritic ? { score: d.metacritic, url: d.metacritic_url || undefined } : undefined,
+		age: d.esrb_rating?.name ? { label: `ESRB ${d.esrb_rating.name}` } : undefined,
+		requirements: { minimum: rawgRequirements(pc?.minimum), recommended: rawgRequirements(pc?.recommended) },
 	};
 }
 
@@ -278,7 +414,7 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 		(await fromSteam(name, locale)) ??
 		(launcher === 'gog' ? await fromGog(id, locale) : null) ??
 		(launcher === 'epic' ? await fromEpic(id, state.settings.launchers?.epic?.path ?? '', locale) : null) ??
-		(state.settings.rawg_key ? await fromRawg(name, state.settings.rawg_key) : null);
+		(state.settings.rawg_key ? await fromRawg(name, state.settings.rawg_key, locale) : null);
 	if (!info) return null;
 	const own = await launcherStore(state, launcher ?? '', id).catch(() => null);
 	info.stores = [...(own ? [own] : []), ...(info.source === 'steam' ? [{ name: 'Steam', url: info.url }] : [])];
