@@ -160,6 +160,10 @@ export const UGI_CSS = `
 .ugi-card h3 { margin: 0 0 4px; font-size: 15px; color: var(--ugi-head); font-weight: 600; }
 .ugi-card p { margin: 0 0 10px; color: var(--ugi-muted); font-size: 13px; line-height: 1.45; }
 .ugi-lrow { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; }
+.ugi-launcher-help { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ugi-muted); line-height: 1.45; }
+.ugi-launcher-help b { color: var(--ugi-text); font-weight: 600; }
+.ugi-launcher-warn { color: var(--ugi-warn); }
+div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-opts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--ugi-muted); margin-top: 6px; align-items: center; }
 .ugi-opts label { display: flex; gap: 6px; align-items: center; }
 .ugi-opts input[type=text] { background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 4px 8px; font: inherit; width: 280px; }

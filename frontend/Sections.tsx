@@ -59,21 +59,38 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 
 	return (
 		<>
+			<div className="ugi-card ugi-launcher-help">
+				<div><b>{t('launchers.helpSwitchTitle')}</b> {t('launchers.helpSwitch')} <span className="ugi-launcher-warn">⚠ {t('launchers.helpSwitchWarn')}</span></div>
+				<div><b>{t('launchers.collection')}</b> {t('launchers.helpCollection')}</div>
+				<div><b>{t('launchers.shelf')}</b> {t('launchers.helpShelf')}</div>
+				<div><b>{t('launchers.path')}</b> {t('launchers.helpPath')}</div>
+			</div>
 			{launchers.map((l) => {
 				const cfg = state.settings.launchers?.[l.id] ?? {};
 				const info = state.collections[l.id] ?? {};
 				const hasCollection = state.settings.collections && !info.off_collection;
 				const hasShelf = hasCollection && state.settings.shelves && !info.off_shelf;
+				// Found by the last scan (apps included, for Xbox) and actually imported
+				const imported = Object.values(state.imported).filter((e) => e.launcher === l.id).length;
 				const meta = l.error
 					? t('launchers.error')
 					: !l.installed
 						? t('launchers.notFound')
-						: t('launchers.found', { n: l.count });
+						: [
+								t('launchers.installed'),
+								l.count === 1 ? t('launchers.foundOne') : t('launchers.found', { n: l.count }),
+								...(imported ? [imported === 1 ? t('launchers.importedOne') : t('launchers.imported', { n: imported })] : []),
+							].join(' · ');
 				return (
 					<div key={l.id} className="ugi-card ugi-lrow">
 						<div>
 							<h3>{LAUNCHER_NAMES[l.id] ?? l.name}</h3>
 							<div className="ugi-muted">{cfg.enabled === false ? t('launchers.disabled') : meta}</div>
+							{cfg.enabled === false && imported > 0 && (
+								<div className="ugi-launcher-warn">
+									⚠ {imported === 1 ? t('launchers.offWarningOne') : t('launchers.offWarning', { n: imported })}
+								</div>
+							)}
 						</div>
 						<Toggle on={cfg.enabled !== false} onChange={(v) => setEnabled(l.id, v)} />
 						<div className="ugi-opts">
