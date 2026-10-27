@@ -1,4 +1,5 @@
 import { callable } from '@steambrew/client';
+import { unquote } from 'backend';
 import { UgiState } from 'types';
 
 // Steam image types used by SetCustomArtworkForApp
@@ -133,9 +134,6 @@ export async function imagesFor(state: UgiState, gameId: number, type: ImageType
 }
 
 const extOf = (url: string) => (/\.(jpe?g|jfif)(\?|$)/i.test(url) ? 'jpg' : 'png');
-
-// Millennium may hand string results back still wrapped in JSON quotes
-const unquote = (value: unknown) => String(value ?? '').replace(/^"|"$/g, '');
 
 async function fetchBase64(url: string): Promise<string | null> {
 	const size = Number(unquote(await download({ a_url: url })));

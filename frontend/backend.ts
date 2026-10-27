@@ -5,6 +5,10 @@ const ugiScan = callable<[{ a_options: string }], string>('ugi_scan');
 const ugiGetState = callable<[], string>('ugi_get_state');
 const ugiSaveState = callable<[{ json: string }], boolean>('ugi_save_state');
 
+// Millennium may hand string results back still wrapped in JSON quotes ("fn" instead of fn):
+// every string from a backend call goes through this
+export const unquote = (value: unknown) => String(value ?? '').replace(/^"|"$/g, '');
+
 function parse<T>(raw: string, fallback: T): T {
 	try {
 		const value = JSON.parse(raw);

@@ -1,4 +1,5 @@
 import { callable } from '@steambrew/client';
+import { unquote } from 'backend';
 import { uiLocale } from 'i18n';
 import { UgiState } from 'types';
 
@@ -29,7 +30,7 @@ export type GameInfo = {
 export type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 8;
 
 type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
 
@@ -72,7 +73,13 @@ function markdownToText(md: string): string {
 		md
 			.replace(/!\[[^\]]*\]\([^)]*\)/g, '')
 			.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-			.replace(/^#+\s*/gm, '# ')
+			// Titles underlined with === or --- are headings
+			.replace(/^([^\n]*\S[^\n]*)\n\s*[=-]{3,}\s*$/gm, '\n# $1\n')
+			// Other rules (---, ___, ***) separate sections: dropped
+			.replace(/^\s*([-_=*])\1{2,}\s*$/gm, '')
+			.replace(/^#+\s*(.*)$/gm, '\n# $1\n')
+			// Escaped punctuation: \! \( \)
+			.replace(/\\([\\`*_{}\[\]()#+\-.!|<>])/g, '$1')
 			.replace(/^\s*[-*]\s+/gm, '• ')
 			.replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1'),
 	);
@@ -168,14 +175,16 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 let epicSlugs: Record<string, string> | null = null;
 
 async function fromEpic(appName: string, dir: string, locale: string): Promise<GameInfo | null> {
-	const namespace = await epicNamespace({ a_app_name: appName, b_dir: dir });
+	const namespace = unquote(await epicNamespace({ a_app_name: appName, b_dir: dir }));
 	if (!namespace) return null;
 	// Epic's own map from store namespace to store page
 	epicSlugs ??= await getJson('https://store-content.ak.epicgames.com/api/content/productmapping');
 	const slug = epicSlugs?.[namespace];
 	if (!slug) return null;
 	const page = await getJson(`https://store-content-ipv4.ak.epicgames.com/api/${locale === 'it' ? 'it' : 'en-US'}/content/products/${encodeURIComponent(slug)}`);
-	const d = page?.pages?.[0]?.data;
+	// The product's home page (Fortnite lists its game modes first)
+	const pages: any[] = page?.pages ?? [];
+	const d = (pages.find((p) => p?.type === 'productHome') ?? pages[0])?.data;
 	const description = markdownToText(d?.about?.description || '');
 	if (!description) return null;
 	return {
@@ -192,7 +201,10 @@ async function fromEpic(appName: string, dir: string, locale: string): Promise<G
 
 async function fromRawg(name: string, key: string): Promise<GameInfo | null> {
 	const search = await getJson(`https://api.rawg.io/api/games?key=${encodeURIComponent(key)}&search=${encodeURIComponent(name)}&page_size=10`);
-	const match = (search?.results ?? []).find((r: any) => simplify(String(r.name ?? '')) === simplify(name));
+	// Several entries can share the name (fan-made pages too): the one most users added
+	const match = (search?.results ?? [])
+		.filter((r: any) => simplify(String(r.name ?? '')) === simplify(name))
+		.sort((a: any, b: any) => (b.added ?? 0) - (a.added ?? 0))[0];
 	if (!match) return null;
 	const d = await getJson(`https://api.rawg.io/api/games/${match.id}?key=${encodeURIComponent(key)}`);
 	const description = tidy(d?.description_raw || '');

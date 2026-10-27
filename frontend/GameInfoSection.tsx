@@ -14,11 +14,11 @@ declare const MainWindowBrowserManager: { m_lastLocation?: { pathname?: string }
 const SOURCE_NAMES: Record<GameInfo['source'], string> = { steam: 'Steam', gog: 'GOG', epic: 'Epic Games Store', rawg: 'RAWG' };
 
 const CSS = `
-.ugi-info { margin: 0 0 16px; padding: 16px 20px; background: rgba(0,0,0,.2); border-radius: 3px; color: #dcdedf; font-family: "Motiva Sans", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
+.ugi-info { overflow-wrap: anywhere; margin: 0 0 16px; padding: 16px 20px; background: rgba(0,0,0,.2); border-radius: 3px; color: #dcdedf; font-family: "Motiva Sans", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
 .ugi-info h2 { margin: 0 0 10px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #ffffff; }
-.ugi-info-text p { margin: 0 0 10px; white-space: pre-line; }
+.ugi-info-text p { margin: 0 0 10px; white-space: pre-line; text-align: justify; }
 .ugi-info-text h3 { margin: 16px 0 6px; font-size: 14px; font-weight: 700; color: #ffffff; }
-.ugi-info-side { margin: 0 0 16px; padding: 14px 16px 6px; background: rgba(0,0,0,.2); border-radius: 3px; color: #dcdedf; font-family: "Motiva Sans", Arial, sans-serif; font-size: 13px; line-height: 1.4; }
+.ugi-info-side { overflow-wrap: anywhere; margin: 0 0 16px; padding: 14px 16px 6px; background: rgba(0,0,0,.2); border-radius: 3px; color: #dcdedf; font-family: "Motiva Sans", Arial, sans-serif; font-size: 13px; line-height: 1.4; }
 .ugi-info-side div { margin-bottom: 10px; }
 .ugi-info-side a { color: #dcdedf; cursor: pointer; }
 .ugi-info-side a:hover { color: #1a9fff; }
