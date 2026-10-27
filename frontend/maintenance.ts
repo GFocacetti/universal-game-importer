@@ -1,0 +1,175 @@
+import { callable } from '@steambrew/client';
+import { loadState, saveState, unquote } from 'backend';
+import { removeCollections, syncCollections } from 'collections';
+import { setLanguage } from 'i18n';
+import { recreateShortcut, shortcutExists } from 'importer';
+import { resetImages } from 'sgdb';
+import { UgiState } from 'types';
+
+// Backup to a .zip in Documents\UGI backup, restore from it, and removal of everything UGI did
+const backupExport = callable<[{ a_state: string; b_appids: string }], string>('ugi_backup_export');
+const backupList = callable<[], string>('ugi_backup_list');
+const backupOpen = callable<[{ a_zip: string }], string>('ugi_backup_open');
+const backupPick = callable<[], string>('ugi_backup_pick');
+const backupRestore = callable<[{ a_appids: string; b_steam: string }], string>('ugi_backup_restore');
+const cleanup = callable<[], boolean>('ugi_cleanup');
+const openFolder = callable<[{ a_path: string }], boolean>('ugi_open_folder');
+const customList = callable<[], string>('ugi_custom_list');
+const customMark = callable<[{ a_appid: number }], boolean>('ugi_custom_mark');
+const listShortcuts = callable<[], string>('ugi_shortcuts');
+
+type SteamShortcut = { appid: number; name: string; exe: string; launch_options: string };
+const unquotePath = (path: string | undefined) => String(path ?? '').replace(/^"|"$/g, '');
+const sameShortcut = (a: SteamShortcut, b: { name: string; exe?: string; launch_options?: string }) =>
+	a.name === b.name && unquotePath(a.exe) === unquotePath(b.exe) && a.launch_options === (b.launch_options ?? '');
+
+declare const appStore: { GetAppOverviewByAppID(appid: number): { app_type?: number } | undefined };
+const SHORTCUT_APP_TYPE = 1073741824;
+
+export type Step = (text: string) => void;
+export type Backup = { name: string; path: string };
+
+// A backup's state also lists the Steam apps whose artwork UGI changed
+type BackupState = UgiState & { customized?: number[] };
+
+// Backend answers are JSON; Millennium may hand them back once more wrapped as a JSON string
+const json = <T>(raw: unknown, fallback: T): T => {
+	try {
+		let value = JSON.parse(String(raw ?? ''));
+		if (typeof value === 'string') value = JSON.parse(value);
+		return value ?? fallback;
+	} catch {
+		return fallback;
+	}
+};
+
+export const openBackupFolder = (path: string) => openFolder({ a_path: path });
+
+// Windows' file dialog: the path of the chosen backup, or "" if cancelled
+export async function pickBackup(): Promise<Backup | null> {
+	const path = unquote(await backupPick()).replace(/\\\\/g, '\\');
+	return path ? { name: path.split('\\').pop() ?? path, path } : null;
+}
+
+// Steam apps (not imported games) whose artwork UGI changed: recorded since this version, plus
+// the ones UGI looked up on SteamGridDB or gave an icon before
+async function customizedSteamApps(state: UgiState): Promise<number[]> {
+	const imported = new Set(Object.values(state.imported).map((e) => e.appid));
+	// An empty Lua list arrives as {}
+	const listed = json<unknown>(unquote(await customList()), []);
+	const ids = new Set<number>(Array.isArray(listed) ? listed : []);
+	for (const key of [...Object.keys(state.sgdb_ids), ...Object.keys(state.custom_icons)]) if (/^\d+$/.test(key)) ids.add(Number(key));
+	// Only Steam apps still in the library (old shortcut ids from earlier imports are left out)
+	return [...ids].filter((id) => {
+		const overview = appStore.GetAppOverviewByAppID(id);
+		return id && !imported.has(id) && !!overview && overview.app_type !== SHORTCUT_APP_TYPE;
+	});
+}
+
+// What "Remove everything" will remove, for the confirmation
+export async function removalSummary(state: UgiState): Promise<{ games: number; apps: number }> {
+	return {
+		games: Object.values(state.imported).filter((e) => shortcutExists(e.appid)).length,
+		apps: (await customizedSteamApps(state)).length,
+	};
+}
+
+export async function exportBackup(): Promise<{ path?: string; error?: string }> {
+	const state: BackupState = await loadState();
+	state.customized = await customizedSteamApps(state);
+	const appids = [...Object.values(state.imported).map((e) => e.appid), ...state.customized];
+	return json(unquote(await backupExport({ a_state: JSON.stringify(state), b_appids: JSON.stringify(appids) })), { error: 'no answer' });
+}
+
+export async function listBackups(): Promise<{ dir: string; files: Backup[] }> {
+	const list = json<{ dir?: string; files?: Backup[] }>(unquote(await backupList()), {});
+	return { dir: list.dir ?? '', files: Array.isArray(list.files) ? list.files : [] };
+}
+
+// Opens a backup: what it holds, for the confirmation
+export async function readBackup(path: string): Promise<BackupState | null> {
+	const state = json<BackupState | null>(await backupOpen({ a_zip: path }), null);
+	return state && typeof state === 'object' && state.settings ? state : null;
+}
+
+// Puts a backup back: settings, imported games (created again when missing), collections and artwork
+export async function restoreBackup(backup: BackupState, step: Step): Promise<{ games: number; files: number }> {
+	const { customized = [], ...restored } = backup;
+	const state = restored as UgiState;
+
+	step('games');
+	// Steam gives a shortcut created again a new id: the artwork is renamed to follow it.
+	// A shortcut already in Steam with the same name and command is used again, and copies of it
+	// (left by an interrupted restore) are removed.
+	const shortcuts = json<unknown>(unquote(await listShortcuts()), []);
+	const existing: SteamShortcut[] = (Array.isArray(shortcuts) ? shortcuts : []).filter((s: SteamShortcut) => shortcutExists(s.appid));
+	// Among copies, the one UGI uses now (it has the pictures and the collections) is kept
+	const inUse = new Set(Object.values((await loadState()).imported).map((e) => e.appid));
+	const moved: Record<string, number> = {};
+	let games = 0;
+	for (const [id, entry] of Object.entries(state.imported)) {
+		try {
+			const matches = existing.filter((s) => sameShortcut(s, entry));
+			const kept = matches.find((s) => s.appid === entry.appid) ?? matches.find((s) => inUse.has(s.appid)) ?? matches[0];
+			for (const copy of matches) {
+				if (copy === kept) continue;
+				for (const type of [0, 1, 2, 3]) SteamClient.Apps.ClearCustomArtworkForApp(copy.appid, type);
+				SteamClient.Apps.RemoveShortcut(copy.appid);
+			}
+			const appid = kept ? kept.appid : await recreateShortcut(id, entry);
+			if (!kept) games++;
+			if (appid !== entry.appid) moved[String(entry.appid)] = appid;
+			entry.appid = appid;
+		} catch (err) {
+			console.error('[UGI] restore: cannot add', entry.name, err);
+		}
+	}
+
+	step('images');
+	const restoredFiles = json<{ files?: number; icons?: Record<string, string>; error?: string }>(
+		unquote(await backupRestore({ a_appids: JSON.stringify(moved), b_steam: JSON.stringify(customized) })),
+		{},
+	);
+	// The settings are only saved once the pictures are back
+	if (restoredFiles.error) throw new Error(restoredFiles.error);
+	for (const [appid, path] of Object.entries(restoredFiles.icons ?? {})) SteamClient.Apps.SetShortcutIcon(Number(appid), path);
+	for (const appid of customized) await customMark({ a_appid: appid });
+
+	step('collections');
+	// Collections and shelves deleted meanwhile are created again by the sync
+	if (state.settings.collections) await syncCollections(state);
+	// A restored UGI is set up already
+	state.onboarded = true;
+	await saveState(state);
+	setLanguage(state.settings.language);
+	return { games, files: restoredFiles.files ?? 0 };
+}
+
+// Before uninstalling: removes the imported games, UGI's collections and shelves, the artwork UGI
+// set on Steam games, its files and its settings
+export async function removeEverything(step: Step): Promise<{ games: number; apps: number }> {
+	const state = await loadState();
+
+	step('steamGames');
+	const apps = await customizedSteamApps(state);
+	await resetImages(apps, () => {}, { stop: false });
+
+	step('games');
+	let games = 0;
+	for (const entry of Object.values(state.imported)) {
+		if (!shortcutExists(entry.appid)) continue;
+		// The custom artwork files would stay behind in Steam's grid folder
+		for (const type of [0, 1, 2, 3]) SteamClient.Apps.ClearCustomArtworkForApp(entry.appid, type);
+		SteamClient.Apps.RemoveShortcut(entry.appid);
+		games++;
+	}
+
+	step('collections');
+	await removeCollections(state);
+
+	step('files');
+	await cleanup();
+	// A clean state: the next start (if the plugin is kept) is a first install
+	await saveState({ imported: {}, excluded: {}, store_kinds: {}, settings: { collections: false, shelves: false }, collections: {}, sgdb_ids: {}, custom_icons: {} });
+	return { games, apps: apps.length };
+}

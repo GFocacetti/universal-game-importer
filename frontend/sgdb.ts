@@ -15,6 +15,8 @@ const downloadSave = callable<[{ a_url: string; b_name: string }], string>('ugi_
 const missingImages = callable<[{ a_appids: string }], string>('ugi_missing_images');
 const iconApply = callable<[{ a_url: string; b_appid: number }], boolean>('ugi_icon_apply');
 const iconReset = callable<[{ a_appid: number }], boolean>('ugi_icon_reset');
+// Steam apps whose artwork UGI changed, so that removing UGI can put them back
+const customMark = callable<[{ a_appid: number }], boolean>('ugi_custom_mark');
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string; app_type?: number } | undefined };
 const SHORTCUT_APP_TYPE = 1073741824;
@@ -152,6 +154,7 @@ async function fetchBase64(url: string): Promise<string | null> {
 // Applies one SteamGridDB image to an app; returns false if it couldn't be downloaded
 export async function applyImage(appid: number, type: ImageType, url: string): Promise<boolean> {
 	const isShortcut = appStore.GetAppOverviewByAppID(appid)?.app_type === SHORTCUT_APP_TYPE;
+	if (!isShortcut) customMark({ a_appid: appid }).catch(() => {});
 	try {
 		if (type === 4) {
 			if (!Number(unquote(await download({ a_url: url })))) return false;

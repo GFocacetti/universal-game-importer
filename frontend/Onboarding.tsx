@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Backup, listBackups, pickBackup, readBackup, restoreBackup } from 'maintenance';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
 import ReviewDialog from 'ReviewDialog';
 import { runScan, ScanOutcome } from 'scanner';
 import { LAUNCHER_NAMES } from 'steamApps';
 
-type Step = 'welcome' | 'key' | 'keyWarning' | 'collections' | 'shelves' | 'scan' | 'review' | 'done';
+type Step = 'welcome' | 'key' | 'keyWarning' | 'collections' | 'shelves' | 'scan' | 'review' | 'done' | 'restored';
 const DOTS: Step[] = ['welcome', 'key', 'collections', 'scan', 'done'];
 
 export default function Onboarding({ onClose }: { onClose: () => void }) {
@@ -16,6 +17,33 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 	const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
 	const [added, setAdded] = useState(0);
 	const [error, setError] = useState('');
+	// Someone who used UGI before can take everything back from a backup instead of setting it up
+	const [latest, setLatest] = useState<Backup | null>(null);
+	const [restoring, setRestoring] = useState('');
+	const [restored, setRestored] = useState('');
+	useEffect(() => {
+		listBackups().then((list) => setLatest(list.files[0] ?? null)).catch(() => {});
+	}, []);
+
+	const restore = async (backup: Backup | null) => {
+		if (!backup) return;
+		setRestoring(t('maint.reading'));
+		try {
+			const content = await readBackup(backup.path);
+			if (!content) {
+				setRestoring('');
+				setRestored(t('maint.notBackup'));
+				return;
+			}
+			const out = await restoreBackup(content, (step) => setRestoring(t(`maint.step.${step}` as any)));
+			setRestored(t('maint.restoreDone', { games: out.games, files: out.files }));
+			setStep('restored');
+		} catch (err) {
+			console.error('[UGI] restore failed', err);
+			setRestored(t('maint.error'));
+		}
+		setRestoring('');
+	};
 
 	const finish = async () => {
 		const s = await loadState();
@@ -39,7 +67,7 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 		}
 	};
 
-	const dot = DOTS.indexOf(step === 'keyWarning' ? 'key' : step === 'shelves' ? 'collections' : step === 'review' ? 'scan' : step);
+	const dot = DOTS.indexOf(step === 'keyWarning' ? 'key' : step === 'shelves' ? 'collections' : step === 'review' ? 'scan' : step === 'restored' ? 'done' : step);
 
 	if (step === 'review' && outcome) {
 		return (
@@ -78,7 +106,32 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 						<p>{t('ob.welcomeText')}</p>
 						<p>{t('ob.supported')} {Object.values(LAUNCHER_NAMES).map((n) => <span key={n} className="ugi-tag">{n}</span>)}</p>
 						<p>{t('ob.minute')}</p>
-						<div className="ugi-foot"><button className="ugi-btn primary" onClick={() => setStep('key')}>{t('ob.start')}</button></div>
+						<div className="ugi-foot"><button className="ugi-btn primary" disabled={!!restoring} onClick={() => setStep('key')}>{t('ob.start')}</button></div>
+						<div className="ugi-card" style={{ marginTop: 18 }}>
+							<strong>{t('ob.restoreTitle')}</strong>
+							<p className="ugi-muted" style={{ margin: '4px 0 10px' }}>{t('ob.restoreText')}</p>
+							{restoring ? (
+								<div className="ugi-row-between"><span>{restoring}</span><div className="ugi-spinner" /></div>
+							) : (
+								<div className="ugi-row-between">
+									{latest ? (
+										<button className="ugi-btn secondary" onClick={() => restore(latest)}>{t('ob.restoreLatest', { name: latest.name })}</button>
+									) : (
+										<span className="ugi-muted">{t('ob.restoreNone')}</span>
+									)}
+									<span className="ugi-link" onClick={async () => restore(await pickBackup())}>{t('maint.pick')}</span>
+								</div>
+							)}
+							{restored && <p style={{ margin: '10px 0 0' }}>{restored}</p>}
+						</div>
+					</>
+				)}
+
+				{step === 'restored' && (
+					<>
+						<h2>{t('ob.restoredTitle')}</h2>
+						<p>{restored}</p>
+						<div className="ugi-foot"><button className="ugi-btn primary" onClick={onClose}>{t('common.close')}</button></div>
 					</>
 				)}
 

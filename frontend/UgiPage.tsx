@@ -10,14 +10,16 @@ import { runScan } from 'scanner';
 import { SyncPlan } from 'importer';
 import Onboarding from 'Onboarding';
 import { takePendingReview } from 'pending';
+import UninstallSection from 'UninstallSection';
 
-type Section = 'games' | 'launchers' | 'images' | 'settings';
+type Section = 'games' | 'launchers' | 'images' | 'settings' | 'uninstall';
 
 const SECTIONS: { id: Section; label: () => string }[] = [
 	{ id: 'games', label: () => t('nav.games') },
 	{ id: 'launchers', label: () => t('nav.launchers') },
 	{ id: 'images', label: () => t('nav.images') },
 	{ id: 'settings', label: () => t('nav.settings') },
+	{ id: 'uninstall', label: () => t('nav.uninstall') },
 ];
 
 function ApiKeyDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
@@ -124,6 +126,7 @@ export default function UgiPage() {
 					{state && section === 'games' && <GamesSection state={state} onChanged={reload} />}
 					{state && section === 'launchers' && <LaunchersSection state={state} onChanged={reload} />}
 					{state && section === 'images' && <ImagesSection state={state} onChanged={reload} />}
+					{state && section === 'uninstall' && <UninstallSection onChanged={reload} />}
 					{state && section === 'settings' && (
 						<SettingsSection
 							state={state}

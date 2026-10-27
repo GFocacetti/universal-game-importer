@@ -62,7 +62,8 @@ local function cache_path(key)
 end
 
 function ugi_info_load(a_key)
-    return utils.read_file(cache_path(a_key)) or ""
+    local path = cache_path(a_key)
+    return fs.exists(path) and (utils.read_file(path) or "") or ""
 end
 
 function ugi_info_save(a_key, b_json)

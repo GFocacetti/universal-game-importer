@@ -1,6 +1,6 @@
 import { Game, ImportedEntry, LauncherStatus, UgiState } from 'types';
 import { loadState, saveState } from 'backend';
-import { syncCollections, removeCollections } from 'collections';
+import { syncCollections } from 'collections';
 import { fillMissing } from 'sgdb';
 import { finishImages, startImages } from 'imagesProgress';
 
@@ -10,7 +10,7 @@ declare const appStore: { GetAppOverviewByAppID(appid: number): unknown };
 const quote = (path: string) => (path.startsWith('"') ? path : `"${path}"`);
 
 // A shortcut still exists in Steam (the user may have deleted it by hand)
-function shortcutExists(appid: number): boolean {
+export function shortcutExists(appid: number): boolean {
 	return !!appStore.GetAppOverviewByAppID(appid);
 }
 
@@ -128,18 +128,14 @@ async function fillInBackground(state: UgiState, appids: number[]) {
 	}
 }
 
-// Removes every shortcut UGI created (used by the test panel)
-export async function removeAll(): Promise<number> {
-	const state = await loadState();
-	let removed = 0;
-	for (const entry of Object.values(state.imported)) {
-		if (shortcutExists(entry.appid)) {
-			SteamClient.Apps.RemoveShortcut(entry.appid);
-			removed++;
-		}
-	}
-	state.imported = {};
-	await removeCollections(state);
-	await saveState(state);
-	return removed;
+// A game from a backup, added to Steam again; returns its appid
+export function recreateShortcut(id: string, entry: ImportedEntry): Promise<number> {
+	return addShortcut({
+		id,
+		launcher: entry.launcher,
+		name: entry.name,
+		exe: entry.exe ?? '',
+		start_dir: entry.start_dir ?? '',
+		launch_options: entry.launch_options ?? '',
+	});
 }
