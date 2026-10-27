@@ -6,14 +6,14 @@ import { UgiState } from 'types';
 
 // Description, developer, genres... of an imported game, for its library page.
 // Sources, first that knows the game: Steam store (same name), GOG (GOG id), Epic (store page
-// of the installed game), RAWG (needs the user's key).
+// of the installed game), Microsoft Store (package of the installed Xbox game), RAWG (needs the user's key).
 const httpGet = callable<[{ a_url: string }], string>('ugi_http_get');
 const epicNamespace = callable<[{ a_app_name: string; b_dir: string }], string>('ugi_epic_namespace');
 const cacheLoad = callable<[{ a_key: string }], string>('ugi_info_load');
 const cacheSave = callable<[{ a_key: string; b_json: string }], boolean>('ugi_info_save');
 
 export type GameInfo = {
-	source: 'steam' | 'gog' | 'epic' | 'rawg';
+	source: 'steam' | 'gog' | 'epic' | 'microsoft' | 'rawg';
 	// Page of the game on the source site
 	url: string;
 	summary: string;
@@ -50,7 +50,7 @@ export type Requirement = { label: string; value: string };
 type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
-const CACHE_VERSION = 13;
+const CACHE_VERSION = 14;
 
 type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
 
@@ -304,6 +304,43 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 	};
 }
 
+// Microsoft Store catalog entry of an installed Xbox game; the id is "<package family>!<app>"
+async function microsoftProduct(id: string, locale: string): Promise<any | null> {
+	const family = id.split('!')[0] ?? '';
+	const market = locale === 'it' ? 'market=IT&languages=it-IT,en-US' : 'market=US&languages=en-US';
+	try {
+		const res = await fetch(`https://displaycatalog.mp.microsoft.com/v7.0/products/lookup?${market}&alternateId=PackageFamilyName&fieldsTemplate=details&value=${encodeURIComponent(family)}`);
+		return res.ok ? ((await res.json())?.Products?.[0] ?? null) : null;
+	} catch {
+		return null;
+	}
+}
+
+async function fromMicrosoft(id: string, locale: string): Promise<GameInfo | null> {
+	const p = await microsoftProduct(id, locale);
+	const l = p?.LocalizedProperties?.[0];
+	const description = tidy(String(l?.ProductDescription ?? '').replace(/\r/g, ''));
+	if (!description) return null;
+	// Image addresses come without the scheme; the "w" parameter asks for a smaller copy
+	const image = (i: any, width?: number) => `https:${i.Uri}${width ? `?w=${width}` : ''}`;
+	const images: any[] = l.Images ?? [];
+	const hero = images.find((i) => i.ImagePurpose === 'TitledHeroArt') ?? images.find((i) => i.ImagePurpose === 'SuperHeroArt');
+	const pegi = (p.MarketProperties?.[0]?.ContentRatings ?? []).find((r: any) => r?.RatingSystem === 'PEGI');
+	return {
+		source: 'microsoft',
+		url: `https://apps.microsoft.com/detail/${p.ProductId}`,
+		summary: tidy(String(l.ShortDescription ?? '').replace(/\r/g, '')).split('\n\n')[0] || firstParagraph(description),
+		description,
+		developers: l.DeveloperName ? [l.DeveloperName] : [],
+		publishers: l.PublisherName ? [l.PublisherName] : [],
+		genres: (p.Properties?.Categories ?? (p.Properties?.Category ? [p.Properties.Category] : [])).filter(Boolean),
+		released: storeDate(p.MarketProperties?.[0]?.OriginalReleaseDate, locale),
+		header: hero ? image(hero, 920) : undefined,
+		screenshots: images.filter((i) => i.ImagePurpose === 'Screenshot').map((i) => ({ thumb: image(i, 640), full: image(i, 1920) })),
+		age: pegi?.RatingId ? { label: String(pegi.RatingId).replace(':', ' ') } : undefined,
+	};
+}
+
 let epicSlugs: Record<string, string> | null = null;
 
 // Store page name of an installed Epic game, from its manifest and Epic's own namespace map
@@ -404,15 +441,8 @@ async function launcherStore(state: UgiState, launcher: string, id: string): Pro
 			return url ? { name: 'GOG', url } : null;
 		}
 		case 'xbox': {
-			// Same Microsoft Store catalog as the game / app check; the id is "<package family>!<app>"
-			const family = id.split('!')[0] ?? '';
-			try {
-				const res = await fetch(`https://displaycatalog.mp.microsoft.com/v7.0/products/lookup?market=US&languages=en-US&alternateId=PackageFamilyName&fieldsTemplate=browse&value=${encodeURIComponent(family)}`);
-				const product = res.ok ? (await res.json())?.Products?.[0]?.ProductId : null;
-				return product ? { name: 'Microsoft Store', url: `https://apps.microsoft.com/detail/${product}` } : null;
-			} catch {
-				return null;
-			}
+			const product = (await microsoftProduct(id, 'en'))?.ProductId;
+			return product ? { name: 'Microsoft Store', url: `https://apps.microsoft.com/detail/${product}` } : null;
 		}
 		case 'battlenet': {
 			const product = BATTLENET_PRODUCTS[id];
@@ -429,6 +459,7 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 		(await fromSteam(name, locale)) ??
 		(launcher === 'gog' ? await fromGog(id, locale) : null) ??
 		(launcher === 'epic' ? await fromEpic(id, state.settings.launchers?.epic?.path ?? '', locale) : null) ??
+		(launcher === 'xbox' ? await fromMicrosoft(id, locale) : null) ??
 		(state.settings.rawg_key ? await fromRawg(name, state.settings.rawg_key, locale) : null);
 	if (!info) return null;
 	const own = await launcherStore(state, launcher ?? '', id).catch(() => null);

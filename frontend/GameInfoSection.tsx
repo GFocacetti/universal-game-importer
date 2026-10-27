@@ -13,7 +13,7 @@ import { imageUrls, openUrl } from 'steamApps';
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 declare const MainWindowBrowserManager: { m_lastLocation?: { pathname?: string } } | undefined;
 
-const SOURCE_NAMES: Record<GameInfo['source'], string> = { steam: 'Steam', gog: 'GOG', epic: 'Epic Games Store', rawg: 'RAWG' };
+const SOURCE_NAMES: Record<GameInfo['source'], string> = { steam: 'Steam', gog: 'GOG', epic: 'Epic Games Store', microsoft: 'Microsoft Store', rawg: 'RAWG' };
 
 // Laid out like a Steam store page: media player and summary across the whole page on top; below,
 // description and system requirements on the left, and features, languages, age rating and Metacritic
