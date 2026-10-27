@@ -1,3 +1,4 @@
+import { Focusable } from '@steambrew/client';
 import React, { useEffect, useState } from 'react';
 import { loadState, saveState } from 'backend';
 import { relativeTime, t } from 'i18n';
@@ -12,7 +13,8 @@ import Onboarding from 'Onboarding';
 import { takePendingReview } from 'pending';
 import UninstallSection from 'UninstallSection';
 import { openUrl } from 'steamApps';
-import { bigPicture } from 'location';
+import { bigPicture, gamepadDocument } from 'location';
+import { watchGamepad } from 'gamepad';
 
 // Big Picture draws its top bar (search, clock) and its button hints over the page: keep the page between them
 const BIG_PICTURE_BARS: React.CSSProperties = { paddingTop: 40, paddingBottom: 40, boxSizing: 'border-box' };
@@ -77,6 +79,7 @@ export default function UgiPage() {
 		// New games announced by the notice
 		const pending = takePendingReview();
 		if (pending) setPlan(pending);
+		if (bigPicture()) watchGamepad(gamepadDocument());
 	}, []);
 
 	const scanNow = async () => {
@@ -98,7 +101,7 @@ export default function UgiPage() {
 		? `${state.last_launchers.filter((l) => l.enabled !== false && l.installed !== false).length}/${state.last_launchers.length}`
 		: '';
 
-	return (
+	const page = (
 		<div className="ugi-root" style={{ ...(themeStyle(theme) as React.CSSProperties), ...(bigPicture() ? BIG_PICTURE_BARS : {}) }}>
 			<style>{UGI_CSS}</style>
 			<nav className="ugi-side">
@@ -173,5 +176,13 @@ export default function UgiPage() {
 				/>
 			)}
 		</div>
+	);
+	// In Big Picture the page holds Steam's gamepad focus, so the controller buttons reach it (see gamepad.ts)
+	return bigPicture() ? (
+		<Focusable onActivate={() => {}} noFocusRing style={{ height: '100%' }}>
+			{page}
+		</Focusable>
+	) : (
+		page
 	);
 }

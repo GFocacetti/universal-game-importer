@@ -1,0 +1,170 @@
+// Controller navigation for UGI's own layers in Big Picture.
+// Steam moves its gamepad focus only between its own components; UGI's page, gallery and dialogs are
+// plain HTML. Steam sends every controller button to the element it has focused as a "vgp_onbuttondown"
+// event; while a UGI layer is on screen the event is caught first and handled here: the D-pad moves a
+// highlight between the clickable elements of the topmost layer, A clicks, B closes the topmost dialog.
+
+// Button codes of Steam's gamepad events
+const OK = 1;
+const CANCEL = 2;
+const BUMPER_LEFT = 5;
+const BUMPER_RIGHT = 6;
+const UP = 9;
+const DOWN = 10;
+const LEFT = 11;
+const RIGHT = 12;
+
+const FOCUS = 'ugi-pad';
+const NATIVE = 'button, input, select, textarea, summary, a[href]';
+const watched = new WeakSet<Document>();
+
+// On screen: hidden elements have no box (offsetParent can't be used, Big Picture's pages are fixed-position)
+const visible = (el: Element): boolean => {
+	const r = el.getBoundingClientRect();
+	return r.width > 0 && r.height > 0 && el.ownerDocument.defaultView!.getComputedStyle(el).visibility !== 'hidden';
+};
+
+// The topmost UGI layer: an open dialog, the gallery, else the UGI page
+function activeLayer(doc: Document): HTMLElement | null {
+	const overlays = [...doc.querySelectorAll<HTMLElement>('.ugi-overlay')].filter(visible);
+	if (overlays.length) return overlays[overlays.length - 1]!;
+	return [...doc.querySelectorAll<HTMLElement>('.ugi-root')].find(visible) ?? null;
+}
+
+const clickable = (el: Element, win: Window): boolean =>
+	(el.matches(NATIVE) && !(el as HTMLButtonElement).disabled) || win.getComputedStyle(el).cursor === 'pointer';
+
+// The clickable elements of a layer; an element inside another clickable one (a checkbox in its label) is left out
+function targets(layer: HTMLElement): HTMLElement[] {
+	const win = layer.ownerDocument.defaultView!;
+	const found: HTMLElement[] = [];
+	const walk = (el: Element) => {
+		for (const child of el.children) {
+			if (clickable(child, win) && visible(child)) found.push(child as HTMLElement);
+			else walk(child);
+		}
+	};
+	walk(layer);
+	return found;
+}
+
+// The nearest target in the given direction, favouring the ones in line with the current one
+function nearest(from: HTMLElement, list: HTMLElement[], dir: number): HTMLElement | undefined {
+	const a = from.getBoundingClientRect();
+	const ax = a.left + a.width / 2;
+	const ay = a.top + a.height / 2;
+	let best: HTMLElement | undefined;
+	let bestScore = Infinity;
+	for (const el of list) {
+		if (el === from) continue;
+		const b = el.getBoundingClientRect();
+		const bx = b.left + b.width / 2;
+		const by = b.top + b.height / 2;
+		const along = dir === UP ? a.top - b.bottom : dir === DOWN ? b.top - a.bottom : dir === LEFT ? a.left - b.right : b.left - a.right;
+		const across = dir === UP || dir === DOWN ? Math.abs(bx - ax) : Math.abs(by - ay);
+		// Only elements beyond the current one's edge (a little overlap is allowed)
+		if (along < -4) continue;
+		const score = Math.max(along, 0) + across * 3;
+		if (score < bestScore) {
+			bestScore = score;
+			best = el;
+		}
+	}
+	return best;
+}
+
+function setFocus(doc: Document, el: HTMLElement) {
+	doc.querySelectorAll(`.${FOCUS}`).forEach((old) => old.classList.remove(FOCUS));
+	el.classList.add(FOCUS);
+	el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+	const active = doc.activeElement as HTMLElement | null;
+	if (active && active !== el && active.matches('input, textarea')) active.blur();
+}
+
+// Picks the previous or next option of a select, the way a user choice would
+function stepSelect(select: HTMLSelectElement, step: number) {
+	const index = select.selectedIndex + step;
+	if (index < 0 || index >= select.options.length) return;
+	const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(select), 'value')?.set;
+	setter?.call(select, select.options[index]!.value);
+	select.dispatchEvent(new (select.ownerDocument.defaultView!.Event)('change', { bubbles: true }));
+}
+
+function onButton(doc: Document, evt: Event) {
+	const button = (evt as CustomEvent<{ button: number }>).detail?.button;
+	const layer = activeLayer(doc);
+	if (!layer) return;
+	const list = targets(layer);
+	if (!list.length) return;
+	let current = doc.querySelector<HTMLElement>(`.${FOCUS}`);
+	if (current && !list.includes(current)) current = null;
+	let handled = true;
+
+	switch (button) {
+		case UP:
+		case DOWN:
+		case LEFT:
+		case RIGHT: {
+			if (current?.tagName === 'SELECT' && (button === LEFT || button === RIGHT)) {
+				stepSelect(current as HTMLSelectElement, button === LEFT ? -1 : 1);
+				break;
+			}
+			// First press: start from the selected section, else the first element
+			const next = current ? nearest(current, list, button) : (list.find((el) => el.classList.contains('on')) ?? list[0]);
+			if (next) setFocus(doc, next);
+			break;
+		}
+		case OK:
+			if (!current) {
+				if (list[0]) setFocus(doc, list[0]);
+			} else if (current.matches('input:not([type=checkbox]):not([type=radio]), textarea')) current.focus();
+			else if (current.tagName === 'SELECT') stepSelect(current as HTMLSelectElement, 1);
+			else current.click();
+			break;
+		case CANCEL: {
+			const active = doc.activeElement as HTMLElement | null;
+			if (active?.matches('input, textarea')) active.blur();
+			// The dialog's backdrop closes it, like a click outside; on the page itself B goes back as usual
+			else if (layer.classList.contains('ugi-overlay')) layer.click();
+			else handled = false;
+			break;
+		}
+		case BUMPER_LEFT:
+		case BUMPER_RIGHT: {
+			// Previous / next section (or image type in the gallery)
+			const tabs = list.filter((el) => el.classList.contains('ugi-nav'));
+			const at = tabs.findIndex((el) => el.classList.contains('on'));
+			const tab = tabs[at + (button === BUMPER_LEFT ? -1 : 1)];
+			if (tab) {
+				tab.click();
+				doc.querySelectorAll(`.${FOCUS}`).forEach((old) => old.classList.remove(FOCUS));
+			}
+			break;
+		}
+		default:
+			handled = false;
+	}
+	if (handled) {
+		evt.stopPropagation();
+		evt.preventDefault();
+	}
+}
+
+// Listens in the given window (Big Picture's); safe to call more than once
+export function watchGamepad(doc: Document | undefined) {
+	if (!doc || watched.has(doc)) return;
+	watched.add(doc);
+	doc.addEventListener('vgp_onbuttondown', (evt) => onButton(doc, evt), true);
+	// The release of a handled button must not reach Steam either
+	doc.addEventListener(
+		'vgp_onbuttonup',
+		(evt) => {
+			const button = (evt as CustomEvent<{ button: number }>).detail?.button;
+			if (activeLayer(doc) && [OK, UP, DOWN, LEFT, RIGHT, BUMPER_LEFT, BUMPER_RIGHT].includes(button)) {
+				evt.stopPropagation();
+				evt.preventDefault();
+			}
+		},
+		true,
+	);
+}

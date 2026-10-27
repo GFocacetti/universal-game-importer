@@ -55,6 +55,7 @@ export function themeStyle(theme: ThemeName): Record<string, string> {
 
 // Shared component styles, all built on the tokens above
 export const UGI_CSS = `
+.ugi-pad { outline: 2px solid var(--ugi-primary) !important; outline-offset: 2px; }
 .ugi-root { position: relative; width: 100%; height: 100%; display: flex; background: var(--ugi-bg); color: var(--ugi-text); font-family: var(--ugi-font); }
 .ugi-side { width: 210px; flex: none; background: var(--ugi-side); padding: 18px 10px; display: flex; flex-direction: column; gap: 4px; }
 .ugi-brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 16px; }

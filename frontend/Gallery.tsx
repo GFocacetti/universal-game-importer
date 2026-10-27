@@ -7,7 +7,8 @@ import { ImageKind, openUrl } from 'steamApps';
 import { SteamImage } from 'SteamImage';
 import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
-import { libraryVisible } from 'location';
+import { bigPicture, libraryVisible } from 'location';
+import { watchGamepad } from 'gamepad';
 
 const TYPES: { type: ImageType; kind: ImageKind; label: () => string }[] = [
 	{ type: 0, kind: 'grid', label: () => t('image.grid') },
@@ -207,6 +208,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 // Opens the gallery over Steam in the given window (the one where the click happened)
 export async function openGallery(appid: number, name: string, doc: Document, onClosed?: () => void) {
 	const theme = (await loadState()).settings.theme ?? 'steam';
+	if (bigPicture()) watchGamepad(doc);
 	const host = doc.createElement('div');
 	Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '9999' });
 	Object.entries(themeStyle(theme)).forEach(([k, v]) => host.style.setProperty(k, v));
