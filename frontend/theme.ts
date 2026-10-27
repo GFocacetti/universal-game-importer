@@ -76,6 +76,7 @@ export const UGI_CSS = `
 .ugi-apibar b { color: var(--ugi-warn); }
 .ugi-apibar .go { margin-left: auto; color: var(--ugi-warn); font-weight: 600; white-space: nowrap; }
 .ugi-content { flex: 1; overflow: auto; padding: 16px 22px 22px; }
+.ugi-credit { flex: none; padding: 10px 22px; text-align: center; font-size: 13px; color: var(--ugi-muted); border-top: 1px solid var(--ugi-panel-border); }
 .ugi-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 10; }
 .ugi-dialog { width: 620px; max-width: calc(100% - 32px); background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius-lg); padding: 24px 28px; }
 .ugi-dialog h2 { margin: 0 0 10px; color: var(--ugi-head); font-weight: 500; }

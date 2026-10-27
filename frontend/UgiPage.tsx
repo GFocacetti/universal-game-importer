@@ -135,6 +135,10 @@ export default function UgiPage() {
 						/>
 					)}
 				</div>
+				{/* Credits: a fixed bar under every section */}
+				<footer className="ugi-credit">
+					Made with ❤️ by <span className="ugi-link" onClick={() => (SteamClient as any).System?.OpenInSystemBrowser?.('https://github.com/GFocacetti')}>Ryu</span>
+				</footer>
 			</section>
 			{keyDialog && (
 				<ApiKeyDialog
