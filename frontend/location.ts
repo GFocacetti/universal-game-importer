@@ -18,7 +18,7 @@ export function bigPicture(): boolean {
 }
 
 // The Big Picture window, while it is open
-function gamepadWindow(): any {
+export function gamepadWindow(): any {
 	return bigPicture() ? (Router as any)?.WindowStore?.GamepadUIMainWindowInstance : undefined;
 }
 

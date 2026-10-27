@@ -56,6 +56,11 @@ export function themeStyle(theme: ThemeName): Record<string, string> {
 // Shared component styles, all built on the tokens above
 export const UGI_CSS = `
 .ugi-pad { outline: 2px solid var(--ugi-primary) !important; outline-offset: 2px; }
+.ugi-overlay.ugi-picker { position: fixed; display: block; background: transparent; z-index: 10000; }
+.ugi-picker-list { position: fixed; overflow-y: auto; padding: 4px; background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.ugi-picker-item { padding: 8px 12px; border-radius: var(--ugi-radius); cursor: pointer; white-space: nowrap; font-size: 14px; }
+.ugi-picker-item.on { color: var(--ugi-primary); }
+.ugi-picker-item:hover { background: var(--ugi-chip); }
 .ugi-root { position: relative; width: 100%; height: 100%; display: flex; background: var(--ugi-bg); color: var(--ugi-text); font-family: var(--ugi-font); }
 .ugi-side { width: 210px; flex: none; background: var(--ugi-side); padding: 18px 10px; display: flex; flex-direction: column; gap: 4px; }
 .ugi-brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 16px; }
