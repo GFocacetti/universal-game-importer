@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { loadState } from 'backend';
 import { t } from 'i18n';
-import { Backup, exportBackup, listBackups, openBackupFolder, pickBackup, readBackup, removalSummary, removeEverything, restoreBackup } from 'maintenance';
+import { Backup, CancelFlag, deleteBackup, exportBackup, listBackups, openBackupFolder, pickBackup, readBackup, removalSummary, removeEverything, restoreBackup } from 'maintenance';
 
 // "Backup and uninstall": a .zip backup of everything UGI keeps, and the removal of all it did
 // before the plugin is uninstalled. Both changes are confirmed first.
@@ -17,7 +17,7 @@ function ConfirmDialog({ confirm, onClose }: { confirm: Confirm; onClose: () => 
 			<div className="ugi-dialog" onClick={(e) => e.stopPropagation()}>
 				<h2>{confirm.title}</h2>
 				<p>{confirm.text}</p>
-				<ul className="ugi-muted">{confirm.lines.map((line) => <li key={line}>{line}</li>)}</ul>
+				{confirm.lines.length > 0 && <ul className="ugi-muted">{confirm.lines.map((line) => <li key={line}>{line}</li>)}</ul>}
 				<div className="ugi-foot">
 					<button className="ugi-btn secondary" onClick={onClose}>{t('common.cancel')}</button>
 					<button
@@ -40,6 +40,8 @@ export default function UninstallSection({ onChanged }: { onChanged: () => void 
 	const [busy, setBusy] = useState('');
 	const [result, setResult] = useState('');
 	const [confirm, setConfirm] = useState<Confirm | null>(null);
+	// Set while a backup is being made: "Stop" cancels it
+	const [backupFlag, setBackupFlag] = useState<CancelFlag | null>(null);
 
 	const refresh = () => listBackups().then(setBackups).catch(() => {});
 	useEffect(() => {
@@ -62,8 +64,24 @@ export default function UninstallSection({ onChanged }: { onChanged: () => void 
 
 	const create = () =>
 		run(t('maint.backupBusy'), async () => {
-			const out = await exportBackup();
-			return out.path ? t('maint.backupDone', { path: out.path }) : t('maint.error');
+			const flag: CancelFlag = { cancel: false };
+			setBackupFlag(flag);
+			try {
+				const out = await exportBackup(flag);
+				return out.cancelled ? t('maint.backupCancelled') : out.path ? t('maint.backupDone', { path: out.path }) : t('maint.error');
+			} finally {
+				setBackupFlag(null);
+			}
+		});
+
+	const askDelete = (backup: Backup) =>
+		setConfirm({
+			title: t('maint.deleteTitle'),
+			text: t('maint.deleteText', { name: backup.name }),
+			lines: [],
+			button: t('maint.deleteButton'),
+			danger: true,
+			run: () => run(t('maint.deleteBusy'), async () => ((await deleteBackup(backup.path)) ? t('maint.deleteDone', { name: backup.name }) : t('maint.error'))),
 		});
 
 	const askRestore = (backup: Backup) =>
@@ -114,7 +132,13 @@ export default function UninstallSection({ onChanged }: { onChanged: () => void 
 		<>
 			{busy && (
 				<div className="ugi-card">
-					<div className="ugi-row-between"><strong>{busy}</strong><div className="ugi-spinner" /></div>
+					<div className="ugi-row-between">
+						<strong>{busy}</strong>
+						<span className="ugi-row-between" style={{ gap: 12 }}>
+							{backupFlag && <button className="ugi-btn secondary" onClick={() => (backupFlag.cancel = true)}>{t('maint.stop')}</button>}
+							<div className="ugi-spinner" />
+						</span>
+					</div>
 				</div>
 			)}
 			{result && <div className="ugi-card">{result}</div>}
@@ -133,7 +157,10 @@ export default function UninstallSection({ onChanged }: { onChanged: () => void 
 				{backups.files.map((backup) => (
 					<div key={backup.path} className="ugi-row-between" style={{ padding: '6px 0' }}>
 						<span>{backup.name}</span>
-						<button className="ugi-btn secondary" disabled={!!busy} onClick={() => askRestore(backup)}>{t('maint.restoreButton')}</button>
+						<span className="ugi-row-between" style={{ gap: 8 }}>
+							<button className="ugi-btn secondary" disabled={!!busy} onClick={() => askRestore(backup)}>{t('maint.restoreButton')}</button>
+							<button className="ugi-btn danger" disabled={!!busy} onClick={() => askDelete(backup)}>{t('maint.deleteButton')}</button>
+						</span>
 					</div>
 				))}
 			</div>

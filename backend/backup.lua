@@ -42,52 +42,147 @@ local function staging(name)
     return dir
 end
 
--- Artwork files of one app in a grid folder (by name: "<appid>p.png", "<appid>_logo.json"...)
-local function artwork_files(grid, appid)
-    local wanted = {}
-    for _, suffix in ipairs(SUFFIXES) do wanted[appid .. suffix] = true end
-    local files = {}
-    for _, entry in ipairs(fs.list(grid) or {}) do
-        if entry.is_file and wanted[fs.stem(entry.path)] then files[#files + 1] = entry end
+-- ---------- Background jobs ----------
+-- Zipping, unzipping and copying hundreds of MB take longer than a backend call may last: they run
+-- in a hidden PowerShell started on its own, and the frontend asks for their state until they end.
+
+local function job_marker(name)
+    return fs.join(paths.data_dir(), name .. "_done.txt")
+end
+
+local function job_pid(name)
+    return fs.join(paths.data_dir(), name .. "_pid.txt")
+end
+
+-- Created by ugi_job_cancel: the job checks it between steps and stops by itself
+local function job_stop(name)
+    return fs.join(paths.data_dir(), name .. "_stop.txt")
+end
+
+-- Progress of backups and restores, in data/frontend.log next to the frontend's own notes
+local function note(message)
+    local f = io.open(fs.join(paths.data_dir(), "frontend.log"), "a")
+    if f then
+        f:write(os.date("%Y-%m-%d %H:%M:%S "), message, "\n")
+        f:close()
     end
-    return files
+end
+
+-- cleanup: PowerShell lines run when the job fails (and by ugi_job_cancel's own clean-up)
+local function start_job(name, body, cleanup)
+    local dir = paths.data_dir()
+    local marker = job_marker(name)
+    if fs.exists(marker) then fs.remove(marker) end
+    if fs.exists(job_stop(name)) then fs.remove(job_stop(name)) end
+    local script = fs.join(dir, name .. "_job.ps1")
+    utils.write_file(script, table.concat({
+        "$ErrorActionPreference = 'Stop'",
+        "$PID | Out-File -FilePath " .. ps_quote(job_pid(name)) .. " -Encoding ascii",
+        -- Called between steps: a requested stop ends the job like an error, with its clean-up
+        "function Check-Stop { if (Test-Path -LiteralPath " .. ps_quote(job_stop(name)) .. ") { throw 'cancelled' } }",
+        "try {",
+        body,
+        "  Check-Stop",
+        "  'ok' | Out-File -FilePath " .. ps_quote(marker) .. " -Encoding utf8",
+        "} catch {",
+        "  $failure = $_.Exception.Message",
+        cleanup or "",
+        "  $result = if ($failure -eq 'cancelled') { 'cancelled' } else { 'error: ' + $failure }",
+        "  $result | Out-File -FilePath " .. ps_quote(marker) .. " -Encoding utf8",
+        "}",
+    }, "\n"))
+    -- Start-Process makes a separate process that shares no handles with this one: the call returns at
+    -- once (a plain "start" kept the backend waiting until the job ended)
+    common.run_powershell_json("job_start", string.format(
+        "Start-Process -FilePath %s -ArgumentList '-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File \"%s\"' -WindowStyle Hidden; ConvertTo-Json @('ok')",
+        ps_quote(common.POWERSHELL), script))
+end
+
+-- "running", "ok" or "error: ..."
+function ugi_job_status(a_name)
+    local marker = job_marker(tostring(a_name))
+    if not fs.exists(marker) then return "running" end
+    local text = (utils.read_file(marker) or ""):gsub("^\239\187\191", ""):gsub("%s+$", "")
+    return text ~= "" and text or "running"
+end
+
+-- Stops a job and removes what it left half done (its "cleanup" paths)
+local JOB_LEFTOVERS = {}
+
+function ugi_job_cancel(a_name)
+    local name = tostring(a_name)
+    -- First the stop request (the job sees it between files); then the process is ended, for the
+    -- long single steps like zipping
+    utils.write_file(job_stop(name), "stop")
+    local pid_path = job_pid(name)
+    local pid = fs.exists(pid_path) and tonumber(((utils.read_file(pid_path) or ""):gsub("%D", ""))) or nil
+    if pid then
+        local out = common.run_powershell_json("job_cancel", string.format(
+            "Stop-Process -Id %d -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; ConvertTo-Json @([bool](Get-Process -Id %d -ErrorAction SilentlyContinue))",
+            pid, pid))
+        note(name .. " cancelled, process " .. pid .. (out[1] and " still running" or " ended"))
+    end
+    for _, path in ipairs(JOB_LEFTOVERS[name] or {}) do
+        if fs.exists(path) then
+            if fs.is_directory(path) then fs.remove_all(path) else fs.remove(path) end
+        end
+    end
+    utils.write_file(job_marker(name), "cancelled")
+    return true
+end
+
+local function ps_list(items)
+    local quoted = {}
+    for _, item in ipairs(items) do quoted[#quoted + 1] = ps_quote(item) end
+    return "@(" .. table.concat(quoted, ",\n") .. ")"
 end
 
 -- a_state: UGI's state as JSON; b_appids: JSON list of the apps whose artwork goes in the backup.
--- Returns {"path": "...zip"} or {"error": "..."}
+-- Starts the "backup" job; returns {"path": "...zip", "files": n} or {"error": "..."}
 function ugi_backup_export(a_state, b_appids)
     local ok, result = pcall(function()
         local ok_ids, appids = pcall(cjson.decode, b_appids or "[]")
-        if not ok_ids or type(appids) ~= "table" then appids = {} end
+        local wanted = {}
+        for _, appid in ipairs(ok_ids and type(appids) == "table" and appids or {}) do
+            for _, suffix in ipairs(SUFFIXES) do wanted[tostring(appid) .. suffix] = true end
+        end
         local dir = staging("backup")
         utils.write_file(fs.join(dir, "state.json"), tostring(a_state))
 
-        local grid_out = fs.join(dir, "grid")
-        fs.create_directories(grid_out)
-        local count = 0
+        -- One pass over Steam's grid folder (it can hold thousands of files)
+        local files, seen = {}, {}
         for _, grid in ipairs(grid_dirs()) do
-            for _, appid in ipairs(appids) do
-                for _, entry in ipairs(artwork_files(grid, tostring(appid))) do
-                    local target = fs.join(grid_out, entry.name)
-                    if not fs.exists(target) then
-                        fs.copy(entry.path, target)
-                        count = count + 1
-                    end
+            for _, entry in ipairs(fs.list(grid) or {}) do
+                if entry.is_file and wanted[fs.stem(entry.path)] and not seen[entry.name] then
+                    seen[entry.name] = true
+                    files[#files + 1] = entry.path
                 end
             end
         end
-        local icons = fs.join(paths.data_dir(), "icons")
-        if fs.exists(icons) then fs.copy_recursive(icons, fs.join(dir, "icons")) end
 
         local zip = fs.join(backup_dir(), "UGI-backup-" .. os.date("%Y-%m-%d_%H-%M") .. ".zip")
-        if fs.exists(zip) then fs.remove(zip) end
-        common.run_powershell_json("backup_zip", string.format(
-            "Compress-Archive -Path (Join-Path %s '*') -DestinationPath %s -Force; ConvertTo-Json @('ok')",
-            ps_quote(dir), ps_quote(zip)))
-        fs.remove_all(dir)
-        if not fs.exists(zip) then error("zip not created") end
-        logger:info("backup: " .. zip .. " (" .. count .. " artwork files)")
-        return { path = zip, files = count }
+        -- Built under a temporary name and moved next to the other backups only when complete,
+        -- so a half-made backup never shows up nor can be restored
+        local partial = fs.join(paths.data_dir(), "backup_partial.zip")
+        local icons = fs.join(paths.data_dir(), "icons")
+        JOB_LEFTOVERS.backup = { dir, partial }
+        start_job("backup", table.concat({
+            "  $dir = " .. ps_quote(dir),
+            "  $grid = Join-Path $dir 'grid'",
+            "  New-Item -ItemType Directory -Path $grid -Force | Out-Null",
+            "  foreach ($f in " .. ps_list(files) .. ") { Check-Stop; Copy-Item -LiteralPath $f -Destination $grid -Force }",
+            "  if (Test-Path -LiteralPath " .. ps_quote(icons) .. ") { Copy-Item -LiteralPath " .. ps_quote(icons) .. " -Destination (Join-Path $dir 'icons') -Recurse -Force }",
+            "  if (Test-Path -LiteralPath " .. ps_quote(partial) .. ") { Remove-Item -LiteralPath " .. ps_quote(partial) .. " -Force }",
+            "  Compress-Archive -Path (Join-Path $dir '*') -DestinationPath " .. ps_quote(partial),
+            "  Check-Stop",
+            "  Move-Item -LiteralPath " .. ps_quote(partial) .. " -Destination " .. ps_quote(zip) .. " -Force",
+            "  Remove-Item -LiteralPath $dir -Recurse -Force",
+        }, "\n"), table.concat({
+            "  Remove-Item -LiteralPath " .. ps_quote(partial) .. " -Force -ErrorAction SilentlyContinue",
+            "  Remove-Item -LiteralPath " .. ps_quote(dir) .. " -Recurse -Force -ErrorAction SilentlyContinue",
+        }, "\n"))
+        logger:info("backup started: " .. zip .. " (" .. #files .. " artwork files)")
+        return { path = zip, files = #files }
     end)
     if not ok then
         logger:error("backup failed: " .. tostring(result))
@@ -107,6 +202,16 @@ function ugi_backup_list()
     end
     table.sort(files, function(a, b) return a.name > b.name end)
     return cjson.encode({ dir = dir, files = files })
+end
+
+-- Moves a backup to the Recycle Bin (it can still be taken back from there)
+function ugi_backup_delete(a_zip)
+    local zip = tostring(a_zip)
+    if not zip:lower():match("%.zip$") or not fs.exists(zip) then return false end
+    common.run_powershell_json("backup_delete", string.format(
+        "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(%s, 'OnlyErrorDialogs', 'SendToRecycleBin'); ConvertTo-Json @('ok')",
+        ps_quote(zip)))
+    return not fs.exists(zip)
 end
 
 -- Lets the user pick a backup file anywhere (Windows' own dialog, above Steam); "" if cancelled
@@ -131,84 +236,24 @@ ConvertTo-Json @($picked) | Out-File -FilePath %s -Encoding utf8
     return ok and type(list) == "table" and tostring(list[1] or "") or ""
 end
 
--- Unpacks a backup and returns its state.json ("" if it isn't a UGI backup)
+-- Starts the "unzip" job for a backup; ugi_backup_state then reads what it holds
 function ugi_backup_open(a_zip)
     local dir = staging("restore")
-    common.run_powershell_json("backup_unzip", string.format(
-        "Expand-Archive -LiteralPath %s -DestinationPath %s -Force; ConvertTo-Json @('ok')",
-        ps_quote(a_zip), ps_quote(dir)))
-    local state = fs.join(dir, "state.json")
-    return fs.exists(state) and (utils.read_file(state) or "") or ""
-end
-
--- Binary-safe copy (the same way downloads are written); returns true when written
-local function copy_file(from, to)
-    local input = io.open(from, "rb")
-    if not input then return false end
-    local data = input:read("*a")
-    input:close()
-    local output = io.open(to, "wb")
-    if not output then return false end
-    output:write(data)
-    output:close()
+    start_job("unzip", "  Expand-Archive -LiteralPath " .. ps_quote(a_zip) .. " -DestinationPath " .. ps_quote(dir) .. " -Force")
     return true
 end
 
--- Progress of a restore, in data/frontend.log next to the frontend's own notes
-local function note(message)
-    local f = io.open(fs.join(paths.data_dir(), "frontend.log"), "a")
-    if f then
-        f:write(os.date("%Y-%m-%d %H:%M:%S "), "restore: ", message, "\n")
-        f:close()
-    end
+-- The unpacked backup's state.json ("" if it isn't a UGI backup)
+function ugi_backup_state()
+    local state = fs.join(paths.data_dir(), "restore", "state.json")
+    return fs.exists(state) and (utils.read_file(state) or "") or ""
 end
 
-local function restore_files(map, is_steam)
-    local dir = fs.join(paths.data_dir(), "restore")
-    local count = 0
-    local grids = grid_dirs()
-    note(#grids .. " grid folders")
-    for _, entry in ipairs(fs.exists(fs.join(dir, "grid")) and fs.list(fs.join(dir, "grid")) or {}) do
-        local old, rest = string.match(entry.is_file and entry.name or "", "^(%d+)(.*)$")
-        if old then
-            local appid = tostring(map[old] or old)
-            if is_steam[appid] and rest:match("^_icon%.") then
-                -- Steam games read their icon from more places than the grid folder
-                local f = io.open(entry.path, "rb")
-                local bytes = f and f:read("*a")
-                if f then f:close() end
-                if bytes then require("icons").write_icon(appid, bytes, rest:match("%.(%w+)$")) end
-                count = count + 1
-            else
-                local copied = false
-                for _, grid in ipairs(grids) do copied = copy_file(entry.path, fs.join(grid, appid .. rest)) or copied end
-                if copied then count = count + 1 else note("cannot copy " .. entry.name) end
-            end
-        end
-    end
-    note(count .. " pictures")
 
-    local icons = {}
-    local icons_dir = fs.join(paths.data_dir(), "icons")
-    for _, entry in ipairs(fs.exists(fs.join(dir, "icons")) and fs.list(fs.join(dir, "icons")) or {}) do
-        local old, rest = string.match(entry.is_file and entry.name or "", "^(%d+)(_icon%..+)$")
-        if old then
-            if not fs.exists(icons_dir) then fs.create_directories(icons_dir) end
-            local appid = tostring(map[old] or old)
-            local target = fs.join(icons_dir, appid .. rest)
-            if copy_file(entry.path, target) then icons[appid] = target end
-        end
-    end
-    local icon_count = 0
-    for _ in pairs(icons) do icon_count = icon_count + 1 end
-    note(icon_count .. " shortcut icons")
-    fs.remove_all(dir)
-    return { files = count, icons = icons }
-end
-
--- Puts the unpacked artwork back. a_appids: JSON {"old appid": new appid} for shortcuts created again
--- with another id; b_steam: JSON list of Steam apps (their icons also go to Steam's library cache).
--- Returns {"files": n, "icons": {"appid": "icon path"}} with the shortcut icons to set, or {"error": "..."}
+-- Puts the unpacked artwork back (the "restore" job copies it). a_appids: JSON {"old appid": new appid}
+-- for shortcuts created again with another id; b_steam: JSON list of Steam apps (their icons also go
+-- to Steam's library cache). Returns {"files": n, "icons": {"appid": "icon path"}} with the shortcut
+-- icons to set once the job is over, or {"error": "..."}
 function ugi_backup_restore(a_appids, b_steam)
     local ok_map, map = pcall(cjson.decode, a_appids or "{}")
     if not ok_map or type(map) ~= "table" then map = {} end
@@ -216,10 +261,55 @@ function ugi_backup_restore(a_appids, b_steam)
     local is_steam = {}
     for _, appid in ipairs(ok_steam and type(steam) == "table" and steam or {}) do is_steam[tostring(appid)] = true end
 
-    note("started")
-    local ok, result = pcall(restore_files, map, is_steam)
+    local ok, result = pcall(function()
+        local dir = fs.join(paths.data_dir(), "restore")
+        local sources, targets = {}, {}
+        local function copy(from, to)
+            sources[#sources + 1] = from
+            targets[#targets + 1] = to
+        end
+        local count = 0
+        local grids = grid_dirs()
+        for _, entry in ipairs(fs.exists(fs.join(dir, "grid")) and fs.list(fs.join(dir, "grid")) or {}) do
+            local old, rest = string.match(entry.is_file and entry.name or "", "^(%d+)(.*)$")
+            if old then
+                local appid = tostring(map[old] or old)
+                if is_steam[appid] and rest:match("^_icon%.") then
+                    -- Steam games read their icon from more places than the grid folder
+                    local f = io.open(entry.path, "rb")
+                    local bytes = f and f:read("*a")
+                    if f then f:close() end
+                    if bytes then require("icons").write_icon(appid, bytes, rest:match("%.(%w+)$")) end
+                else
+                    for _, grid in ipairs(grids) do copy(entry.path, fs.join(grid, appid .. rest)) end
+                end
+                count = count + 1
+            end
+        end
+
+        local icons = {}
+        local icons_dir = fs.join(paths.data_dir(), "icons")
+        if not fs.exists(icons_dir) then fs.create_directories(icons_dir) end
+        for _, entry in ipairs(fs.exists(fs.join(dir, "icons")) and fs.list(fs.join(dir, "icons")) or {}) do
+            local old, rest = string.match(entry.is_file and entry.name or "", "^(%d+)(_icon%..+)$")
+            if old then
+                local appid = tostring(map[old] or old)
+                icons[appid] = fs.join(icons_dir, appid .. rest)
+                copy(entry.path, icons[appid])
+            end
+        end
+
+        start_job("restore", table.concat({
+            "  $from = " .. ps_list(sources),
+            "  $to = " .. ps_list(targets),
+            "  for ($i = 0; $i -lt $from.Count; $i++) { Copy-Item -LiteralPath $from[$i] -Destination $to[$i] -Force }",
+            "  Remove-Item -LiteralPath " .. ps_quote(dir) .. " -Recurse -Force",
+        }, "\n"))
+        note("restore: " .. count .. " pictures, " .. #sources .. " copies started")
+        return { files = count, icons = icons }
+    end)
     if not ok then
-        note("failed: " .. tostring(result))
+        note("restore failed: " .. tostring(result))
         logger:error("restore failed: " .. tostring(result))
         return cjson.encode({ error = tostring(result) })
     end
@@ -315,6 +405,35 @@ end
 function ugi_custom_mark(a_appid)
     local list = customized()
     list[tostring(a_appid)] = true
+    utils.write_file(customized_path(), cjson.encode(list))
+    return true
+end
+
+-- Apps with custom artwork in Steam's grid folder, whoever set it (Steam's own dialog, Easy SteamGrid,
+-- UGI). Non-Steam shortcuts have the top bit of their id set and are left out.
+function ugi_custom_scan()
+    local found, ids = {}, {}
+    for _, grid in ipairs(grid_dirs()) do
+        for _, entry in ipairs(fs.list(grid) or {}) do
+            local id = entry.is_file and fs.stem(entry.path):match("^(%d+)p?$")
+                or entry.is_file and fs.stem(entry.path):match("^(%d+)_hero$")
+                or entry.is_file and fs.stem(entry.path):match("^(%d+)_logo$")
+                or entry.is_file and fs.stem(entry.path):match("^(%d+)_icon$")
+            local appid = tonumber(id or "")
+            if appid and appid < 2147483648 and not found[appid] then
+                found[appid] = true
+                ids[#ids + 1] = appid
+            end
+        end
+    end
+    return cjson.encode(ids)
+end
+
+-- Same as ugi_custom_mark for a JSON list of apps, in one call
+function ugi_custom_mark_many(a_appids)
+    local ok, appids = pcall(cjson.decode, a_appids or "[]")
+    local list = customized()
+    for _, appid in ipairs(ok and type(appids) == "table" and appids or {}) do list[tostring(appid)] = true end
     utils.write_file(customized_path(), cjson.encode(list))
     return true
 end

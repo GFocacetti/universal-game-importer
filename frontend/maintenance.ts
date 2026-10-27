@@ -15,8 +15,29 @@ const backupRestore = callable<[{ a_appids: string; b_steam: string }], string>(
 const cleanup = callable<[], boolean>('ugi_cleanup');
 const openFolder = callable<[{ a_path: string }], boolean>('ugi_open_folder');
 const customList = callable<[], string>('ugi_custom_list');
-const customMark = callable<[{ a_appid: number }], boolean>('ugi_custom_mark');
 const listShortcuts = callable<[], string>('ugi_shortcuts');
+const customScan = callable<[], string>('ugi_custom_scan');
+const customMarkMany = callable<[{ a_appids: string }], boolean>('ugi_custom_mark_many');
+const backupState = callable<[], string>('ugi_backup_state');
+const backupDelete = callable<[{ a_zip: string }], boolean>('ugi_backup_delete');
+const jobStatus = callable<[{ a_name: string }], string>('ugi_job_status');
+const jobCancel = callable<[{ a_name: string }], boolean>('ugi_job_cancel');
+
+// Zipping and copying hundreds of MB run as background jobs in the backend: wait for their end
+export type CancelFlag = { cancel: boolean };
+async function waitJob(name: string, flag?: CancelFlag): Promise<'ok' | 'cancelled'> {
+	for (;;) {
+		await new Promise((r) => setTimeout(r, 1500));
+		if (flag?.cancel) {
+			await jobCancel({ a_name: name });
+			return 'cancelled';
+		}
+		const status = unquote(await jobStatus({ a_name: name }));
+		if (status === 'ok') return 'ok';
+		if (status === 'cancelled') return 'cancelled';
+		if (status.startsWith('error')) throw new Error(status);
+	}
+}
 
 type SteamShortcut = { appid: number; name: string; exe: string; launch_options: string };
 const unquotePath = (path: string | undefined) => String(path ?? '').replace(/^"|"$/g, '');
@@ -74,11 +95,31 @@ export async function removalSummary(state: UgiState): Promise<{ games: number; 
 	};
 }
 
-export async function exportBackup(): Promise<{ path?: string; error?: string }> {
+// UGI takes over the custom artwork Steam games already have (from Steam's dialog, Easy SteamGrid…):
+// from now on it goes in the backups and is reset by "Remove everything"
+async function adoptExistingArtwork() {
+	const found = json<unknown>(unquote(await customScan()), []);
+	const known = new Set(json<unknown[]>(unquote(await customList()), []));
+	const adopted = (Array.isArray(found) ? found : []).filter((appid) => {
+		const overview = appStore.GetAppOverviewByAppID(appid);
+		return !known.has(appid) && overview && overview.app_type !== SHORTCUT_APP_TYPE;
+	});
+	if (adopted.length) await customMarkMany({ a_appids: JSON.stringify(adopted) });
+}
+
+export async function exportBackup(flag: CancelFlag): Promise<{ path?: string; error?: string; cancelled?: boolean }> {
+	await adoptExistingArtwork();
 	const state: BackupState = await loadState();
 	state.customized = await customizedSteamApps(state);
 	const appids = [...Object.values(state.imported).map((e) => e.appid), ...state.customized];
-	return json(unquote(await backupExport({ a_state: JSON.stringify(state), b_appids: JSON.stringify(appids) })), { error: 'no answer' });
+	const started = json<{ path?: string; error?: string }>(unquote(await backupExport({ a_state: JSON.stringify(state), b_appids: JSON.stringify(appids) })), { error: 'no answer' });
+	if (!started.path) return started;
+	return (await waitJob('backup', flag)) === 'cancelled' ? { cancelled: true } : { path: started.path };
+}
+
+// Moves a backup to the Recycle Bin
+export async function deleteBackup(path: string): Promise<boolean> {
+	return String(unquote(await backupDelete({ a_zip: path }))) === 'true';
 }
 
 export async function listBackups(): Promise<{ dir: string; files: Backup[] }> {
@@ -88,7 +129,9 @@ export async function listBackups(): Promise<{ dir: string; files: Backup[] }> {
 
 // Opens a backup: what it holds, for the confirmation
 export async function readBackup(path: string): Promise<BackupState | null> {
-	const state = json<BackupState | null>(await backupOpen({ a_zip: path }), null);
+	await backupOpen({ a_zip: path });
+	await waitJob('unzip');
+	const state = json<BackupState | null>(await backupState(), null);
 	return state && typeof state === 'object' && state.settings ? state : null;
 }
 
@@ -132,8 +175,9 @@ export async function restoreBackup(backup: BackupState, step: Step): Promise<{ 
 	);
 	// The settings are only saved once the pictures are back
 	if (restoredFiles.error) throw new Error(restoredFiles.error);
+	await waitJob('restore');
 	for (const [appid, path] of Object.entries(restoredFiles.icons ?? {})) SteamClient.Apps.SetShortcutIcon(Number(appid), path);
-	for (const appid of customized) await customMark({ a_appid: appid });
+	if (customized.length) await customMarkMany({ a_appids: JSON.stringify(customized) });
 
 	step('collections');
 	// Collections and shelves deleted meanwhile are created again by the sync
