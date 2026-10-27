@@ -2,7 +2,7 @@ import { callable } from '@steambrew/client';
 import { loadState, saveState, unquote } from 'backend';
 import { removeCollections, syncCollections } from 'collections';
 import { setLanguage } from 'i18n';
-import { recreateShortcut, shortcutExists } from 'importer';
+import { recreateShortcut, restoreManual, shortcutExists, SteamShortcut, steamShortcuts, unquotePath } from 'importer';
 import { resetImages } from 'sgdb';
 import { isSteamApp } from 'steamApps';
 import { UgiState } from 'types';
@@ -16,7 +16,6 @@ const backupRestore = callable<[{ a_appids: string; b_steam: string }], string>(
 const cleanup = callable<[], boolean>('ugi_cleanup');
 const openFolder = callable<[{ a_path: string }], boolean>('ugi_open_folder');
 const customList = callable<[], string>('ugi_custom_list');
-const listShortcuts = callable<[], string>('ugi_shortcuts');
 const customScan = callable<[], string>('ugi_custom_scan');
 const customMarkMany = callable<[{ a_appids: string }], boolean>('ugi_custom_mark_many');
 const backupState = callable<[], string>('ugi_backup_state');
@@ -40,8 +39,6 @@ async function waitJob(name: string, flag?: CancelFlag): Promise<'ok' | 'cancell
 	}
 }
 
-type SteamShortcut = { appid: number; name: string; exe: string; launch_options: string };
-const unquotePath = (path: string | undefined) => String(path ?? '').replace(/^"|"$/g, '');
 const sameShortcut = (a: SteamShortcut, b: { name: string; exe?: string; launch_options?: string }) =>
 	a.name === b.name && unquotePath(a.exe) === unquotePath(b.exe) && a.launch_options === (b.launch_options ?? '');
 
@@ -137,8 +134,7 @@ export async function restoreBackup(backup: BackupState, step: Step): Promise<{ 
 	// Steam gives a shortcut created again a new id: the artwork is renamed to follow it.
 	// A shortcut already in Steam with the same name and command is used again, and copies of it
 	// (left by an interrupted restore) are removed.
-	const shortcuts = json<unknown>(unquote(await listShortcuts()), []);
-	const existing: SteamShortcut[] = (Array.isArray(shortcuts) ? shortcuts : []).filter((s: SteamShortcut) => shortcutExists(s.appid));
+	const existing = await steamShortcuts();
 	// Among copies, the one UGI uses now (it has the pictures and the collections) is kept
 	const inUse = new Set(Object.values((await loadState()).imported).map((e) => e.appid));
 	const moved: Record<string, number> = {};
@@ -195,6 +191,11 @@ export async function removeEverything(step: Step): Promise<{ games: number; app
 	let games = 0;
 	for (const entry of Object.values(state.imported)) {
 		if (!shortcutExists(entry.appid)) continue;
+		// A shortcut the user had made stays, as it was
+		if (entry.manual) {
+			restoreManual(entry.appid, entry.manual);
+			continue;
+		}
 		// The custom artwork files would stay behind in Steam's grid folder
 		for (const type of [0, 1, 2, 3]) SteamClient.Apps.ClearCustomArtworkForApp(entry.appid, type);
 		SteamClient.Apps.RemoveShortcut(entry.appid);

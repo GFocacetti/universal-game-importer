@@ -25,7 +25,7 @@ export default function ReviewDialog({ plan, onClose, onDone }: { plan: SyncPlan
 		<label key={g.id} className={`ugi-check${chosen.has(g.id) ? '' : ' off'}`}>
 			<input type="checkbox" checked={chosen.has(g.id)} onChange={() => toggle(g.id)} />
 			<span>{g.name}</span>
-			<small>{note ?? (g.kind === 'uncertain' ? t('review.uncertain') : '')}</small>
+			<small>{note ?? (plan.adopt[g.id] ? t('review.adopt') : g.kind === 'uncertain' ? t('review.uncertain') : '')}</small>
 		</label>
 	);
 

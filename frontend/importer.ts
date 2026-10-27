@@ -1,5 +1,6 @@
-import { Game, ImportedEntry, LauncherStatus, UgiState } from 'types';
-import { loadState, saveState } from 'backend';
+import { callable } from '@steambrew/client';
+import { Game, ImportedEntry, LauncherStatus, ShortcutFields, UgiState } from 'types';
+import { loadState, saveState, unquote } from 'backend';
 import { syncCollections } from 'collections';
 import { fillMissing } from 'sgdb';
 import { finishImages, startImages } from 'imagesProgress';
@@ -7,7 +8,22 @@ import { finishImages, startImages } from 'imagesProgress';
 // Steam client store of all library apps (global in Steam's UI context)
 declare const appStore: { GetAppOverviewByAppID(appid: number): unknown };
 
+const listShortcuts = callable<[], string>('ugi_shortcuts');
+
 const quote = (path: string) => (path.startsWith('"') ? path : `"${path}"`);
+export const unquotePath = (path: string | undefined) => String(path ?? '').replace(/^"|"$/g, '');
+
+export type SteamShortcut = ShortcutFields & { appid: number };
+
+// The non-Steam shortcuts in Steam now, as saved in its shortcuts file
+export async function steamShortcuts(): Promise<SteamShortcut[]> {
+	try {
+		const list = JSON.parse(unquote(await listShortcuts()));
+		return (Array.isArray(list) ? list : []).filter((s: SteamShortcut) => shortcutExists(s.appid));
+	} catch {
+		return [];
+	}
+}
 
 // A shortcut still exists in Steam (the user may have deleted it by hand)
 export function shortcutExists(appid: number): boolean {
@@ -22,6 +38,14 @@ function applyShortcutSettings(appid: number, game: Game) {
 	if (game.icon) SteamClient.Apps.SetShortcutIcon(appid, game.icon);
 }
 
+// Puts back a shortcut the user had made, as it was before UGI took it over
+export function restoreManual(appid: number, manual: ShortcutFields) {
+	SteamClient.Apps.SetShortcutName(appid, manual.name);
+	SteamClient.Apps.SetShortcutExe(appid, manual.exe);
+	SteamClient.Apps.SetShortcutStartDir(appid, manual.start_dir);
+	SteamClient.Apps.SetShortcutLaunchOptions(appid, manual.launch_options);
+}
+
 // Adds the game to Steam live, without restarting; returns the new appid
 async function addShortcut(game: Game): Promise<number> {
 	const appid = await SteamClient.Apps.AddShortcut(game.name, game.exe, game.start_dir, game.launch_options);
@@ -29,8 +53,9 @@ async function addShortcut(game: Game): Promise<number> {
 	return appid;
 }
 
-const entryFor = (game: Game, appid: number): ImportedEntry => ({
+const entryFor = (game: Game, appid: number, manual?: ShortcutFields): ImportedEntry => ({
 	appid, name: game.name, launcher: game.launcher, exe: game.exe, start_dir: game.start_dir, launch_options: game.launch_options,
+	...(manual ? { manual } : {}),
 });
 
 const changed = (entry: ImportedEntry, game: Game) =>
@@ -42,18 +67,41 @@ export type SyncPlan = {
 	gone: string[];
 	// Already imported, but the launch settings changed (e.g. after a UGI update)
 	outdated: Game[];
+	// New games the user had already added to Steam by hand: UGI takes over that shortcut, by game id
+	adopt: Record<string, SteamShortcut>;
 };
+
+const simplify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// A shortcut added by hand for the same game: its program is in the game's folder, or it has the same name
+function findManual(game: Game, shortcuts: SteamShortcut[]): SteamShortcut | undefined {
+	const folder = unquotePath(game.start_dir).replace(/\\+$/, '').toLowerCase();
+	const inFolder = (s: SteamShortcut) => folder.length > 3 && unquotePath(s.exe).toLowerCase().startsWith(folder + '\\');
+	return shortcuts.find(inFolder) ?? shortcuts.find((s) => simplify(s.name) === simplify(game.name));
+}
 
 // Compares what the launchers report with what UGI already manages.
 // Only launchers scanned successfully (or disabled) can mark games as gone: a failed scan removes nothing.
-export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiState): SyncPlan {
+// shortcuts: the non-Steam shortcuts in Steam, to recognise games the user had added by hand.
+export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiState, shortcuts: SteamShortcut[] = []): SyncPlan {
 	const found = new Set(games.map((g) => g.id));
 	const reliable = new Set(launchers.filter((l) => !l.error).map((l) => l.id));
 	const managed = (g: Game) => {
 		const entry = state.imported[g.id];
 		return !!entry && shortcutExists(entry.appid);
 	};
+	// Shortcuts not made by UGI, each taken over by one game at most
+	const used = new Set(Object.values(state.imported).map((e) => e.appid));
+	const adopt: Record<string, SteamShortcut> = {};
+	for (const game of games.filter((g) => !managed(g))) {
+		const manual = findManual(game, shortcuts.filter((s) => !used.has(s.appid)));
+		if (manual) {
+			adopt[game.id] = manual;
+			used.add(manual.appid);
+		}
+	}
 	return {
+		adopt,
 		newGames: games.filter((g) => !managed(g) && !state.excluded[g.id]),
 		previouslyExcluded: games.filter((g) => !managed(g) && state.excluded[g.id]),
 		outdated: games.filter((g) => {
@@ -73,8 +121,14 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 	for (const game of [...plan.newGames, ...plan.previouslyExcluded]) {
 		if (chosen.has(game.id)) {
 			try {
-				const appid = await addShortcut(game);
+				const manual = plan.adopt[game.id];
+				const appid = manual ? manual.appid : await addShortcut(game);
 				state.imported[game.id] = entryFor(game, appid);
+				if (manual) {
+					const { appid: _, ...fields } = manual;
+					state.imported[game.id]!.manual = fields;
+					applyShortcutSettings(appid, game);
+				}
 				delete state.excluded[game.id];
 				added++;
 			} catch (err) {
@@ -90,13 +144,15 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 		const entry = state.imported[game.id];
 		if (!entry) continue;
 		applyShortcutSettings(entry.appid, game);
-		state.imported[game.id] = entryFor(game, entry.appid);
+		state.imported[game.id] = entryFor(game, entry.appid, entry.manual);
 		updated++;
 	}
 
 	for (const id of plan.gone) {
 		const entry = state.imported[id];
-		if (entry && shortcutExists(entry.appid)) SteamClient.Apps.RemoveShortcut(entry.appid);
+		// A shortcut the user had made stays, as it was
+		if (entry?.manual && shortcutExists(entry.appid)) restoreManual(entry.appid, entry.manual);
+		else if (entry && shortcutExists(entry.appid)) SteamClient.Apps.RemoveShortcut(entry.appid);
 		delete state.imported[id];
 		removed++;
 	}

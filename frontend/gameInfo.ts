@@ -471,7 +471,8 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 
 const running = new Map<string, Promise<GameInfo | null>>();
 
-export async function gameInfo(state: UgiState, key: string): Promise<GameInfo | null> {
+// key: the imported game's id, or "manual:<appid>" for a shortcut added by hand (looked up by name)
+export async function gameInfo(state: UgiState, key: string, name: string): Promise<GameInfo | null> {
 	const locale = uiLocale();
 	const rawg = !!state.settings.rawg_key;
 	let cached: CacheEntry | null = null;
@@ -486,7 +487,6 @@ export async function gameInfo(state: UgiState, key: string): Promise<GameInfo |
 
 	const id = `${key}|${locale}`;
 	if (!running.has(id)) {
-		const name = state.imported[key]?.name ?? '';
 		running.set(
 			id,
 			lookup(state, key, name, locale)

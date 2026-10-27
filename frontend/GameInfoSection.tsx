@@ -8,7 +8,7 @@ import { importedKeyFor, loadState } from 'backend';
 import { GameInfo, gameInfo, Requirement, Reviews, Video } from 'gameInfo';
 import { t } from 'i18n';
 import { mainDocument } from 'overlay';
-import { imageUrls, openUrl } from 'steamApps';
+import { imageUrls, isShortcut, openUrl } from 'steamApps';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 declare const MainWindowBrowserManager: { m_lastLocation?: { pathname?: string } } | undefined;
@@ -320,8 +320,9 @@ function InfoBlock({ appid, sideHost, topHost }: { appid: number; sideHost: HTML
 		setInfo(undefined);
 		(async () => {
 			const state = await loadState();
-			const key = importedKeyFor(state, appid);
-			const found = key ? await gameInfo(state, key) : null;
+			const key = importedKeyFor(state, appid) ?? `manual:${appid}`;
+			const name = state.imported[key]?.name ?? appStore.GetAppOverviewByAppID(appid)?.display_name ?? '';
+			const found = name ? await gameInfo(state, key, name) : null;
 			if (alive) setInfo(found);
 		})().catch(() => alive && setInfo(null));
 		return () => {
@@ -462,8 +463,6 @@ type Mounted = {
 	observer?: ResizeObserver;
 };
 let mounted: Mounted | null = null;
-let importedAppids = new Set<number>();
-let lastStateLoad = 0;
 
 function unmount() {
 	if (!mounted) return;
@@ -584,20 +583,12 @@ function alignSide(m: Mounted) {
 	}
 }
 
-async function refreshImported() {
-	// The list changes only on imports: reloaded at most every 10 seconds
-	if (Date.now() - lastStateLoad < 10000) return;
-	lastStateLoad = Date.now();
-	const state = await loadState();
-	importedAppids = new Set(Object.values(state.imported).map((e) => e.appid));
-}
-
 async function tick() {
 	const path = MainWindowBrowserManager?.m_lastLocation?.pathname ?? '';
 	const appid = Number(path.match(/^\/library\/app\/(\d+)/)?.[1] ?? 0);
 	if (!appid) return unmount();
-	await refreshImported();
-	if (!importedAppids.has(appid)) return unmount();
+	// Every non-Steam game: imported by UGI or added by hand
+	if (!isShortcut(appid)) return unmount();
 
 	const doc = mainDocument();
 	// Already in place for this game

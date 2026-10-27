@@ -36,7 +36,11 @@ export type ImportedEntry = {
 	exe?: string;
 	start_dir?: string;
 	launch_options?: string;
+	// A shortcut the user had added by hand and UGI took over: how it was, to put it back
+	manual?: ShortcutFields;
 };
+
+export type ShortcutFields = { name: string; exe: string; start_dir: string; launch_options: string };
 
 export type UgiState = {
 	imported: Record<string, ImportedEntry>;

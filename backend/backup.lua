@@ -330,7 +330,7 @@ local function read_vdf_map(data, pos)
     return map, pos
 end
 
--- Every non-Steam shortcut of every Steam user: [{appid, name, exe, launch_options}]
+-- Every non-Steam shortcut of every Steam user: [{appid, name, exe, start_dir, launch_options}]
 function ugi_shortcuts()
     local list = {}
     local userdata = fs.join(millennium.steam_path(), "userdata")
@@ -347,6 +347,7 @@ function ugi_shortcuts()
                         appid = entry.appid,
                         name = entry.appname or "",
                         exe = entry.exe or "",
+                        start_dir = entry.StartDir or "",
                         launch_options = entry.launchoptions or "",
                     }
                 end
