@@ -77,7 +77,7 @@ export type UgiSettings = {
 	filters?: Record<string, { style?: string; dimension?: string; webp?: boolean; nsfw?: string; humor?: string }>;
 };
 
-export type CollectionInfo = {
+type CollectionInfo = {
 	collection_id?: string;
 	shelf_id?: number;
 	off_collection?: boolean;

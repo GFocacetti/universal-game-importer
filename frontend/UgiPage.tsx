@@ -11,6 +11,7 @@ import { SyncPlan } from 'importer';
 import Onboarding from 'Onboarding';
 import { takePendingReview } from 'pending';
 import UninstallSection from 'UninstallSection';
+import { openUrl } from 'steamApps';
 
 type Section = 'games' | 'launchers' | 'images' | 'settings' | 'uninstall';
 
@@ -137,7 +138,7 @@ export default function UgiPage() {
 				</div>
 				{/* Credits: a fixed bar under every section */}
 				<footer className="ugi-credit">
-					Made with ❤️ by <span className="ugi-link" onClick={() => (SteamClient as any).System?.OpenInSystemBrowser?.('https://github.com/GFocacetti')}>Ryu</span>
+					Made with ❤️ by <span className="ugi-link" onClick={() => openUrl('https://github.com/GFocacetti')}>Ryu</span>
 				</footer>
 			</section>
 			{keyDialog && (

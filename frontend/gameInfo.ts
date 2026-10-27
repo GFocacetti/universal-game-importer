@@ -1,5 +1,6 @@
 import { callable } from '@steambrew/client';
 import { unquote } from 'backend';
+import { simplifyName } from 'steamApps';
 import { uiLocale } from 'i18n';
 import { UgiState } from 'types';
 
@@ -40,13 +41,13 @@ export type GameInfo = {
 	requirements?: { minimum: Requirement[]; recommended: Requirement[] };
 };
 
-export type StoreLink = { name: string; url: string };
+type StoreLink = { name: string; url: string };
 export type Video = { thumb: string; hls?: string; page?: string; name?: string };
 export type Reviews = { percent: number; total: number };
 export type Language = { name: string; interface: boolean; audio: boolean };
 export type Requirement = { label: string; value: string };
 
-export type Screenshot = { thumb: string; full: string };
+type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
 const CACHE_VERSION = 13;
@@ -66,9 +67,6 @@ async function getJson(url: string): Promise<any | null> {
 		return null;
 	}
 }
-
-// Same words, ignoring case, punctuation and ™ ® ©
-const simplify = (name: string) => name.toLowerCase().replace(/[™®©]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 const decode = (text: string) => new DOMParser().parseFromString(text, 'text/html').documentElement.textContent ?? '';
 
@@ -162,7 +160,7 @@ const GOG_FEATURES: Record<string, number> = {
 	'single-player': 2, 'multi-player': 1, 'co-op': 9, achievements: 22, 'cloud saves': 23, 'controller support': 28, leaderboards: 15,
 };
 
-// Dates written like the Steam store's ("27 ago 2020")
+// Dates written like the Steam store's ("27 Aug 2020")
 function storeDate(value: string | undefined, locale: string): string | undefined {
 	const date = value ? new Date(value) : null;
 	return date && !isNaN(date.getTime()) ? date.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : undefined;
@@ -194,7 +192,7 @@ function steamRequirements(html: string | undefined): Requirement[] {
 		.filter((r) => r.value);
 }
 
-// "Inglese<strong>*</strong>, Italiano<br><strong>*</strong>languages with full audio support"
+// "English<strong>*</strong>, Italian<br><strong>*</strong>languages with full audio support"
 function steamLanguages(html: string | undefined): Language[] {
 	if (!html) return [];
 	return html
@@ -204,7 +202,7 @@ function steamLanguages(html: string | undefined): Language[] {
 		.filter((l) => l.name);
 }
 
-// Steam's verdict comes from the review histogram (the reviews API now redirects to the store)
+// Steam's verdict comes from the review histogram (Steam's reviews API redirects to the store)
 async function steamReviews(appid: number): Promise<Reviews | undefined> {
 	const results = (await getJson(`https://store.steampowered.com/appreviewhistogram/${appid}?review_score_preference=0`))?.results;
 	let up = 0;
@@ -220,7 +218,7 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 	const lang = locale === 'it' ? 'italian' : 'english';
 	const cc = locale === 'it' ? 'IT' : 'US';
 	const search = await getJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(name)}&l=${lang}&cc=${cc}`);
-	const match = (search?.items ?? []).find((item: any) => simplify(String(item.name ?? '')) === simplify(name));
+	const match = (search?.items ?? []).find((item: any) => simplifyName(String(item.name ?? '')) === simplifyName(name));
 	if (!match) return null;
 	const details = (await getJson(`https://store.steampowered.com/api/appdetails?appids=${match.id}&l=${lang}`))?.[match.id];
 	const d = details?.success ? details.data : null;
@@ -320,7 +318,7 @@ async function fromEpic(appName: string, dir: string, locale: string): Promise<G
 	const slug = await epicSlug(appName, dir);
 	if (!slug) return null;
 	const page = await getJson(`https://store-content-ipv4.ak.epicgames.com/api/${locale === 'it' ? 'it' : 'en-US'}/content/products/${encodeURIComponent(slug)}`);
-	// The product's home page (Fortnite lists its game modes first)
+	// The product's home page (some products list other pages first)
 	const pages: any[] = page?.pages ?? [];
 	const d = (pages.find((p) => p?.type === 'productHome') ?? pages[0])?.data;
 	const description = markdownToText(d?.about?.description || '');
@@ -358,7 +356,7 @@ async function fromRawg(name: string, key: string, locale: string): Promise<Game
 	const search = await getJson(`https://api.rawg.io/api/games?key=${encodeURIComponent(key)}&search=${encodeURIComponent(name)}&page_size=10`);
 	// Several entries can share the name (fan-made pages too): the one most users added
 	const match = (search?.results ?? [])
-		.filter((r: any) => simplify(String(r.name ?? '')) === simplify(name))
+		.filter((r: any) => simplifyName(String(r.name ?? '')) === simplifyName(name))
 		.sort((a: any, b: any) => (b.added ?? 0) - (a.added ?? 0))[0];
 	if (!match) return null;
 	const d = await getJson(`https://api.rawg.io/api/games/${match.id}?key=${encodeURIComponent(key)}`);
@@ -441,10 +439,6 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 // ---------- Cache ----------
 
 const running = new Map<string, Promise<GameInfo | null>>();
-
-export function importedKeyFor(state: UgiState, appid: number): string | undefined {
-	return Object.entries(state.imported).find(([, e]) => e.appid === appid)?.[0];
-}
 
 export async function gameInfo(state: UgiState, key: string): Promise<GameInfo | null> {
 	const locale = uiLocale();

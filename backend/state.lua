@@ -1,9 +1,8 @@
 local millennium = require("millennium")
 local cjson = require("json")
 
--- Persistent state, stored in the plugin config:
---   imported: game id -> { appid, name, launcher }
---   excluded: game id -> true (games the user unticked)
+-- UGI's persistent state (shape defined by the frontend, see types.ts), stored in the plugin config.
+-- imported and excluded are always present.
 local KEY = "ugi_state"
 
 local M = {}

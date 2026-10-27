@@ -6,6 +6,7 @@ local utils = require("utils")
 local cjson = require("json")
 local logger = require("logger")
 local paths = require("paths")
+local common = require("launchers.common")
 
 local M = {
     id = "xbox",
@@ -126,10 +127,8 @@ Add-Type -TypeDefinition $csharp -ReferencedAssemblies "System.dll", "System.Cor
 [UgiUwpLauncher]::LaunchAndWait($Aumid)
 ]==]
 
-local POWERSHELL = [[C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe]]
--- conhost --headless runs the console helper without any window and waits for it,
--- so Steam still sees the game running (and counts playtime)
-local CONHOST = [[C:\Windows\System32\conhost.exe]]
+local POWERSHELL = common.POWERSHELL
+local CONHOST = common.CONHOST
 
 local function launcher_script_path()
     return fs.join(paths.data_dir(), "uwp_launcher.ps1")
@@ -176,8 +175,8 @@ function M.discover()
                 start_dir = dir,
                 launch_options = string.format([[--headless "%s" -NoProfile -ExecutionPolicy Bypass -File "%s" -Aumid "%s"]], POWERSHELL, launcher_script_path(), aumid),
                 icon = app.icon,
-                -- Packages with MicrosoftGame.config are games; the others are classified by the
-                -- frontend through the Microsoft Store catalog (HTTP calls crash the Lua backend)
+                -- Packages with MicrosoftGame.config are games; the frontend classifies the others
+                -- through the Microsoft Store catalog
                 kind = app.is_game and "game" or nil,
                 store_family = aumid:match("^([^!]+)"),
             }

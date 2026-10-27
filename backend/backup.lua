@@ -11,18 +11,9 @@ local paths = require("paths")
 -- Custom artwork names in Steam's grid folder: grid, wide grid, hero, logo (+ position), icon
 local SUFFIXES = { "p", "", "_hero", "_logo", "_icon" }
 
-local function grid_dirs()
-    local dirs = {}
-    local userdata = fs.join(millennium.steam_path(), "userdata")
-    for _, user in ipairs(fs.exists(userdata) and fs.list(userdata) or {}) do
-        if user.is_directory then
-            local grid = fs.join(user.path, "config", "grid")
-            if fs.exists(grid) then dirs[#dirs + 1] = grid end
-        end
-    end
-    return dirs
-end
+local grid_dirs = paths.grid_dirs
 
+-- A PowerShell single-quoted string
 local function ps_quote(text)
     return "'" .. tostring(text):gsub("'", "''") .. "'"
 end
@@ -59,14 +50,7 @@ local function job_stop(name)
     return fs.join(paths.data_dir(), name .. "_stop.txt")
 end
 
--- Progress of backups and restores, in data/frontend.log next to the frontend's own notes
-local function note(message)
-    local f = io.open(fs.join(paths.data_dir(), "frontend.log"), "a")
-    if f then
-        f:write(os.date("%Y-%m-%d %H:%M:%S "), message, "\n")
-        f:close()
-    end
-end
+local note = paths.log
 
 -- cleanup: PowerShell lines run when the job fails (and by ugi_job_cancel's own clean-up)
 local function start_job(name, body, cleanup)
@@ -91,8 +75,8 @@ local function start_job(name, body, cleanup)
         "  $result | Out-File -FilePath " .. ps_quote(marker) .. " -Encoding utf8",
         "}",
     }, "\n"))
-    -- Start-Process makes a separate process that shares no handles with this one: the call returns at
-    -- once (a plain "start" kept the backend waiting until the job ended)
+    -- Start-Process makes a separate process that shares no handles with the backend, so the call
+    -- returns at once (a child started otherwise would keep the backend waiting until it ends)
     common.run_powershell_json("job_start", string.format(
         "Start-Process -FilePath %s -ArgumentList '-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File \"%s\"' -WindowStyle Hidden; ConvertTo-Json @('ok')",
         ps_quote(common.POWERSHELL), script))

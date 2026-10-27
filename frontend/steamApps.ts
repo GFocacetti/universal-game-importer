@@ -1,4 +1,4 @@
-// Helpers around Steam's app store for the UI (image URLs, launching)
+// Helpers around Steam's app store for the UI (shortcuts, image URLs, launching, links)
 
 type Overview = { appid: number; display_name?: string; app_type?: number };
 declare const appStore: {
@@ -10,6 +10,26 @@ declare const appStore: {
 	GetCustomLogoImageURLs(o: Overview): string[];
 	GetIconURLForApp(o: Overview): string | null;
 };
+
+const SHORTCUT_APP_TYPE = 1073741824;
+
+// A non-Steam shortcut (every imported game is one)
+export const isShortcut = (appid: number) => appStore.GetAppOverviewByAppID(appid)?.app_type === SHORTCUT_APP_TYPE;
+
+// A Steam app that is in the library
+export function isSteamApp(appid: number): boolean {
+	const overview = appStore.GetAppOverviewByAppID(appid);
+	return !!overview && overview.app_type !== SHORTCUT_APP_TYPE;
+}
+
+// Same words, ignoring case, punctuation and ™ ® © ("DungeonKeeper" is not "Dungeon Keeper")
+export const simplifyName = (name: string) => name.toLowerCase().replace(/[™®©]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Steam store pages open in Steam's own store; other sites in the web browser
+export function openUrl(url: string) {
+	if (url.startsWith('https://store.steampowered.com/')) (SteamClient as any).URL.ExecuteSteamURL(`steam://openurl/${url}`);
+	else (SteamClient as any).System?.OpenInSystemBrowser?.(url);
+}
 
 export const LAUNCHER_NAMES: Record<string, string> = {
 	xbox: 'Xbox',

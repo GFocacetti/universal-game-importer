@@ -1,7 +1,6 @@
 import { Game, UgiState } from 'types';
 
 // Microsoft Store catalog: tells whether a Store package is a game or an app.
-// Queried from the frontend because HTTP calls inside a backend call crash Millennium's Lua host.
 const STORE_LOOKUP =
 	'https://displaycatalog.mp.microsoft.com/v7.0/products/lookup?market=US&languages=en-US&alternateId=PackageFamilyName&fieldsTemplate=browse&value=';
 const PARALLEL = 6;

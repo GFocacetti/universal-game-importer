@@ -1,4 +1,4 @@
-import { callable, definePlugin, DialogButton, IconsModule, Navigation, routerHook } from '@steambrew/client';
+import { definePlugin, DialogButton, IconsModule, Navigation, routerHook } from '@steambrew/client';
 import React from 'react';
 import UgiPage from 'UgiPage';
 import { initLanguage, setLanguage, t } from 'i18n';
@@ -28,18 +28,10 @@ function PluginPanel() {
 	);
 }
 
-const ugiLog = callable<[{ a_message: string }], boolean>('ugi_log');
-// Startup trace (best effort: the backend may not answer yet)
-const trace = (msg: string) => {
-	console.log('[UGI]', msg);
-	ugiLog({ a_message: msg }).catch(() => {});
-};
-
 // Right after Steam starts the backend may not answer yet (a call can even hang): retry with a timeout
 async function loadStateWhenReady() {
 	for (let attempt = 0; attempt < 60; attempt++) {
 		try {
-			trace(`loading state, attempt ${attempt + 1}`);
 			return await Promise.race([
 				loadState(),
 				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
@@ -63,18 +55,14 @@ async function waitForStableMainWindow() {
 }
 
 async function onStartup() {
-	trace('startup: waiting for the main window');
 	const doc = await waitForMainDocument();
-	trace(`startup: main window ${doc ? 'found' : 'not found'}`);
 	const state = await loadStateWhenReady();
 	setLanguage(state.settings.language);
-	trace(`startup: state loaded, onboarded=${state.onboarded}`);
 	if (!state.onboarded && doc) {
 		// Steam replaces its first window a few seconds after startup: wait for the final one,
 		// then open the UGI page, where the setup is shown
 		await waitForStableMainWindow();
 		Navigation.Navigate(UGI_ROUTE);
-		trace('startup: UGI page opened for the setup');
 	}
 	startPeriodicCheck().catch((err) => console.error('[UGI] periodic check failed', err));
 }

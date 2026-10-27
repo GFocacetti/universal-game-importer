@@ -4,11 +4,11 @@ import Hls from 'hls.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
-import { loadState } from 'backend';
-import { GameInfo, gameInfo, importedKeyFor, Requirement, Reviews, Video } from 'gameInfo';
+import { importedKeyFor, loadState } from 'backend';
+import { GameInfo, gameInfo, Requirement, Reviews, Video } from 'gameInfo';
 import { t } from 'i18n';
 import { mainDocument } from 'overlay';
-import { imageUrls } from 'steamApps';
+import { imageUrls, openUrl } from 'steamApps';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 declare const MainWindowBrowserManager: { m_lastLocation?: { pathname?: string } } | undefined;
@@ -101,12 +101,6 @@ const CSS = `
 .ugi-meta b { width: 40px; height: 40px; flex: none; display: grid; place-items: center; color: #ffffff; font-size: 18px; border-radius: 3px; }
 .ugi-meta a { color: #66c0f4; cursor: pointer; font-size: 12px; }
 `;
-
-// Steam store pages open in Steam's own store; other sites in the web browser
-function openUrl(url: string) {
-	if (url.startsWith('https://store.steampowered.com/')) (SteamClient as any).URL.ExecuteSteamURL(`steam://openurl/${url}`);
-	else (SteamClient as any).System?.OpenInSystemBrowser?.(url);
-}
 
 const Chevron = ({ left }: { left?: boolean }) => (
 	<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">

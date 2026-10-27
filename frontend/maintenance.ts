@@ -4,6 +4,7 @@ import { removeCollections, syncCollections } from 'collections';
 import { setLanguage } from 'i18n';
 import { recreateShortcut, shortcutExists } from 'importer';
 import { resetImages } from 'sgdb';
+import { isSteamApp } from 'steamApps';
 import { UgiState } from 'types';
 
 // Backup to a .zip in Documents\UGI backup, restore from it, and removal of everything UGI did
@@ -44,8 +45,6 @@ const unquotePath = (path: string | undefined) => String(path ?? '').replace(/^"
 const sameShortcut = (a: SteamShortcut, b: { name: string; exe?: string; launch_options?: string }) =>
 	a.name === b.name && unquotePath(a.exe) === unquotePath(b.exe) && a.launch_options === (b.launch_options ?? '');
 
-declare const appStore: { GetAppOverviewByAppID(appid: number): { app_type?: number } | undefined };
-const SHORTCUT_APP_TYPE = 1073741824;
 
 export type Step = (text: string) => void;
 export type Backup = { name: string; path: string };
@@ -72,8 +71,8 @@ export async function pickBackup(): Promise<Backup | null> {
 	return path ? { name: path.split('\\').pop() ?? path, path } : null;
 }
 
-// Steam apps (not imported games) whose artwork UGI changed: recorded since this version, plus
-// the ones UGI looked up on SteamGridDB or gave an icon before
+// Steam apps (not imported games) whose artwork UGI changed: the ones recorded when artwork is
+// applied, plus the ones UGI looked up on SteamGridDB or gave an icon
 async function customizedSteamApps(state: UgiState): Promise<number[]> {
 	const imported = new Set(Object.values(state.imported).map((e) => e.appid));
 	// An empty Lua list arrives as {}
@@ -81,10 +80,7 @@ async function customizedSteamApps(state: UgiState): Promise<number[]> {
 	const ids = new Set<number>(Array.isArray(listed) ? listed : []);
 	for (const key of [...Object.keys(state.sgdb_ids), ...Object.keys(state.custom_icons)]) if (/^\d+$/.test(key)) ids.add(Number(key));
 	// Only Steam apps still in the library (old shortcut ids from earlier imports are left out)
-	return [...ids].filter((id) => {
-		const overview = appStore.GetAppOverviewByAppID(id);
-		return id && !imported.has(id) && !!overview && overview.app_type !== SHORTCUT_APP_TYPE;
-	});
+	return [...ids].filter((id) => id && !imported.has(id) && isSteamApp(id));
 }
 
 // What "Remove everything" will remove, for the confirmation
@@ -100,10 +96,7 @@ export async function removalSummary(state: UgiState): Promise<{ games: number; 
 async function adoptExistingArtwork() {
 	const found = json<unknown>(unquote(await customScan()), []);
 	const known = new Set(json<unknown[]>(unquote(await customList()), []));
-	const adopted = (Array.isArray(found) ? found : []).filter((appid) => {
-		const overview = appStore.GetAppOverviewByAppID(appid);
-		return !known.has(appid) && overview && overview.app_type !== SHORTCUT_APP_TYPE;
-	});
+	const adopted = (Array.isArray(found) ? found : []).filter((appid) => !known.has(appid) && isSteamApp(appid));
 	if (adopted.length) await customMarkMany({ a_appids: JSON.stringify(adopted) });
 }
 

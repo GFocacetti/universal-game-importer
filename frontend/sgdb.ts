@@ -1,11 +1,11 @@
 import { callable } from '@steambrew/client';
-import { unquote } from 'backend';
+import { importedKeyFor, unquote } from 'backend';
+import { isShortcut, simplifyName } from 'steamApps';
 import { UgiState } from 'types';
 
 // Steam image types used by SetCustomArtworkForApp
-export const IMAGE_TYPES = [0, 1, 2, 3, 4] as const;
+const IMAGE_TYPES = [0, 1, 2, 3, 4] as const;
 export type ImageType = (typeof IMAGE_TYPES)[number];
-export const IMAGE_TYPE_NAMES: Record<ImageType, string> = { 0: 'grid', 1: 'hero', 2: 'logo', 3: 'wide grid', 4: 'icon' };
 
 const sgdbGet = callable<[{ a_key: string; b_endpoint: string }], string>('ugi_sgdb_get');
 const download = callable<[{ a_url: string }], number>('ugi_download');
@@ -18,8 +18,7 @@ const iconReset = callable<[{ a_appid: number }], boolean>('ugi_icon_reset');
 // Steam apps whose artwork UGI changed, so that removing UGI can put them back
 const customMark = callable<[{ a_appid: number }], boolean>('ugi_custom_mark');
 
-declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string; app_type?: number } | undefined };
-const SHORTCUT_APP_TYPE = 1073741824;
+declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 
 type Filter = { endpoint: string; dimensions?: string; styles: string; mimes: string; nsfw: string; humor: string };
 
@@ -61,12 +60,6 @@ function effectiveFilter(state: UgiState, type: ImageType): Filter {
 
 export type SgdbImage = { id: number; url: string; thumb: string; mime?: string };
 
-// Optional step-by-step reporting (shown by the test panel while debugging)
-let trace: (msg: string) => void = () => {};
-export function setTrace(fn: (msg: string) => void) {
-	trace = fn;
-}
-
 async function api(state: UgiState, endpoint: string): Promise<any> {
 	if (!state.settings.sgdb_key) throw new Error('missing SteamGridDB API key');
 	const raw = await sgdbGet({ a_key: state.settings.sgdb_key, b_endpoint: endpoint });
@@ -80,40 +73,33 @@ async function api(state: UgiState, endpoint: string): Promise<any> {
 	return body;
 }
 
-// UGI key of an imported shortcut ("gog:1207658754"), if the app is one
-const importedKey = (state: UgiState, appid: number) => Object.entries(state.imported).find(([, e]) => e.appid === appid)?.[0];
-
 // Key of the cached SteamGridDB id: the UGI key for imported games (it survives a re-import), else the appid
-export const sgdbCacheKey = (state: UgiState, appid: number) => importedKey(state, appid) ?? String(appid);
-
-// Same words, ignoring case and punctuation ("DungeonKeeper" is not "Dungeon Keeper")
-const simplify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+export const sgdbCacheKey = (state: UgiState, appid: number) => importedKeyFor(state, appid) ?? String(appid);
 
 // SteamGridDB game id for a Steam app or shortcut (cached in the state)
 export async function gameIdFor(state: UgiState, appid: number): Promise<number | null> {
 	const key = sgdbCacheKey(state, appid);
 	if (state.sgdb_ids[key]) return state.sgdb_ids[key];
-	const overview = appStore.GetAppOverviewByAppID(appid);
 	let id: number | null = null;
-	if (overview?.app_type !== SHORTCUT_APP_TYPE) {
+	if (!isShortcut(appid)) {
 		const res = await api(state, `games/steam/${appid}`);
 		id = res?.success ? res.data?.id ?? null : null;
 	} else {
 		// Epic and GOG games: SteamGridDB knows them by their store id (more precise than the title).
 		// Battle.net codes aren't used: SteamGridDB maps some to an older edition (S1 -> the original StarCraft).
-		const imported = importedKey(state, appid);
+		const imported = importedKeyFor(state, appid);
 		const platform = imported?.startsWith('epic:') ? 'egs' : imported?.startsWith('gog:') ? 'gog' : null;
 		if (platform && imported) {
 			const res = await api(state, `games/${platform}/${encodeURIComponent(imported.slice(imported.indexOf(':') + 1))}`);
 			id = res?.success ? res.data?.id ?? null : null;
 		}
 	}
-	const name = overview?.display_name;
+	const name = appStore.GetAppOverviewByAppID(appid)?.display_name;
 	if (!id && name) {
 		// Prefer a result with the same name, else SteamGridDB's best match
 		const res = await api(state, `search/autocomplete/${encodeURIComponent(name)}`);
 		const results: { id: number; name: string }[] = res?.success && Array.isArray(res.data) ? res.data : [];
-		id = (results.find((r) => simplify(r.name) === simplify(name)) ?? results[0])?.id ?? null;
+		id = (results.find((r) => simplifyName(r.name) === simplifyName(name)) ?? results[0])?.id ?? null;
 	}
 	if (id) state.sgdb_ids[key] = id;
 	return id;
@@ -153,22 +139,20 @@ async function fetchBase64(url: string): Promise<string | null> {
 
 // Applies one SteamGridDB image to an app; returns false if it couldn't be downloaded
 export async function applyImage(appid: number, type: ImageType, url: string): Promise<boolean> {
-	const isShortcut = appStore.GetAppOverviewByAppID(appid)?.app_type === SHORTCUT_APP_TYPE;
-	if (!isShortcut) customMark({ a_appid: appid }).catch(() => {});
+	const shortcut = isShortcut(appid);
+	if (!shortcut) customMark({ a_appid: appid }).catch(() => {});
 	try {
 		if (type === 4) {
 			if (!Number(unquote(await download({ a_url: url })))) return false;
 			// Steam games: icon files written where Steam reads them; shortcuts: icon path through the client API
-			if (!isShortcut) return String(unquote(await iconApply({ a_url: url, b_appid: appid }))) === 'true';
+			if (!shortcut) return String(unquote(await iconApply({ a_url: url, b_appid: appid }))) === 'true';
 			const path = unquote(await downloadSave({ a_url: url, b_name: `${appid}_icon.${extOf(url)}` }));
 			if (!path) return false;
 			SteamClient.Apps.SetShortcutIcon(appid, path);
 			return true;
 		}
-		trace(`${appid} ${IMAGE_TYPE_NAMES[type]}: downloading`);
 		const data = await fetchBase64(url);
 		if (!data) return false;
-		trace(`${appid} ${IMAGE_TYPE_NAMES[type]}: applying`);
 		// Not awaited: Steam may never settle these promises (Easy SteamGrid doesn't await them either)
 		SteamClient.Apps.ClearCustomArtworkForApp(appid, type);
 		SteamClient.Apps.SetCustomArtworkForApp(appid, data, extOf(url), type);
@@ -180,10 +164,8 @@ export async function applyImage(appid: number, type: ImageType, url: string): P
 
 // Applies the first image of the given type that downloads correctly
 async function applyFirst(state: UgiState, appid: number, type: ImageType): Promise<boolean> {
-	trace(`${appid} ${IMAGE_TYPE_NAMES[type]}: finding the game`);
 	const gameId = await gameIdFor(state, appid);
 	if (!gameId) return false;
-	trace(`${appid} ${IMAGE_TYPE_NAMES[type]}: searching images`);
 	for (const image of await imagesFor(state, gameId, type)) {
 		if (await applyImage(appid, type, image.url)) return true;
 	}
@@ -192,8 +174,8 @@ async function applyFirst(state: UgiState, appid: number, type: ImageType): Prom
 
 // Shortcut icons leave no file Steam's detection sees, so one set by UGI is remembered
 function wantedTypes(state: UgiState, appid: number, types: ImageType[]): ImageType[] {
-	const isShortcut = appStore.GetAppOverviewByAppID(appid)?.app_type === SHORTCUT_APP_TYPE;
-	return types.filter((t) => t !== 4 || !isShortcut || !state.custom_icons[String(appid)]);
+	const shortcut = isShortcut(appid);
+	return types.filter((t) => t !== 4 || !shortcut || !state.custom_icons[String(appid)]);
 }
 
 async function applyTracked(state: UgiState, appid: number, type: ImageType): Promise<boolean> {
@@ -204,7 +186,7 @@ async function applyTracked(state: UgiState, appid: number, type: ImageType): Pr
 
 // ---------- Bulk tools ----------
 
-export type Progress = (done: number, total: number) => void;
+type Progress = (done: number, total: number) => void;
 export type StopFlag = { stop: boolean };
 
 // Missing image types per app, read from Steam's local artwork (official + custom)
@@ -275,7 +257,7 @@ export async function replaceGame(state: UgiState, appid: number): Promise<numbe
 // One image type back to Steam's original
 export async function resetImage(appid: number, type: ImageType): Promise<void> {
 	if (type === 4) {
-		if (appStore.GetAppOverviewByAppID(appid)?.app_type !== SHORTCUT_APP_TYPE) await iconReset({ a_appid: appid });
+		if (!isShortcut(appid)) await iconReset({ a_appid: appid });
 		return;
 	}
 	SteamClient.Apps.ClearCustomArtworkForApp(appid, type);
@@ -286,7 +268,7 @@ export async function resetImages(appids: number[], progress: Progress, flag: St
 	for (let i = 0; i < appids.length && !flag.stop; i++) {
 		progress(i, appids.length);
 		for (const type of [0, 1, 2, 3] as ImageType[]) SteamClient.Apps.ClearCustomArtworkForApp(appids[i]!, type);
-		if (appStore.GetAppOverviewByAppID(appids[i]!)?.app_type !== SHORTCUT_APP_TYPE) await iconReset({ a_appid: appids[i]! });
+		if (!isShortcut(appids[i]!)) await iconReset({ a_appid: appids[i]! });
 	}
 	progress(appids.length, appids.length);
 }

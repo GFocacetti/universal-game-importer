@@ -91,13 +91,9 @@ local CUSTOM_SUFFIXES = { [0] = "p", [1] = "_hero", [2] = "_logo", [3] = "", [4]
 
 local function grid_stems()
     local stems = {}
-    local userdata = fs.join(millennium.steam_path(), "userdata")
-    for _, user in ipairs(fs.exists(userdata) and fs.list(userdata) or {}) do
-        if user.is_directory then
-            local grid = fs.join(user.path, "config", "grid")
-            for _, entry in ipairs(fs.exists(grid) and fs.list(grid) or {}) do
-                if entry.is_file then stems[string.lower(fs.stem(entry.path))] = true end
-            end
+    for _, grid in ipairs(require("paths").grid_dirs()) do
+        for _, entry in ipairs(fs.list(grid) or {}) do
+            if entry.is_file then stems[string.lower(fs.stem(entry.path))] = true end
         end
     end
     return stems

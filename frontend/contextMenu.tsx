@@ -1,9 +1,10 @@
-// "Images (UGI)…" entry in the library's right-click menu, opening the gallery.
+// "Customize (UGI)…" entry in the library's right-click menu, opening the gallery.
 // Hooking technique from steam-easygrid by luthor112 (MIT), see THIRD_PARTY_NOTICES.md
 import { afterPatch, fakeRenderComponent, findInReactTree, findInTree, findModuleByExport, MenuItem } from '@steambrew/client';
 import React from 'react';
 import { openGallery } from 'Gallery';
 import { t } from 'i18n';
+import { mainDocument } from 'overlay';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 
@@ -22,15 +23,6 @@ const findAppId = (tree: any, owner: any): number | undefined => {
 	const found = findInTree(tree, (node: any) => node?.app?.appid || node?.overview?.appid, { walkable: ['props', 'children', '_owner', 'pendingProps'] });
 	return found?.app?.appid ?? found?.overview?.appid;
 };
-
-// The main Steam window, where the gallery opens
-function mainDocument(): Document | undefined {
-	let doc: Document | undefined;
-	(window as any).g_PopupManager?.m_mapPopups?.forEach?.((popup: any) => {
-		if (!doc && String(popup?.m_strName ?? '').startsWith('SP Desktop')) doc = popup?.m_popup?.document;
-	});
-	return doc;
-}
 
 function insertItem(items: any[], appid: number): boolean {
 	if (!appid || items.find((item: any) => item?.key === KEY)) return false;

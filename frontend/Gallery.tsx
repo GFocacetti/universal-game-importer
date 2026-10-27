@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
 import { applyImage, FILTER_OPTIONS, gameIdFor, imagesFor, ImageType, replaceGame, resetImage, SgdbImage, sgdbCacheKey, UserFilter } from 'sgdb';
-import { ImageKind } from 'steamApps';
+import { ImageKind, openUrl } from 'steamApps';
 import { SteamImage } from 'SteamImage';
 import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
@@ -110,7 +110,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 	};
 
 	const openWebsite = () => {
-		if (gameId) (SteamClient as any).System?.OpenInSystemBrowser?.(`https://www.steamgriddb.com/game/${gameId}`);
+		if (gameId) openUrl(`https://www.steamgriddb.com/game/${gameId}`);
 	};
 
 	const options = FILTER_OPTIONS[type];

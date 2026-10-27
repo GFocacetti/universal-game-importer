@@ -1,7 +1,7 @@
 // Theme tokens: every UGI screen uses these variables, so both themes stay in sync.
-// Values from the approved mockups ("Steam nativo" default, "Moderno" as an option).
+// Two themes: "Steam" (default, like Steam's own screens) and "Modern".
 
-export type ThemeName = 'steam' | 'modern';
+type ThemeName = 'steam' | 'modern';
 
 const TOKENS: Record<ThemeName, Record<string, string>> = {
 	steam: {

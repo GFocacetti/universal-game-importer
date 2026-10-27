@@ -35,22 +35,10 @@ function ugi_save_state(json)
     return true
 end
 
--- Startup diagnostics from the frontend, appended to data/frontend.log
-function ugi_log(a_message)
-    local f = io.open(require("fs").join(require("paths").data_dir(), "frontend.log"), "a")
-    if f then
-        f:write(os.date("%Y-%m-%d %H:%M:%S "), tostring(a_message), "\n")
-        f:close()
-    end
-    return true
-end
-
 local function on_load()
     logger:info("UGI backend loading, Millennium " .. tostring(millennium.version()))
     -- Ready first: nothing slow may run before this, or Steam's startup waits for it
     millennium.ready()
-    -- Leftover from an earlier build that cached Store lookups in the plugin config
-    if millennium.config.get("ugi_xbox_kinds") ~= nil then millennium.config.delete("ugi_xbox_kinds") end
     launchers.prepare_all()
 end
 

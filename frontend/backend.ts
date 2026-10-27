@@ -58,6 +58,11 @@ export async function loadState(): Promise<UgiState> {
 	};
 }
 
+// UGI key of an imported game ("gog:1207658754") from its appid
+export function importedKeyFor(state: UgiState, appid: number): string | undefined {
+	return Object.entries(state.imported).find(([, e]) => e.appid === appid)?.[0];
+}
+
 export async function saveState(state: UgiState): Promise<boolean> {
 	return ugiSaveState({ json: JSON.stringify(state) });
 }

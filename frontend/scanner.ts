@@ -23,7 +23,3 @@ export async function runScan(): Promise<ScanOutcome> {
 	return { plan: planSync(result.games, result.launchers, state), launchers: result.launchers, games: result.games };
 }
 
-// Something worth showing to the user: new games, or games to remove / update
-export function hasChanges(plan: SyncPlan): boolean {
-	return plan.newGames.length > 0 || plan.gone.length > 0 || plan.outdated.length > 0;
-}

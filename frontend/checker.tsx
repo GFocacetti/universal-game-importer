@@ -44,7 +44,7 @@ function Toast({ plan, onOpen, onClose }: { plan: SyncPlan; onOpen: () => void; 
 }
 
 // Opens the review list for the new games inside the UGI page
-export function showReview(plan: SyncPlan) {
+function showReview(plan: SyncPlan) {
 	setPendingReview(plan);
 	Navigation.Navigate(UGI_ROUTE);
 }
