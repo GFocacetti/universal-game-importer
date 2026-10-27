@@ -552,12 +552,20 @@ function alignSide(m: Mounted) {
 		}
 	}
 
+	const player = head.querySelector<HTMLElement>('.ugi-player');
 	if (!glance || !heading || !row || view?.getComputedStyle(row).flexDirection === 'column') {
 		if (glance?.style.flexBasis) glance.style.flexBasis = '';
+		if (player?.style.marginRight) player.style.marginRight = '';
 		return;
 	}
 	const width = `${Math.max(0, glance.getBoundingClientRect().right - heading.getBoundingClientRect().left)}px`;
 	if (glance.style.flexBasis !== width) glance.style.flexBasis = width;
+
+	// The player ends where the description does; the summary stays put
+	if (player) {
+		const delta = player.getBoundingClientRect().right - block.getBoundingClientRect().right;
+		if (Math.abs(delta) >= 1) player.style.marginRight = `${Math.max(0, (parseFloat(player.style.marginRight) || 0) + delta)}px`;
+	}
 }
 
 async function refreshImported() {
