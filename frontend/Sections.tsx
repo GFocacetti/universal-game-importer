@@ -130,7 +130,7 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 	const [ask, setAsk] = useState<{ title: string; go: () => void } | null>(null);
 	const [backup, setBackup] = useState<CancelFlag | null>(null);
 
-	// Games only: tools Steam keeps in the library (dedicated servers, SDKs, benchmarks) are left out
+	// Games and demos: tools Steam keeps in the library (dedicated servers, SDKs, benchmarks) are left out
 	const appids = (): number[] => {
 		if (scope === 'imported') return Object.values(state.imported).map((e) => e.appid);
 		const apps = scope.startsWith('coll:')

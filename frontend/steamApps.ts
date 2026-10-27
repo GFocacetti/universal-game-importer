@@ -16,10 +16,10 @@ const SHORTCUT_APP_TYPE = 1073741824;
 // A non-Steam shortcut (every imported game is one)
 export const isShortcut = (appid: number) => appStore.GetAppOverviewByAppID(appid)?.app_type === SHORTCUT_APP_TYPE;
 
-// A game (Steam's app type 1) or a non-Steam shortcut, not a tool or a demo
+// A game or demo (Steam's app types 1 and 8) or a non-Steam shortcut, not a tool or an application
 export function isGameOrShortcut(appid: number): boolean {
 	const type = appStore.GetAppOverviewByAppID(appid)?.app_type;
-	return type === 1 || type === SHORTCUT_APP_TYPE;
+	return type === 1 || type === 8 || type === SHORTCUT_APP_TYPE;
 }
 
 // A Steam app that is in the library
