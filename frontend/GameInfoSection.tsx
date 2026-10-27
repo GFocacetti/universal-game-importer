@@ -242,13 +242,30 @@ function rightColumn(notice: HTMLElement): HTMLElement | null {
 	return null;
 }
 
-// The side box starts level with the "About this game" block
+// The side box starts level with the "About this game" block, and has the same side edges as the
+// first section of Steam's column (the notes)
 function alignSide(m: Mounted) {
 	const anchor = m.host.querySelector('.ugi-info');
 	if (!m.side || !anchor) return;
 	const delta = anchor.getBoundingClientRect().top - m.side.getBoundingClientRect().top;
-	if (Math.abs(delta) < 1) return;
-	m.side.style.marginTop = `${Math.max(0, (parseFloat(m.side.style.marginTop) || 0) + delta)}px`;
+	if (Math.abs(delta) >= 1) m.side.style.marginTop = `${Math.max(0, (parseFloat(m.side.style.marginTop) || 0) + delta)}px`;
+
+	const column = m.column?.getBoundingClientRect();
+	const section = m.side.nextElementSibling;
+	// The notes box: the first element set in from the column's edges and almost as wide
+	const edge =
+		column &&
+		section &&
+		Array.from(section.querySelectorAll('*')).find((el) => {
+			const r = el.getBoundingClientRect();
+			return r.left > column.left + 1 && r.width > column.width * 0.8;
+		});
+	if (!column || !edge) return;
+	const r = edge.getBoundingClientRect();
+	const left = `${Math.max(0, r.left - column.left)}px`;
+	const right = `${Math.max(0, column.right - r.right)}px`;
+	if (m.side.style.marginLeft !== left) m.side.style.marginLeft = left;
+	if (m.side.style.marginRight !== right) m.side.style.marginRight = right;
 }
 
 async function refreshImported() {
@@ -301,12 +318,14 @@ async function tick() {
 		</>,
 	);
 	mounted = { host, root, appid, notice, side, column };
-	// Realigned as soon as the block changes size (text and pictures loading)
+	// Realigned as soon as the block or the right column changes size (pictures loading, window resized)
 	const view = doc.defaultView as (Window & typeof globalThis) | null;
 	if (view?.ResizeObserver) {
 		const current = mounted;
 		current.observer = new view.ResizeObserver(() => alignSide(current));
 		current.observer.observe(host);
+		// The notes narrow with the window: the side box follows at once
+		if (column) current.observer.observe(column);
 	}
 }
 
