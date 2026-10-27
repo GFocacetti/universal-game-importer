@@ -14,10 +14,12 @@ declare const MainWindowBrowserManager: { m_lastLocation?: { pathname?: string }
 
 const SOURCE_NAMES: Record<GameInfo['source'], string> = { steam: 'Steam', gog: 'GOG', epic: 'Epic Games Store', rawg: 'RAWG' };
 
-// Laid out like a Steam store page: media player and summary on top, description and system
-// requirements below; features, languages, age rating and Metacritic in Steam's right column
+// Laid out like a Steam store page: media player and summary across the whole page on top; below,
+// description and system requirements on the left, and features, languages, age rating and Metacritic
+// at the top of Steam's right column (above the notes)
 const CSS = `
 .ugi-info { container-type: inline-size; overflow-wrap: anywhere; margin: 0 0 16px; padding: 16px 20px; background: rgba(0,0,0,.2); border-radius: 3px; color: #dcdedf; font-family: "Motiva Sans", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
+.ugi-info h2.first { margin-top: 0; }
 .ugi-info h2 { margin: 18px 0 10px; padding-bottom: 4px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #ffffff; border-bottom: 1px solid rgba(255,255,255,.08); }
 .ugi-info-text p { margin: 0 0 10px; white-space: pre-line; text-align: justify; }
 .ugi-info-text h3 { margin: 16px 0 6px; font-size: 14px; font-weight: 700; color: #ffffff; }
@@ -26,7 +28,7 @@ const CSS = `
 .ugi-info-muted { color: #8f98a0; }
 .ugi-top { display: flex; gap: 16px; align-items: flex-start; }
 .ugi-top .ugi-player { flex: 1 1 auto; min-width: 0; }
-.ugi-glance { flex: 0 0 36%; min-width: 0; font-size: 12px; line-height: 1.45; }
+.ugi-glance { flex: 0 0 32%; min-width: 0; font-size: 12px; line-height: 1.45; }
 .ugi-top > .ugi-glance:only-child { flex: 1 1 auto; }
 .ugi-glance-header { width: 100%; aspect-ratio: 460 / 215; object-fit: cover; display: block; margin-bottom: 10px; }
 .ugi-glance-summary { margin: 0 0 12px; color: #c6d4df; font-size: 13px; line-height: 1.45; }
@@ -294,7 +296,7 @@ function SidePanels({ info }: { info: GameInfo }) {
 	);
 }
 
-function InfoBlock({ appid, sideHost }: { appid: number; sideHost: HTMLElement | null }) {
+function InfoBlock({ appid, sideHost, topHost }: { appid: number; sideHost: HTMLElement | null; topHost: HTMLElement | null }) {
 	const [info, setInfo] = useState<GameInfo | null | undefined>(undefined);
 
 	useEffect(() => {
@@ -367,37 +369,49 @@ function InfoBlock({ appid, sideHost }: { appid: number; sideHost: HTMLElement |
 			</div>
 		);
 
+	const top = (
+		<div className="ugi-top">
+			{media.length > 0 && <Player media={media} />}
+			<div className="ugi-glance">
+				<FirstImage urls={headers} className="ugi-glance-header" />
+				{info.summary && <p className="ugi-glance-summary">{info.summary}</p>}
+				{rows.length > 0 && (
+					<div className="ugi-glance-grid">
+						{rows.map(([label, value]) => (
+							<React.Fragment key={label}>
+								<div className="ugi-glance-label">{label}</div>
+								<div className="ugi-glance-value">{value}</div>
+							</React.Fragment>
+						))}
+					</div>
+				)}
+				{info.genres.length > 0 && (
+					<div className="ugi-chips">
+						{info.genres.map((g) =>
+							info.links?.[g] ? (
+								<span key={g} className="ugi-chip" onClick={() => openUrl(info.links![g]!)}>{g}</span>
+							) : (
+								<span key={g} className="ugi-chip plain">{g}</span>
+							),
+						)}
+					</div>
+				)}
+			</div>
+		</div>
+	);
+
 	return (
 		<div className="ugi-info">
-			<div className="ugi-top">
-				{media.length > 0 && <Player media={media} />}
-				<div className="ugi-glance">
-					<FirstImage urls={headers} className="ugi-glance-header" />
-					{info.summary && <p className="ugi-glance-summary">{info.summary}</p>}
-					{rows.length > 0 && (
-						<div className="ugi-glance-grid">
-							{rows.map(([label, value]) => (
-								<React.Fragment key={label}>
-									<div className="ugi-glance-label">{label}</div>
-									<div className="ugi-glance-value">{value}</div>
-								</React.Fragment>
-							))}
-						</div>
-					)}
-					{info.genres.length > 0 && (
-						<div className="ugi-chips">
-							{info.genres.map((g) =>
-								info.links?.[g] ? (
-									<span key={g} className="ugi-chip" onClick={() => openUrl(info.links![g]!)}>{g}</span>
-								) : (
-									<span key={g} className="ugi-chip plain">{g}</span>
-								),
-							)}
-						</div>
-					)}
-				</div>
-			</div>
-			<h2>{t('info.title')}</h2>
+			{topHost
+				? createPortal(
+						<div className="ugi-info ugi-info-head">
+							<style>{CSS}</style>
+							{top}
+						</div>,
+						topHost,
+					)
+				: top}
+			<h2 className="first">{t('info.title')}</h2>
 			<div className="ugi-info-text">
 				{info.description.split('\n\n').filter(Boolean).map((p, i) => (p.startsWith('# ') ? <h3 key={i}>{p.slice(2)}</h3> : <p key={i}>{p}</p>))}
 			</div>
@@ -420,7 +434,17 @@ function InfoBlock({ appid, sideHost }: { appid: number; sideHost: HTMLElement |
 
 // ---------- Placing the block in Steam's page ----------
 
-type Mounted = { host: HTMLElement; root: Root; appid: number; notice: HTMLElement; side: HTMLElement | null; column: HTMLElement | null; observer?: ResizeObserver };
+type Mounted = {
+	host: HTMLElement;
+	root: Root;
+	appid: number;
+	notice: HTMLElement;
+	side: HTMLElement | null;
+	column: HTMLElement | null;
+	// Player and summary, across both columns
+	top: HTMLElement | null;
+	observer?: ResizeObserver;
+};
 let mounted: Mounted | null = null;
 let importedAppids = new Set<number>();
 let lastStateLoad = 0;
@@ -433,6 +457,7 @@ function unmount() {
 	mounted.observer?.disconnect();
 	mounted.host.remove();
 	mounted.side?.remove();
+	mounted.top?.remove();
 	showNotice(mounted.notice);
 	mounted = null;
 }
@@ -459,11 +484,11 @@ function shortcutNotice(doc: Document, name: string): HTMLElement | null {
 	return null;
 }
 
-// Steam's right column (notes, screenshots): a sibling of the column holding the box
-function rightColumn(notice: HTMLElement): HTMLElement | null {
+// Steam's two columns: the one holding the box, and the right one (notes, screenshots) next to it
+function columns(notice: HTMLElement): { left: HTMLElement; right: HTMLElement } | null {
 	for (let el: HTMLElement | null = notice; el?.parentElement; el = el.parentElement) {
 		const found = Array.from(el.parentElement.children).find((sibling) => sibling !== el && sibling.classList.contains('RightColumn'));
-		if (found) return found as HTMLElement;
+		if (found) return { left: el, right: found as HTMLElement };
 	}
 	return null;
 }
@@ -492,6 +517,14 @@ function alignSide(m: Mounted) {
 	const right = `${Math.max(0, column.right - r.right)}px`;
 	if (m.side.style.marginLeft !== left) m.side.style.marginLeft = left;
 	if (m.side.style.marginRight !== right) m.side.style.marginRight = right;
+
+	// The top part spans from the left edge of the description to the right edge of the notes
+	const container = m.top?.parentElement?.getBoundingClientRect();
+	if (!m.top || !container) return;
+	const topLeft = `${Math.max(0, m.host.getBoundingClientRect().left - container.left)}px`;
+	const topRight = `${Math.max(0, container.right - r.right)}px`;
+	if (m.top.style.marginLeft !== topLeft) m.top.style.marginLeft = topLeft;
+	if (m.top.style.marginRight !== topRight) m.top.style.marginRight = topRight;
 }
 
 async function refreshImported() {
@@ -517,7 +550,8 @@ async function tick() {
 		mounted.host.isConnected &&
 		mounted.host.nextElementSibling === mounted.notice &&
 		mounted.notice.dataset.ugiStyle !== undefined &&
-		(!mounted.side || (mounted.side.isConnected && mounted.column?.firstElementChild === mounted.side))
+		(!mounted.side || (mounted.side.isConnected && mounted.column?.firstElementChild === mounted.side)) &&
+		(!mounted.top || mounted.top.isConnected)
 	) {
 		alignSide(mounted);
 		return;
@@ -528,22 +562,30 @@ async function tick() {
 
 	unmount();
 	// Measured while Steam's box is still visible
-	const column = rightColumn(notice);
+	const cols = columns(notice);
+	const column = cols?.right ?? null;
 	const host = doc.createElement('div');
 	notice.insertAdjacentElement('beforebegin', host);
 	hideNotice(notice);
 	const side = column ? doc.createElement('div') : null;
 	if (column && side) column.insertAdjacentElement('afterbegin', side);
+	// Above both columns, like the store's media section
+	let top: HTMLElement | null = null;
+	if (cols) {
+		top = doc.createElement('div');
+		const first = cols.left.compareDocumentPosition(cols.right) & Node.DOCUMENT_POSITION_FOLLOWING ? cols.left : cols.right;
+		first.insertAdjacentElement('beforebegin', top);
+	}
 	// Like Steam's box: its own layout context, so it narrows beside the floating right column
 	host.style.display = 'flow-root';
 	const root = createRoot(host);
 	root.render(
 		<>
 			<style>{CSS}</style>
-			<InfoBlock appid={appid} sideHost={side} />
+			<InfoBlock appid={appid} sideHost={side} topHost={top} />
 		</>,
 	);
-	mounted = { host, root, appid, notice, side, column };
+	mounted = { host, root, appid, notice, side, column, top };
 	// Realigned as soon as the block or the right column changes size (pictures loading, window resized)
 	const view = doc.defaultView as (Window & typeof globalThis) | null;
 	if (view?.ResizeObserver) {
@@ -552,6 +594,7 @@ async function tick() {
 		current.observer.observe(host);
 		// The notes narrow with the window: the side box follows at once
 		if (column) current.observer.observe(column);
+		if (top) current.observer.observe(top);
 	}
 }
 
