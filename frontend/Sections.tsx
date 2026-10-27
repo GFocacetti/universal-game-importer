@@ -4,6 +4,7 @@ import { removeCollections, removeLauncherCollection, syncCollections } from 'co
 import { LanguageChoice, setLanguage, t } from 'i18n';
 import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag } from 'sgdb';
 import { LAUNCHER_NAMES } from 'steamApps';
+import { CancelFlag, exportBackup } from 'maintenance';
 import { UgiState } from 'types';
 
 declare const collectionStore: {
@@ -106,6 +107,9 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 	const [flag, setFlag] = useState<StopFlag | null>(null);
 	const [progress, setProgress] = useState<{ label: string; done: number; total: number } | null>(null);
 	const [result, setResult] = useState('');
+	// "Replace all" and "Restore" overwrite the current pictures: confirmed first, with a backup offered
+	const [ask, setAsk] = useState<{ title: string; go: () => void } | null>(null);
+	const [backup, setBackup] = useState<CancelFlag | null>(null);
 
 	const appids = (): number[] => {
 		if (scope === 'imported') return Object.values(state.imported).map((e) => e.appid);
@@ -131,6 +135,22 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 		onChanged();
 	};
 
+	const backupThen = async (go: () => void) => {
+		const f: CancelFlag = { cancel: false };
+		setBackup(f);
+		setResult('');
+		try {
+			const out = await exportBackup(f);
+			setBackup(null);
+			if (out.path) go();
+			else setResult(out.cancelled ? t('images.backupCancelled') : t('maint.error'));
+		} catch (err) {
+			console.error('[UGI] backup before images failed', err);
+			setBackup(null);
+			setResult(t('maint.error'));
+		}
+	};
+
 	const names: Record<ImageType, string> = { 0: t('image.grid'), 1: t('image.hero'), 2: t('image.logo'), 3: t('image.wide'), 4: t('image.icon') };
 	const noKey = !state.settings.sgdb_key;
 
@@ -144,6 +164,30 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 					{collectionStore.userCollections.map((c) => <option key={c.id} value={`coll:${c.id}`}>{t('images.scopeCollection', { name: c.displayName })}</option>)}
 				</select>
 			</div>
+			{backup && (
+				<div className="ugi-card">
+					<div className="ugi-row-between">
+						<strong>{t('maint.backupBusy')}</strong>
+						<span className="ugi-row-between" style={{ gap: 12 }}>
+							<button className="ugi-btn secondary" onClick={() => (backup.cancel = true)}>{t('maint.stop')}</button>
+							<div className="ugi-spinner" />
+						</span>
+					</div>
+				</div>
+			)}
+			{ask && (
+				<div className="ugi-overlay" onClick={() => setAsk(null)}>
+					<div className="ugi-dialog" onClick={(e) => e.stopPropagation()}>
+						<h2>{ask.title}</h2>
+						<p>{t('images.confirmText', { n: appids().length })}</p>
+						<div className="ugi-foot">
+							<button className="ugi-btn secondary" onClick={() => setAsk(null)}>{t('common.cancel')}</button>
+							<button className="ugi-btn secondary" onClick={() => { const go = ask.go; setAsk(null); go(); }}>{t('images.withoutBackup')}</button>
+							<button className="ugi-btn primary" onClick={() => { const go = ask.go; setAsk(null); backupThen(go); }}>{t('images.backupFirst')}</button>
+						</div>
+					</div>
+				</div>
+			)}
 			{progress && (
 				<div className="ugi-card">
 					<div className="ugi-row-between">
@@ -172,14 +216,20 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 				<div className="ugi-card">
 					<h3>{t('images.replace')}</h3>
 					<p>{t('images.replaceText')}</p>
-					<button className="ugi-btn secondary" disabled={!!flag || noKey} onClick={() => run(t('images.replace'), async (ids, p, f, s) => t('images.applied', { n: await replaceAll(s, ids, [0, 1, 2, 3, 4], p, f) }))}>{t('images.replaceButton')}</button>
+					<button className="ugi-btn secondary" disabled={!!flag || !!backup || noKey} onClick={() => setAsk({
+						title: t('images.replace'),
+						go: () => run(t('images.replace'), async (ids, p, f, s) => t('images.applied', { n: await replaceAll(s, ids, [0, 1, 2, 3, 4], p, f) })),
+					})}>{t('images.replaceButton')}</button>
 				</div>
 				<div className="ugi-card">
 					<h3>{t('images.reset')}</h3>
 					<p>{t('images.resetText')}</p>
-					<button className="ugi-btn secondary" disabled={!!flag} onClick={() => run(t('images.reset'), async (ids, p, f) => {
-						await resetImages(ids, p, f);
-						return t('images.resetDone');
+					<button className="ugi-btn secondary" disabled={!!flag || !!backup} onClick={() => setAsk({
+						title: t('images.reset'),
+						go: () => run(t('images.reset'), async (ids, p, f) => {
+							await resetImages(ids, p, f);
+							return t('images.resetDone');
+						}),
 					})}>{t('images.resetButton')}</button>
 				</div>
 			</div>
