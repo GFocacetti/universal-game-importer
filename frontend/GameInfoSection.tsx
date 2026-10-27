@@ -1,5 +1,6 @@
 // "About this game" section in the library page of imported games. Steam shows a dashed box there
 // ("some detailed information is not available for non-Steam shortcuts"): UGI's block takes its place.
+import Hls from 'hls.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
@@ -120,19 +121,39 @@ const PlayIcon = () => (
 	</svg>
 );
 
-// Steam's trailers are HLS streams: played here only if this browser can
-let hlsSupport: boolean | null = null;
-function canPlayHls(doc: Document): boolean {
-	hlsSupport ??= doc.createElement('video').canPlayType('application/vnd.apple.mpegurl') !== '';
-	return hlsSupport;
+// Steam's trailers are HLS streams (video and audio in separate tracks): played with hls.js, or by
+// the browser itself where it can. If neither works, the trailer opens on its store page.
+function Trailer({ video, onFail }: { video: Video; onFail: () => void }) {
+	const element = useRef<HTMLVideoElement>(null);
+	useEffect(() => {
+		const el = element.current;
+		if (!el || !video.hls) return onFail();
+		if (Hls.isSupported()) {
+			const hls = new Hls();
+			hls.on(Hls.Events.ERROR, (_event, data) => {
+				if (data.fatal) onFail();
+			});
+			hls.loadSource(video.hls);
+			hls.attachMedia(el);
+			return () => hls.destroy();
+		}
+		if (el.canPlayType('application/vnd.apple.mpegurl')) {
+			el.src = video.hls;
+			return;
+		}
+		onFail();
+	}, [video.hls]);
+	return <video ref={element} poster={video.thumb} controls autoPlay muted onError={onFail} />;
 }
 
 type Media = { thumb: string; full?: string; video?: Video };
 
-function MediaView({ item, doc, onZoom }: { item: Media; doc: Document; onZoom?: () => void }) {
+function MediaView({ item, onZoom }: { item: Media; onZoom?: () => void }) {
+	const [failed, setFailed] = useState(false);
+	useEffect(() => setFailed(false), [item]);
 	if (!item.video) return <img src={item.full} onClick={onZoom} />;
 	const video = item.video;
-	if (video.hls && canPlayHls(doc)) return <video key={video.hls} src={video.hls} poster={video.thumb} controls autoPlay muted />;
+	if (video.hls && !failed) return <Trailer key={video.hls} video={video} onFail={() => setFailed(true)} />;
 	return (
 		<>
 			<img src={video.thumb} />
@@ -180,11 +201,10 @@ function Player({ media }: { media: Media[] }) {
 	}, [full, media.length]);
 
 	const current = media[Math.min(index, media.length - 1)]!;
-	const doc = box.current?.ownerDocument ?? document;
 	return (
 		<div className="ugi-player" ref={box}>
 			<div className={`ugi-player-main${current.video ? '' : ' image'}`}>
-				<MediaView item={current} doc={doc} onZoom={() => setFull(true)} />
+				<MediaView item={current} onZoom={() => setFull(true)} />
 			</div>
 			<div className="ugi-player-strip">
 				<button className="ugi-player-arrow" onClick={() => go(-1)}><Chevron left /></button>
@@ -203,7 +223,7 @@ function Player({ media }: { media: Media[] }) {
 					<div className="ugi-full" onClick={() => setFull(false)}>
 						<style>{CSS}</style>
 						<div onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
-							<MediaView item={current} doc={doc} />
+							<MediaView item={current} />
 						</div>
 						<button className="ugi-full-arrow left" onClick={(e) => { e.stopPropagation(); go(-1); }}><Chevron left /></button>
 						<button className="ugi-full-arrow right" onClick={(e) => { e.stopPropagation(); go(1); }}><Chevron /></button>

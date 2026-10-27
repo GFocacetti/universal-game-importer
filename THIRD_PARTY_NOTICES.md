@@ -25,3 +25,10 @@ It includes or is derived from the following third-party works, used under their
 - License: MIT — full text in `LICENSES/MIT-millennium-uwp-library-sync.txt`
 - Used for: the project's starting point. The Xbox / Microsoft Store discovery script and the UWP launch helper in `backend/launchers/xbox.lua` are derived from it.
 - Changes: discovery reworked (game detection via `MicrosoftGame.config`, UTF-8 output, hidden system apps); the launch helper runs through `conhost --headless`; shortcuts are no longer written to `shortcuts.vdf` but added live through Steam's client API; the rest of the plugin was rewritten for UGI.
+
+## hls.js
+
+- Source: https://github.com/video-dev/hls.js
+- Authors: Dailymotion and hls.js contributors
+- License: Apache-2.0 — full text in `LICENSES/Apache-2.0-hls.js.txt`
+- Used for: playing Steam store trailers (HLS streams) in the game information player, `frontend/GameInfoSection.tsx`. Bundled unchanged in the built frontend.

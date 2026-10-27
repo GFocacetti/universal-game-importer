@@ -18,5 +18,8 @@
   "description": "Imports games from other launchers into your Steam library.",
   "main": "./frontend/index.jsx",
   "author": "Giuseppe Focacetti",
-  "license": "GPL-3.0-only"
+  "license": "GPL-3.0-only",
+  "dependencies": {
+    "hls.js": "^1.7.3"
+  }
 }
