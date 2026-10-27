@@ -7,6 +7,7 @@ import { LAUNCHER_NAMES } from 'steamApps';
 import { CancelFlag, exportBackup } from 'maintenance';
 import { UgiState } from 'types';
 
+declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 declare const collectionStore: {
 	allAppsCollection: { allApps: { appid: number }[] };
 	userCollections: { id: string; displayName: string; allApps: { appid: number }[] }[];
@@ -122,7 +123,8 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged: () => void }) {
 	const [scope, setScope] = useState('all');
 	const [flag, setFlag] = useState<StopFlag | null>(null);
-	const [progress, setProgress] = useState<{ label: string; done: number; total: number } | null>(null);
+	// The running operation: what it does, where it is, what it changed so far
+	const [progress, setProgress] = useState<{ label: string; text: string; done: number; total: number; current?: string; applied?: number; games?: number } | null>(null);
 	const [result, setResult] = useState('');
 	// "Replace all" and "Restore" overwrite the current pictures: confirmed first, with a backup offered
 	const [ask, setAsk] = useState<{ title: string; go: () => void } | null>(null);
@@ -134,16 +136,21 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 		return collectionStore.allAppsCollection.allApps.map((a) => a.appid);
 	};
 
-	const run = async (label: string, job: (ids: number[], p: (d: number, tt: number) => void, f: StopFlag, s: UgiState) => Promise<string>) => {
+	const run = async (label: string, text: string, job: (ids: number[], p: (d: number, tt: number, applied?: number, games?: number) => void, f: StopFlag, s: UgiState) => Promise<string>) => {
 		const f: StopFlag = { stop: false };
 		setFlag(f);
 		setResult('');
 		const s = await loadState();
 		const ids = appids();
 		try {
-			const text = await job(ids, (done, total) => setProgress({ label, done, total }), f, s);
+			const outcome = await job(
+				ids,
+				(done, total, applied, games) => setProgress({ label, text, done, total, applied, games, current: ids[done] ? appStore.GetAppOverviewByAppID(ids[done]!)?.display_name : undefined }),
+				f,
+				s,
+			);
 			await saveState(s);
-			setResult(f.stop ? t('images.stopped', { result: text }) : text);
+			setResult(f.stop ? t('images.stopped', { result: outcome }) : outcome);
 		} catch (err) {
 			setResult(String(err).includes('API key') ? t('gallery.keyError') : t('gallery.error'));
 		}
@@ -211,8 +218,15 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 						<strong>{progress.label}</strong>
 						<button className="ugi-btn secondary" onClick={() => flag && (flag.stop = true)}>{t('images.stop')}</button>
 					</div>
+					<p className="ugi-muted" style={{ margin: '4px 0 8px' }}>{progress.text}</p>
 					<div className="ugi-progress"><b style={{ width: `${progress.total ? (100 * progress.done) / progress.total : 0}%` }} /></div>
-					<span className="ugi-muted">{t('images.progress', { done: progress.done, total: progress.total })}</span>
+					<div className="ugi-row-between ugi-muted">
+						<span>
+							{t('images.progress', { done: progress.done, total: progress.total })}
+							{progress.current && <> · {t('images.current', { name: progress.current })}</>}
+						</span>
+						{progress.applied !== undefined && <span>{t('images.sofar', { n: progress.applied, games: progress.games ?? 0 })}</span>}
+					</div>
 				</div>
 			)}
 			{result && <div className="ugi-card">{result}</div>}
@@ -220,7 +234,7 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 				<div className="ugi-card">
 					<h3>{t('images.check')}</h3>
 					<p>{t('images.checkText')}</p>
-					<button className="ugi-btn secondary" disabled={!!flag} onClick={() => run(t('images.check'), async (ids) => {
+					<button className="ugi-btn secondary" disabled={!!flag} onClick={() => run(t('images.check'), t('images.checkRunning'), async (ids) => {
 						const counts = await checkMissing(ids);
 						return t('images.checkResult', { n: ids.length }) + ' ' + (Object.keys(counts) as unknown as ImageType[]).map((ty) => `${names[ty]} ${counts[ty]}`).join(' · ');
 					})}>{t('images.checkButton')}</button>
@@ -228,14 +242,14 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 				<div className="ugi-card">
 					<h3>{t('images.fill')}</h3>
 					<p>{t('images.fillText')}</p>
-					<button className="ugi-btn primary" disabled={!!flag || noKey} onClick={() => run(t('images.fill'), async (ids, p, f, s) => t('images.applied', { n: await fillMissing(s, ids, p, f) }))}>{t('images.fillButton')}</button>
+					<button className="ugi-btn primary" disabled={!!flag || noKey} onClick={() => run(t('images.fill'), t('images.fillRunning'), async (ids, p, f, s) => t('images.applied', { n: await fillMissing(s, ids, p, f) }))}>{t('images.fillButton')}</button>
 				</div>
 				<div className="ugi-card">
 					<h3>{t('images.replace')}</h3>
 					<p>{t('images.replaceText')}</p>
 					<button className="ugi-btn secondary" disabled={!!flag || !!backup || noKey} onClick={() => setAsk({
 						title: t('images.replace'),
-						go: () => run(t('images.replace'), async (ids, p, f, s) => t('images.applied', { n: await replaceAll(s, ids, [0, 1, 2, 3, 4], p, f) })),
+						go: () => run(t('images.replace'), t('images.replaceRunning'), async (ids, p, f, s) => t('images.applied', { n: await replaceAll(s, ids, [0, 1, 2, 3, 4], p, f) })),
 					})}>{t('images.replaceButton')}</button>
 				</div>
 				<div className="ugi-card">
@@ -243,7 +257,7 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 					<p>{t('images.resetText')}</p>
 					<button className="ugi-btn secondary" disabled={!!flag || !!backup} onClick={() => setAsk({
 						title: t('images.reset'),
-						go: () => run(t('images.reset'), async (ids, p, f) => {
+						go: () => run(t('images.reset'), t('images.resetRunning'), async (ids, p, f) => {
 							await resetImages(ids, p, f);
 							return t('images.resetDone');
 						}),

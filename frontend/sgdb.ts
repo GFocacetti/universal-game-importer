@@ -186,7 +186,8 @@ async function applyTracked(state: UgiState, appid: number, type: ImageType): Pr
 
 // ---------- Bulk tools ----------
 
-type Progress = (done: number, total: number) => void;
+// done / total games; applied images and changed games so far
+type Progress = (done: number, total: number, applied?: number, games?: number) => void;
 export type StopFlag = { stop: boolean };
 
 // Missing image types per app, read from Steam's local artwork (official + custom)
@@ -213,27 +214,21 @@ export async function checkMissing(appids: number[]): Promise<Record<ImageType, 
 
 export async function fillMissing(state: UgiState, appids: number[], progress: Progress, flag: StopFlag): Promise<number> {
 	const missing = await missingFor(appids);
-	let applied = 0;
-	for (let i = 0; i < appids.length && !flag.stop; i++) {
-		progress(i, appids.length);
-		for (const type of wantedTypes(state, appids[i]!, missing[String(appids[i]!)] ?? [])) {
-			try {
-				if (await applyTracked(state, appids[i]!, type)) applied++;
-			} catch (err) {
-				console.error('[UGI] image failed', appids[i]!, type, err);
-				if (String(err).includes('API key')) throw err;
-			}
-		}
-	}
-	progress(appids.length, appids.length);
-	return applied;
+	return applyToAll(state, appids, (appid) => missing[String(appid)] ?? [], progress, flag);
 }
 
 export async function replaceAll(state: UgiState, appids: number[], types: ImageType[], progress: Progress, flag: StopFlag): Promise<number> {
+	return applyToAll(state, appids, () => types, progress, flag);
+}
+
+// Applies the given image types to each app in turn; returns how many images were applied
+async function applyToAll(state: UgiState, appids: number[], typesFor: (appid: number) => ImageType[], progress: Progress, flag: StopFlag): Promise<number> {
 	let applied = 0;
+	let games = 0;
 	for (let i = 0; i < appids.length && !flag.stop; i++) {
-		progress(i, appids.length);
-		for (const type of wantedTypes(state, appids[i]!, types)) {
+		progress(i, appids.length, applied, games);
+		const before = applied;
+		for (const type of wantedTypes(state, appids[i]!, typesFor(appids[i]!))) {
 			try {
 				if (await applyTracked(state, appids[i]!, type)) applied++;
 			} catch (err) {
@@ -241,8 +236,9 @@ export async function replaceAll(state: UgiState, appids: number[], types: Image
 				if (String(err).includes('API key')) throw err;
 			}
 		}
+		if (applied > before) games++;
 	}
-	progress(appids.length, appids.length);
+	progress(appids.length, appids.length, applied, games);
 	return applied;
 }
 
