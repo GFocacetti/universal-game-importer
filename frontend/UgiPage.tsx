@@ -12,6 +12,10 @@ import Onboarding from 'Onboarding';
 import { takePendingReview } from 'pending';
 import UninstallSection from 'UninstallSection';
 import { openUrl } from 'steamApps';
+import { bigPicture } from 'location';
+
+// Big Picture draws its top bar (search, clock) and its button hints over the page: keep the page between them
+const BIG_PICTURE_BARS: React.CSSProperties = { paddingTop: 40, paddingBottom: 40, boxSizing: 'border-box' };
 
 type Section = 'games' | 'launchers' | 'images' | 'settings' | 'uninstall';
 
@@ -95,7 +99,7 @@ export default function UgiPage() {
 		: '';
 
 	return (
-		<div className="ugi-root" style={themeStyle(theme) as React.CSSProperties}>
+		<div className="ugi-root" style={{ ...(themeStyle(theme) as React.CSSProperties), ...(bigPicture() ? BIG_PICTURE_BARS : {}) }}>
 			<style>{UGI_CSS}</style>
 			<nav className="ugi-side">
 				<div className="ugi-brand">

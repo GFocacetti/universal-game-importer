@@ -1,14 +1,18 @@
 // "Customize (UGI)…" entry in the library's right-click menu, opening the gallery.
+// In Big Picture, which has no LIBRARY menu, a "UGI" entry opening the UGI page comes after it.
 // Hooking technique from steam-easygrid by luthor112 (MIT), see THIRD_PARTY_NOTICES.md
-import { afterPatch, fakeRenderComponent, findInReactTree, findInTree, findModuleByExport, MenuItem } from '@steambrew/client';
+import { afterPatch, fakeRenderComponent, findInReactTree, findInTree, findModuleByExport, MenuItem, Navigation } from '@steambrew/client';
 import React from 'react';
 import { openGallery } from 'Gallery';
 import { t } from 'i18n';
 import { mainDocument } from 'overlay';
+import { bigPicture, gamepadDocument } from 'location';
+import { UGI_ROUTE } from 'menu';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 
 const KEY = 'ugi-images';
+const PAGE_KEY = 'ugi-page';
 
 const isPropertiesMenuItem = (node: any): boolean => {
 	const selected = node?.props?.onSelected?.toString?.() ?? node?.onSelected?.toString?.() ?? '';
@@ -30,16 +34,23 @@ function insertItem(items: any[], appid: number): boolean {
 		<MenuItem
 			key={KEY}
 			onClick={() => {
-				const doc = mainDocument();
+				const doc = (bigPicture() && gamepadDocument()) || mainDocument();
 				if (doc) openGallery(appid, appStore.GetAppOverviewByAppID(appid)?.display_name ?? String(appid), doc);
 			}}
 		>
 			{t('ctx.images')}
 		</MenuItem>
 	);
+	const entries = [entry];
+	if (bigPicture())
+		entries.push(
+			<MenuItem key={PAGE_KEY} onClick={() => Navigation.Navigate(UGI_ROUTE)}>
+				{t('menu.item')}
+			</MenuItem>,
+		);
 	const properties = items.findIndex((item: any) => Boolean(findInReactTree([item], isPropertiesMenuItem)));
-	if (properties === -1) items.push(entry);
-	else items.splice(properties, 0, entry);
+	if (properties === -1) items.push(...entries);
+	else items.splice(properties, 0, ...entries);
 	return true;
 }
 
