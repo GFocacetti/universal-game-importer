@@ -15,7 +15,8 @@ const TOKENS: Record<ThemeName, Record<string, string>> = {
 		'--ugi-muted': '#8f98a0',
 		'--ugi-head': '#ffffff',
 		'--ugi-accent': '#1a9fff',
-		'--ugi-primary': 'linear-gradient(90deg,#06bfff,#2d73ff)',
+		// Solid, like the selected buttons and switches in Steam's own settings
+		'--ugi-primary': '#1a9fff',
 		'--ugi-secondary': '#3d4450',
 		'--ugi-radius': '3px',
 		'--ugi-radius-lg': '4px',
