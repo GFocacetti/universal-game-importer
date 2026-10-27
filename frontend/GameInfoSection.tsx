@@ -83,6 +83,8 @@ const CSS = `
 .ugi-side-panel { margin: 0 0 16px; padding: 12px 14px; background: rgba(0,0,0,.2); border-radius: 3px; }
 .ugi-side-panel h3 { margin: 0 0 8px; color: #8f98a0; font-size: 12px; font-weight: 400; text-transform: uppercase; letter-spacing: .04em; }
 .ugi-feature { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; padding: 4px 6px; background: rgba(103,193,245,.08); color: #67c1f5; font-size: 13px; }
+.ugi-feature.link { cursor: pointer; }
+.ugi-feature.link:hover { background: rgba(103,193,245,.25); color: #ffffff; }
 .ugi-feature span { width: 26px; height: 16px; flex: none; display: grid; place-items: center; }
 .ugi-feature img { max-width: 26px; max-height: 16px; }
 .ugi-feature i { width: 6px; height: 6px; border-radius: 50%; background: #67c1f5; }
@@ -244,7 +246,7 @@ function SidePanels({ info }: { info: GameInfo }) {
 				<div className="ugi-side-panel">
 					<h3>{t('info.features')}</h3>
 					{info.features.map((f) => (
-						<div key={f.name} className="ugi-feature">
+						<div key={f.name} className={`ugi-feature${f.url ? ' link' : ''}`} onClick={f.url ? () => openUrl(f.url!) : undefined}>
 							<span>{f.icon ? <img src={f.icon} /> : <i />}</span>
 							{f.name}
 						</div>

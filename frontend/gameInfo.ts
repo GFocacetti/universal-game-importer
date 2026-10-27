@@ -23,7 +23,7 @@ export type GameInfo = {
 	genres: string[];
 	released?: string;
 	screenshots: Screenshot[];
-	// Store pages for developers, publishers and genres, by name (Steam only)
+	// Store pages for developers, publishers and genres, by name
 	links?: Record<string, string>;
 	// Where the game is sold: its launcher's store (when the page is known exactly) and Steam
 	stores?: StoreLink[];
@@ -33,7 +33,8 @@ export type GameInfo = {
 	header?: string;
 	reviews?: Reviews;
 	metacritic?: { score: number; url?: string };
-	features?: { name: string; icon?: string }[];
+	// With the store search for games that have the same feature (as on Steam)
+	features?: { name: string; icon?: string; url?: string }[];
 	languages?: Language[];
 	age?: { label: string; descriptors?: string };
 	requirements?: { minimum: Requirement[]; recommended: Requirement[] };
@@ -48,7 +49,7 @@ export type Requirement = { label: string; value: string };
 export type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
-const CACHE_VERSION = 11;
+const CACHE_VERSION = 13;
 
 type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
 
@@ -129,8 +130,17 @@ const names = (list: any): string[] => (Array.isArray(list) ? list.map((x) => (t
 // Steam's genre ids and their store pages (the page names are in English)
 const STEAM_GENRES: Record<string, string> = {
 	1: 'Action', 2: 'Strategy', 3: 'RPG', 4: 'Casual', 9: 'Racing', 18: 'Sports', 23: 'Indie', 25: 'Adventure',
-	28: 'Simulation', 29: 'Massively Multiplayer', 37: 'Free to Play', 70: 'Early Access',
+	28: 'Simulation', 29: 'Massively Multiplayer', 37: 'Free to Play', 70: 'Early Access', 51: 'Animation & Modeling',
+	52: 'Audio Production', 53: 'Design & Illustration', 54: 'Education', 55: 'Photo Editing', 56: 'Software Training',
+	57: 'Utilities', 58: 'Video Production', 59: 'Web Publishing', 60: 'Game Development', 73: 'Violent', 74: 'Gore',
+	81: 'Documentary', 84: 'Tutorial',
 };
+
+// Tags from GOG, Epic and RAWG are English names, like the Steam store's tag pages
+// (a tag Steam doesn't know leads to the store's home page)
+function steamTagLinks(tags: string[]): Record<string, string> {
+	return Object.fromEntries(tags.map((tag) => [tag, `https://store.steampowered.com/tags/en/${encodeURIComponent(tag)}/`]));
+}
 
 // Steam's feature ids and the store's own icons for them
 const STEAM_FEATURE_ICONS: Record<string, string> = {
@@ -141,10 +151,15 @@ const STEAM_FEATURE_ICONS: Record<string, string> = {
 };
 const STEAM_ICONS = 'https://store.akamai.steamstatic.com/public/images/v6/ico/ico_';
 
-// GOG's feature names, drawn with the same Steam icons
-const GOG_FEATURE_ICONS: Record<string, string> = {
-	'single-player': 'singlePlayer', 'multi-player': 'multiPlayer', 'co-op': 'coop', achievements: 'achievements',
-	'cloud saves': 'cloud', 'controller support': 'controller', leaderboards: 'stats',
+// Steam's feature: its icon and the store search for games that have it
+function steamFeature(id: string | number, name: string) {
+	const icon = STEAM_FEATURE_ICONS[String(id)];
+	return { name, icon: icon ? `${STEAM_ICONS}${icon}.png` : undefined, url: `https://store.steampowered.com/search/?category2=${id}` };
+}
+
+// GOG's feature names and the matching Steam features (same icons and store search)
+const GOG_FEATURES: Record<string, number> = {
+	'single-player': 2, 'multi-player': 1, 'co-op': 9, achievements: 22, 'cloud saves': 23, 'controller support': 28, leaderboards: 15,
 };
 
 // Dates written like the Steam store's ("27 ago 2020")
@@ -229,7 +244,7 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 		header: d.header_image || undefined,
 		reviews: await steamReviews(match.id).catch(() => undefined),
 		metacritic: d.metacritic?.score ? { score: d.metacritic.score, url: d.metacritic.url } : undefined,
-		features: (d.categories ?? []).map((c: any) => ({ name: c.description, icon: STEAM_FEATURE_ICONS[String(c.id)] ? `${STEAM_ICONS}${STEAM_FEATURE_ICONS[String(c.id)]}.png` : undefined })),
+		features: (d.categories ?? []).filter((c: any) => c?.description).map((c: any) => steamFeature(c.id, c.description)),
 		languages: steamLanguages(d.supported_languages),
 		age: pegi?.rating
 			? { label: `PEGI ${pegi.rating}`, descriptors: String(pegi.descriptors ?? '').split(/\r?\n/).filter(Boolean).join(', ') || undefined }
@@ -270,6 +285,7 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 		developers: names(e.developers),
 		publishers: names(e.publishers?.length ? e.publishers : e.publisher ? [e.publisher] : []),
 		genres: names(e.tags).slice(0, 5),
+		links: steamTagLinks(names(e.tags).slice(0, 5)),
 		released: storeDate(e.product?.globalReleaseDate, locale),
 		screenshots: (e.screenshots ?? [])
 			.map((s: any) => String(s?._links?.self?.href ?? ''))
@@ -279,8 +295,8 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 			.filter((v: any) => v?.provider === 'youtube' && v.videoId)
 			.map((v: any) => ({ thumb: v._links?.thumbnail?.href ?? `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`, page: `https://www.youtube.com/watch?v=${v.videoId}` })),
 		features: names(e.features).map((name) => {
-			const icon = GOG_FEATURE_ICONS[name.toLowerCase()];
-			return { name, icon: icon ? `${STEAM_ICONS}${icon}.png` : undefined };
+			const steam = GOG_FEATURES[name.toLowerCase()];
+			return steam ? steamFeature(steam, name) : { name };
 		}),
 		languages: [...languages.values()],
 		age: e.pegiRating?.ageRating
@@ -357,6 +373,7 @@ async function fromRawg(name: string, key: string, locale: string): Promise<Game
 		developers: names(d.developers),
 		publishers: names(d.publishers),
 		genres: names(d.genres),
+		links: steamTagLinks(names(d.genres)),
 		released: storeDate(d.released, locale),
 		screenshots: (match.short_screenshots ?? []).map((s: any) => s.image).filter(Boolean).slice(1).map((src: string) => ({ thumb: src, full: src })),
 		header: d.background_image || undefined,
