@@ -458,6 +458,10 @@ function unmount() {
 	mounted.host.remove();
 	mounted.side?.remove();
 	mounted.top?.remove();
+	if (mounted.column && mounted.column.dataset.ugiMargin !== undefined) {
+		mounted.column.style.marginLeft = mounted.column.dataset.ugiMargin;
+		delete mounted.column.dataset.ugiMargin;
+	}
 	showNotice(mounted.notice);
 	mounted = null;
 }
@@ -518,13 +522,42 @@ function alignSide(m: Mounted) {
 	if (m.side.style.marginLeft !== left) m.side.style.marginLeft = left;
 	if (m.side.style.marginRight !== right) m.side.style.marginRight = right;
 
-	// The top part spans from the left edge of the description to the right edge of the notes
-	const container = m.top?.parentElement?.getBoundingClientRect();
-	if (!m.top || !container) return;
-	const topLeft = `${Math.max(0, m.host.getBoundingClientRect().left - container.left)}px`;
-	const topRight = `${Math.max(0, container.right - r.right)}px`;
-	if (m.top.style.marginLeft !== topLeft) m.top.style.marginLeft = topLeft;
-	if (m.top.style.marginRight !== topRight) m.top.style.marginRight = topRight;
+	// The top part spans from the left edge of the description to the right edge of the notes,
+	// measured on screen (Steam's containers have their own padding)
+	const head = m.top?.querySelector<HTMLElement>('.ugi-info-head');
+	const block = m.host.querySelector('.ugi-info');
+	if (!m.top || !head || !block) return;
+	const nudge = (side: 'marginLeft' | 'marginRight', delta: number) => {
+		if (Math.abs(delta) >= 1) m.top!.style[side] = `${Math.max(0, (parseFloat(m.top!.style[side]) || 0) + delta)}px`;
+	};
+	nudge('marginLeft', block.getBoundingClientRect().left - head.getBoundingClientRect().left);
+	nudge('marginRight', head.getBoundingClientRect().right - r.right);
+
+	// The summary starts where the right column's text does ("Features"), unless it sits under the player
+	const glance = head.querySelector<HTMLElement>('.ugi-glance');
+	const heading = m.side.querySelector('.ugi-side-panel h3');
+	const row = head.querySelector('.ugi-top');
+	const view = head.ownerDocument.defaultView;
+
+	// The description comes as close to the right column as the player to the summary: Steam keeps
+	// its floating column away with a left margin, which is narrowed (restored on leaving)
+	const panel = m.side.querySelector('.ugi-side-panel');
+	if (m.column && panel && row && view) {
+		const gap = parseFloat(view.getComputedStyle(row).columnGap) || 16;
+		const delta = panel.getBoundingClientRect().left - block.getBoundingClientRect().right - gap;
+		if (Math.abs(delta) >= 1) {
+			if (m.column.dataset.ugiMargin === undefined) m.column.dataset.ugiMargin = m.column.style.marginLeft;
+			const current = parseFloat(view.getComputedStyle(m.column).marginLeft) || 0;
+			m.column.style.marginLeft = `${current - delta}px`;
+		}
+	}
+
+	if (!glance || !heading || !row || view?.getComputedStyle(row).flexDirection === 'column') {
+		if (glance?.style.flexBasis) glance.style.flexBasis = '';
+		return;
+	}
+	const width = `${Math.max(0, glance.getBoundingClientRect().right - heading.getBoundingClientRect().left)}px`;
+	if (glance.style.flexBasis !== width) glance.style.flexBasis = width;
 }
 
 async function refreshImported() {
