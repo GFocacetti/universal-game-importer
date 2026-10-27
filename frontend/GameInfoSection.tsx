@@ -163,6 +163,17 @@ function InfoBlock({ appid, sideHost }: { appid: number; sideHost: HTMLElement |
 	const side: [string, React.ReactNode][] = [
 		[t('info.developer'), linked(info.developers)],
 		[t('info.publisher'), linked(info.publishers)],
+		[
+			t('info.store'),
+			info.stores?.length
+				? info.stores.map((store, i) => (
+						<React.Fragment key={store.url}>
+							{i > 0 && ', '}
+							<a onClick={() => openUrl(store.url)}>{store.name}</a>
+						</React.Fragment>
+					))
+				: undefined,
+		],
 		[t('info.genres'), linked(info.genres)],
 		[t('info.released'), info.released],
 	];

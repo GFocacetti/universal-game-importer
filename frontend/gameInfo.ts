@@ -25,12 +25,16 @@ export type GameInfo = {
 	screenshots: Screenshot[];
 	// Store pages for developers, publishers and genres, by name (Steam only)
 	links?: Record<string, string>;
+	// Where the game is sold: its launcher's store (when the page is known exactly) and Steam
+	stores?: StoreLink[];
 };
+
+export type StoreLink = { name: string; url: string };
 
 export type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
-const CACHE_VERSION = 8;
+const CACHE_VERSION = 9;
 
 type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
 
@@ -174,12 +178,16 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 
 let epicSlugs: Record<string, string> | null = null;
 
-async function fromEpic(appName: string, dir: string, locale: string): Promise<GameInfo | null> {
+// Store page name of an installed Epic game, from its manifest and Epic's own namespace map
+async function epicSlug(appName: string, dir: string): Promise<string | null> {
 	const namespace = unquote(await epicNamespace({ a_app_name: appName, b_dir: dir }));
 	if (!namespace) return null;
-	// Epic's own map from store namespace to store page
 	epicSlugs ??= await getJson('https://store-content.ak.epicgames.com/api/content/productmapping');
-	const slug = epicSlugs?.[namespace];
+	return epicSlugs?.[namespace] ?? null;
+}
+
+async function fromEpic(appName: string, dir: string, locale: string): Promise<GameInfo | null> {
+	const slug = await epicSlug(appName, dir);
 	if (!slug) return null;
 	const page = await getJson(`https://store-content-ipv4.ak.epicgames.com/api/${locale === 'it' ? 'it' : 'en-US'}/content/products/${encodeURIComponent(slug)}`);
 	// The product's home page (Fortnite lists its game modes first)
@@ -222,15 +230,59 @@ async function fromRawg(name: string, key: string): Promise<GameInfo | null> {
 	};
 }
 
+// ---------- Store pages ----------
+
+// Battle.net products by launcher code (the shop sends each user to their own region)
+const BATTLENET_PRODUCTS: Record<string, string> = {
+	s1: 'starcraft-remastered', s2: 'starcraft-ii', w3: 'warcraft-iii-reforged', d3: 'diablo-iii', fenris: 'diablo-iv',
+	osi: 'diablo-ii-resurrected', anbs: 'diablo-immortal', pro: 'overwatch', hsb: 'hearthstone', hero: 'heroes-of-the-storm',
+	wow: 'world-of-warcraft', rtro: 'blizzard-arcade-collection', wlby: 'crash-bandicoot-4-its-about-time',
+	viper: 'call-of-duty-black-ops-4', odin: 'call-of-duty-modern-warfare', zeus: 'call-of-duty-black-ops-cold-war',
+	lazr: 'call-of-duty-modern-warfare-2-campaign-remastered', fore: 'call-of-duty-vanguard', dst2: 'destiny-2',
+};
+
+// Only launchers whose store page is known exactly: Epic, GOG, Microsoft Store, Battle.net
+async function launcherStore(state: UgiState, launcher: string, id: string): Promise<StoreLink | null> {
+	switch (launcher) {
+		case 'epic': {
+			const slug = await epicSlug(id, state.settings.launchers?.epic?.path ?? '');
+			return slug ? { name: 'Epic Games Store', url: `https://store.epicgames.com/p/${slug}` } : null;
+		}
+		case 'gog': {
+			const url = (await getJson(`https://api.gog.com/products/${encodeURIComponent(id)}`))?.links?.product_card;
+			return url ? { name: 'GOG', url } : null;
+		}
+		case 'xbox': {
+			// Same Microsoft Store catalog as the game / app check; the id is "<package family>!<app>"
+			const family = id.split('!')[0] ?? '';
+			try {
+				const res = await fetch(`https://displaycatalog.mp.microsoft.com/v7.0/products/lookup?market=US&languages=en-US&alternateId=PackageFamilyName&fieldsTemplate=browse&value=${encodeURIComponent(family)}`);
+				const product = res.ok ? (await res.json())?.Products?.[0]?.ProductId : null;
+				return product ? { name: 'Microsoft Store', url: `https://apps.microsoft.com/detail/${product}` } : null;
+			} catch {
+				return null;
+			}
+		}
+		case 'battlenet': {
+			const product = BATTLENET_PRODUCTS[id];
+			return product ? { name: 'Battle.net', url: `https://shop.battle.net/product/${product}` } : null;
+		}
+	}
+	return null;
+}
+
 async function lookup(state: UgiState, key: string, name: string, locale: string): Promise<GameInfo | null> {
 	const [launcher, ...rest] = key.split(':');
 	const id = rest.join(':');
-	return (
+	const info =
 		(await fromSteam(name, locale)) ??
 		(launcher === 'gog' ? await fromGog(id, locale) : null) ??
 		(launcher === 'epic' ? await fromEpic(id, state.settings.launchers?.epic?.path ?? '', locale) : null) ??
-		(state.settings.rawg_key ? await fromRawg(name, state.settings.rawg_key) : null)
-	);
+		(state.settings.rawg_key ? await fromRawg(name, state.settings.rawg_key) : null);
+	if (!info) return null;
+	const own = await launcherStore(state, launcher ?? '', id).catch(() => null);
+	info.stores = [...(own ? [own] : []), ...(info.source === 'steam' ? [{ name: 'Steam', url: info.url }] : [])];
+	return info;
 }
 
 // ---------- Cache ----------
