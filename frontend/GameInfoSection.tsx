@@ -62,7 +62,7 @@ const CSS = `
 .ugi-play svg { width: 64px; height: 64px; }
 .ugi-play:hover { background: rgba(0,0,0,.15); }
 .ugi-player-strip { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-.ugi-player-thumbs { flex: 1; min-width: 0; display: flex; gap: 4px; overflow: hidden; scroll-behavior: smooth; }
+.ugi-player-thumbs { position: relative; flex: 1; min-width: 0; display: flex; gap: 4px; overflow: hidden; scroll-behavior: smooth; }
 .ugi-thumb { position: relative; width: 116px; height: 65px; flex: none; cursor: pointer; opacity: .6; border: 2px solid transparent; box-sizing: border-box; }
 .ugi-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ugi-thumb svg { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; color: #ffffff; }
