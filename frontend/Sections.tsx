@@ -3,7 +3,7 @@ import { loadState, saveState } from 'backend';
 import { removeCollections, removeLauncherCollection, syncCollections } from 'collections';
 import { LanguageChoice, setLanguage, t } from 'i18n';
 import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag } from 'sgdb';
-import { LAUNCHER_NAMES } from 'steamApps';
+import { isGameOrShortcut, LAUNCHER_NAMES } from 'steamApps';
 import { CancelFlag, exportBackup } from 'maintenance';
 import { UgiState } from 'types';
 
@@ -130,10 +130,13 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 	const [ask, setAsk] = useState<{ title: string; go: () => void } | null>(null);
 	const [backup, setBackup] = useState<CancelFlag | null>(null);
 
+	// Games only: tools Steam keeps in the library (dedicated servers, SDKs, benchmarks) are left out
 	const appids = (): number[] => {
 		if (scope === 'imported') return Object.values(state.imported).map((e) => e.appid);
-		if (scope.startsWith('coll:')) return collectionStore.userCollections.find((c) => c.id === scope.slice(5))?.allApps.map((a) => a.appid) ?? [];
-		return collectionStore.allAppsCollection.allApps.map((a) => a.appid);
+		const apps = scope.startsWith('coll:')
+			? collectionStore.userCollections.find((c) => c.id === scope.slice(5))?.allApps ?? []
+			: collectionStore.allAppsCollection.allApps;
+		return apps.map((a) => a.appid).filter((appid) => isGameOrShortcut(appid));
 	};
 
 	const run = async (label: string, text: string, job: (ids: number[], p: (d: number, tt: number, applied?: number, games?: number) => void, f: StopFlag, s: UgiState) => Promise<string>) => {
