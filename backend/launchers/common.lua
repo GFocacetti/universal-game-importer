@@ -65,6 +65,46 @@ function M.launch_through(start, arguments, wait_dir)
     }
 end
 
+-- PowerShell code defining [UgiSqlite]::Query(file, sql, columns): reads a SQLite database with
+-- Windows' built-in winsqlite3.dll, opened read-only; returns the rows as string arrays
+M.SQLITE_READER = [==[
+Add-Type -TypeDefinition @"
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class UgiSqlite {
+  [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.StdCall)] static extern int sqlite3_open_v2(byte[] file, out IntPtr db, int flags, IntPtr vfs);
+  [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.StdCall)] static extern int sqlite3_prepare_v2(IntPtr db, byte[] sql, int len, out IntPtr stmt, IntPtr tail);
+  [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.StdCall)] static extern int sqlite3_step(IntPtr stmt);
+  [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.StdCall)] static extern IntPtr sqlite3_column_text(IntPtr stmt, int col);
+  [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.StdCall)] static extern int sqlite3_finalize(IntPtr stmt);
+  [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.StdCall)] static extern int sqlite3_close(IntPtr db);
+  static byte[] Utf8(string s) { return System.Text.Encoding.UTF8.GetBytes(s + "\0"); }
+  static string Text(IntPtr p) {
+    if (p == IntPtr.Zero) return null;
+    int n = 0; while (Marshal.ReadByte(p, n) != 0) n++;
+    byte[] b = new byte[n]; Marshal.Copy(p, b, 0, n);
+    return System.Text.Encoding.UTF8.GetString(b);
+  }
+  public static List<string[]> Query(string file, string sql, int columns) {
+    var rows = new List<string[]>();
+    IntPtr db, stmt;
+    if (sqlite3_open_v2(Utf8(file), out db, 1, IntPtr.Zero) != 0) return rows; // read-only
+    if (sqlite3_prepare_v2(db, Utf8(sql), -1, out stmt, IntPtr.Zero) == 0) {
+      while (sqlite3_step(stmt) == 100) {
+        var row = new string[columns];
+        for (int i = 0; i < columns; i++) row[i] = Text(sqlite3_column_text(stmt, i));
+        rows.Add(row);
+      }
+      sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return rows;
+  }
+}
+"@
+]==]
+
 -- Runs a PowerShell scan script whose output is JSON; returns a list (empty if no output)
 function M.run_powershell_json(name, script)
     local dir = paths.data_dir()

@@ -45,6 +45,7 @@ export const LAUNCHER_NAMES: Record<string, string> = {
 	battlenet: 'Battle.net',
 	amazon: 'Amazon Games',
 	ubisoft: 'Ubisoft Connect',
+	itch: 'itch.io',
 };
 
 export type ImageKind = 'grid' | 'wide' | 'hero' | 'logo' | 'icon';

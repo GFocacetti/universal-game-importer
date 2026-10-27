@@ -11,6 +11,7 @@ local M = {
         require("launchers.battlenet"),
         require("launchers.amazon"),
         require("launchers.ubisoft"),
+        require("launchers.itch"),
     },
 }
 

@@ -1,4 +1,5 @@
 import { UgiState } from 'types';
+import { LAUNCHER_NAMES } from 'steamApps';
 
 // Steam client stores (globals in Steam's UI context)
 type SteamCollection = {
@@ -20,16 +21,6 @@ declare const showcaseStore: {
 	DeleteShowcase(showcaseId: number): void;
 };
 declare const appStore: { GetAppOverviewByAppID(appid: number): unknown };
-
-const LAUNCHER_NAMES: Record<string, string> = {
-	xbox: 'Xbox',
-	epic: 'Epic Games',
-	gog: 'GOG',
-	ea: 'EA',
-	battlenet: 'Battle.net',
-	amazon: 'Amazon Games',
-	ubisoft: 'Ubisoft Connect',
-};
 
 const shelfExists = (id: number) => showcaseStore.showcases.some((s) => s.nShowcaseId === id);
 
