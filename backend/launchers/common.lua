@@ -66,9 +66,11 @@ function M.launch_through(start, arguments, wait_dir)
 end
 
 -- PowerShell code defining [UgiSqlite]::Query(file, sql, columns): reads a SQLite database with
--- Windows' built-in winsqlite3.dll, opened read-only; returns the rows as string arrays
+-- Windows' built-in winsqlite3.dll, opened read-only; returns the rows as string arrays.
+-- Compiled once into the data folder, beside the scripts (the number changes with the code).
 M.SQLITE_READER = [==[
-Add-Type -TypeDefinition @"
+$ugiSqliteDll = Join-Path $PSScriptRoot 'UgiSqlite-1.dll'
+$ugiSqliteCode = @"
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -103,6 +105,12 @@ public static class UgiSqlite {
   }
 }
 "@
+try {
+  if (-not (Test-Path $ugiSqliteDll)) { Add-Type -TypeDefinition $ugiSqliteCode -OutputAssembly $ugiSqliteDll }
+  Add-Type -Path $ugiSqliteDll
+} catch {
+  Add-Type -TypeDefinition $ugiSqliteCode
+}
 ]==]
 
 -- Runs a PowerShell scan script whose output is JSON; returns a list (empty if no output)

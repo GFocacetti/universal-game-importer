@@ -3,6 +3,7 @@ import { Game, ImportedEntry, LauncherStatus, ShortcutFields, UgiState } from 't
 import { loadState, saveState, unquote } from 'backend';
 import { syncCollections } from 'collections';
 import { fillMissing } from 'sgdb';
+import { prefetchInfo } from 'gameInfo';
 import { finishImages, startImages } from 'imagesProgress';
 
 // Steam client store of all library apps (global in Steam's UI context)
@@ -164,6 +165,9 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 	// downloads can take a while and the import shouldn't wait for them
 	const newAppids = [...plan.newGames, ...plan.previouslyExcluded].filter((g) => chosen.has(g.id) && state.imported[g.id]).map((g) => state.imported[g.id]!.appid);
 	if (newAppids.length && state.settings.sgdb_key) fillInBackground(state, newAppids);
+	// And their information, for the page in the library
+	const newIds = [...plan.newGames, ...plan.previouslyExcluded].filter((g) => chosen.has(g.id) && state.imported[g.id]).map((g) => g.id);
+	if (newIds.length) prefetchInfo(state, newIds);
 	return { added, removed, updated };
 }
 

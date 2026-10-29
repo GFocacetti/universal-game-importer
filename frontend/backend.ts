@@ -28,8 +28,16 @@ export async function scan(options: { enabled?: Record<string, boolean>; paths?:
 	return { launchers: result.launchers ?? [], games: Array.isArray(result.games) ? result.games : [] };
 }
 
+// The state changes only through saveState: read once and kept here, so a page doesn't wait for the
+// backend while it is busy (each caller gets its own copy)
+let stateRead: Promise<string> | null = null;
+
 export async function loadState(): Promise<UgiState> {
-	const state = parse<Partial<UgiState>>(await ugiGetState(), {});
+	if (!stateRead) {
+		stateRead = ugiGetState();
+		stateRead.catch(() => (stateRead = null));
+	}
+	const state = parse<Partial<UgiState>>(await stateRead, {});
 	const settings: Partial<UgiSettings> = asRecord(state.settings);
 	return {
 		imported: asRecord(state.imported),
@@ -40,6 +48,7 @@ export async function loadState(): Promise<UgiState> {
 			shelves: settings.shelves === true,
 			sgdb_key: typeof settings.sgdb_key === 'string' ? settings.sgdb_key : '',
 			rawg_key: typeof settings.rawg_key === 'string' ? settings.rawg_key : '',
+			xbl_key: typeof settings.xbl_key === 'string' ? settings.xbl_key : '',
 			animated: settings.animated === true,
 			// WebP included unless the user turned it off
 			webp: settings.webp !== false,
@@ -64,5 +73,10 @@ export function importedKeyFor(state: UgiState, appid: number): string | undefin
 }
 
 export async function saveState(state: UgiState): Promise<boolean> {
-	return ugiSaveState({ json: JSON.stringify(state) });
+	const json = JSON.stringify(state);
+	stateRead = Promise.resolve(json);
+	return ugiSaveState({ json }).catch((err) => {
+		stateRead = null;
+		throw err;
+	});
 }

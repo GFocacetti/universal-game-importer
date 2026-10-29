@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { loadState, saveState } from 'backend';
+import { callable } from '@steambrew/client';
+import React, { useEffect, useState } from 'react';
+import { loadState, saveState, unquote } from 'backend';
 import { removeCollections, removeLauncherCollection, syncCollections } from 'collections';
 import { LanguageChoice, setLanguage, t } from 'i18n';
 import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag } from 'sgdb';
-import { isGameOrShortcut, LAUNCHER_NAMES } from 'steamApps';
+import { isGameOrShortcut, LAUNCHER_NAMES, openUrl } from 'steamApps';
 import { CancelFlag, exportBackup } from 'maintenance';
 import { UgiState } from 'types';
 
@@ -273,9 +274,71 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 
 // ---------- Settings ----------
 
+// The site where a key is made, after the setting's explanation
+const SiteLink = ({ url }: { url: string }) => (
+	<>
+		{' '}
+		<button className="ugi-link" onClick={() => openUrl(url)}>{url.replace(/^https:\/\/(www\.)?/, '')}</button>
+	</>
+);
+
+const epicAccountName = callable<[], string>('ugi_epic_account');
+const epicSignIn = callable<[{ a_code: string }], string>('ugi_epic_sign_in');
+const epicSignOut = callable<[], boolean>('ugi_epic_sign_out');
+// Epic's sign-in page: once signed in, it shows the code to paste in UGI
+const EPIC_LOGIN = 'https://www.epicgames.com/id/login?redirectUrl=' +
+	encodeURIComponent('https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code');
+
+// Epic account for achievements: sign in on Epic's page, then paste the code it shows
+function EpicAccount() {
+	const [name, setName] = useState<string | null>(null);
+	const [code, setCode] = useState('');
+	const [busy, setBusy] = useState(false);
+	const [failed, setFailed] = useState(false);
+	useEffect(() => {
+		epicAccountName().then((n) => setName(unquote(n)));
+	}, []);
+	const signIn = async () => {
+		setBusy(true);
+		setFailed(false);
+		const signed = unquote(await epicSignIn({ a_code: code }));
+		setBusy(false);
+		if (signed) {
+			setName(signed);
+			setCode('');
+		} else setFailed(true);
+	};
+	return (
+		<div className="ugi-set">
+			<div>
+				<strong>{t('settings.epic')}</strong>
+				<small>
+					{name ? t('settings.epicSignedIn', { name }) : t('settings.epicText')}
+					{!name && (
+						<>
+							{' '}
+							<button className="ugi-link" onClick={() => openUrl(EPIC_LOGIN)}>{t('settings.epicOpen')}</button>
+						</>
+					)}
+				</small>
+				{failed && <small className="ugi-launcher-warn">{t('settings.epicFailed')}</small>}
+			</div>
+			{name ? (
+				<button className="ugi-btn secondary" onClick={() => epicSignOut().then(() => setName(''))}>{t('settings.epicSignOut')}</button>
+			) : (
+				<div className="ugi-field">
+					<input type="text" value={code} placeholder={t('settings.epicCode')} onChange={(e) => setCode(e.target.value)} />
+					<button className="ugi-btn secondary" disabled={!code.trim() || busy} onClick={signIn}>{t('settings.epicConnect')}</button>
+				</div>
+			)}
+		</div>
+	);
+}
+
 export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiState; onChanged: () => void; onRedoSetup: () => void }) {
 	const [key, setKey] = useState<string | null>(null);
 	const [rawgKey, setRawgKey] = useState<string | null>(null);
+	const [xblKey, setXblKey] = useState<string | null>(null);
 	const set = (patch: Partial<UgiState['settings']>) => update((s) => void Object.assign(s.settings, patch), onChanged);
 
 	return (
@@ -290,19 +353,27 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 				</select>
 			</div>
 			<div className="ugi-set">
-				<div><strong>{t('apikey.title')}</strong><small>{t('settings.keyText')}</small></div>
+				<div><strong>{t('apikey.title')}</strong><small>{t('settings.keyText')}<SiteLink url="https://www.steamgriddb.com/profile/preferences/api" /></small></div>
 				<div className="ugi-field">
 					<input type="password" value={key ?? state.settings.sgdb_key ?? ''} placeholder={t('apikey.placeholder')} onChange={(e) => setKey(e.target.value)} />
 					<button className="ugi-btn secondary" disabled={key === null} onClick={() => set({ sgdb_key: (key ?? '').trim() }).then(() => setKey(null))}>{t('settings.save')}</button>
 				</div>
 			</div>
 			<div className="ugi-set">
-				<div><strong>{t('settings.rawg')}</strong><small>{t('settings.rawgText')}</small></div>
+				<div><strong>{t('settings.rawg')}</strong><small>{t('settings.rawgText')}<SiteLink url="https://rawg.io/apidocs" /></small></div>
 				<div className="ugi-field">
 					<input type="password" value={rawgKey ?? state.settings.rawg_key ?? ''} placeholder={t('apikey.placeholder')} onChange={(e) => setRawgKey(e.target.value)} />
 					<button className="ugi-btn secondary" disabled={rawgKey === null} onClick={() => set({ rawg_key: (rawgKey ?? '').trim() }).then(() => setRawgKey(null))}>{t('settings.save')}</button>
 				</div>
 			</div>
+			<div className="ugi-set">
+				<div><strong>{t('settings.xbl')}</strong><small>{t('settings.xblText')}<SiteLink url="https://xbl.io" /></small></div>
+				<div className="ugi-field">
+					<input type="password" value={xblKey ?? state.settings.xbl_key ?? ''} placeholder={t('apikey.placeholder')} onChange={(e) => setXblKey(e.target.value)} />
+					<button className="ugi-btn secondary" disabled={xblKey === null} onClick={() => set({ xbl_key: (xblKey ?? '').trim() }).then(() => setXblKey(null))}>{t('settings.save')}</button>
+				</div>
+			</div>
+			<EpicAccount />
 			<div className="ugi-set">
 				<div><strong>{t('settings.animated')}</strong><small>{t('settings.animatedText')}</small></div>
 				<Toggle on={!!state.settings.animated} onChange={(v) => set({ animated: v })} />

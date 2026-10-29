@@ -4,6 +4,7 @@ import Hls from 'hls.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
+import { AchievementsBlock } from 'Achievements';
 import { importedKeyFor, loadState } from 'backend';
 import { GameInfo, gameInfo, Requirement, Reviews, Video } from 'gameInfo';
 import { t } from 'i18n';
@@ -312,7 +313,20 @@ function SidePanels({ info }: { info: GameInfo }) {
 	);
 }
 
-function InfoBlock({ appid, sideHost, topHost }: { appid: number; sideHost: HTMLElement | null; topHost: HTMLElement | null }) {
+// The plugin's backend does one thing at a time: the achievements (slower to read) wait until the
+// information is there, so they don't hold it up
+function Blocks({ appid, side, top }: { appid: number; side: HTMLElement | null; top: HTMLElement | null }) {
+	const [ready, setReady] = useState(false);
+	return (
+		<>
+			<style>{CSS}</style>
+			<InfoBlock appid={appid} sideHost={side} topHost={top} onDone={() => setReady(true)} />
+			<AchievementsBlock appid={appid} ready={ready} />
+		</>
+	);
+}
+
+function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHost: HTMLElement | null; topHost: HTMLElement | null; onDone: () => void }) {
 	const [info, setInfo] = useState<GameInfo | null | undefined>(undefined);
 
 	useEffect(() => {
@@ -322,9 +336,11 @@ function InfoBlock({ appid, sideHost, topHost }: { appid: number; sideHost: HTML
 			const state = await loadState();
 			const key = importedKeyFor(state, appid) ?? `manual:${appid}`;
 			const name = state.imported[key]?.name ?? appStore.GetAppOverviewByAppID(appid)?.display_name ?? '';
-			const found = name ? await gameInfo(state, key, name) : null;
+			const found = name ? await gameInfo(state, key, name, (fresh) => alive && setInfo(fresh)) : null;
 			if (alive) setInfo(found);
-		})().catch(() => alive && setInfo(null));
+		})()
+			.catch(() => alive && setInfo(null))
+			.finally(onDone);
 		return () => {
 			alive = false;
 		};
@@ -583,12 +599,20 @@ function alignSide(m: Mounted) {
 	}
 }
 
+// Steam draws a game's page a moment after opening it: its box is looked for at every check for the
+// first seconds, then once a second (the search goes through the whole page)
+let searching = { appid: 0, since: 0, last: 0 };
+let aligned = 0;
+
 async function tick() {
 	const path = MainWindowBrowserManager?.m_lastLocation?.pathname ?? '';
 	const appid = Number(path.match(/^\/library\/app\/(\d+)/)?.[1] ?? 0);
-	if (!appid) return unmount();
 	// Every non-Steam game: imported by UGI or added by hand
-	if (!isShortcut(appid)) return unmount();
+	if (!appid || !isShortcut(appid)) {
+		searching.appid = 0;
+		return unmount();
+	}
+	const now = Date.now();
 
 	const doc = mainDocument();
 	// Already in place for this game
@@ -601,9 +625,15 @@ async function tick() {
 		(!mounted.side || (mounted.side.isConnected && mounted.column?.firstElementChild === mounted.side)) &&
 		(!mounted.top || mounted.top.isConnected)
 	) {
-		alignSide(mounted);
+		if (now - aligned >= 1000) {
+			aligned = now;
+			alignSide(mounted);
+		}
 		return;
 	}
+	if (searching.appid !== appid) searching = { appid, since: now, last: 0 };
+	if (now - searching.since > 3000 && now - searching.last < 1000) return;
+	searching.last = now;
 	const name = appStore.GetAppOverviewByAppID(appid)?.display_name;
 	const notice = doc && name ? shortcutNotice(doc, name) : null;
 	if (!doc || !notice) return unmount();
@@ -627,13 +657,10 @@ async function tick() {
 	// Like Steam's box: its own layout context, so it narrows beside the floating right column
 	host.style.display = 'flow-root';
 	const root = createRoot(host);
-	root.render(
-		<>
-			<style>{CSS}</style>
-			<InfoBlock appid={appid} sideHost={side} topHost={top} />
-		</>,
-	);
+	root.render(<Blocks appid={appid} side={side} top={top} />);
 	mounted = { host, root, appid, notice, side, column, top };
+	// Steam drawing the page again: looked for quickly once more
+	searching.appid = 0;
 	// Realigned as soon as the block or the right column changes size (pictures loading, window resized)
 	const view = doc.defaultView as (Window & typeof globalThis) | null;
 	if (view?.ResizeObserver) {
@@ -654,5 +681,5 @@ export function startGameInfo() {
 		tick()
 			.catch((err) => console.error('[UGI] game info', err))
 			.finally(() => (busy = false));
-	}, 1000);
+	}, 150);
 }

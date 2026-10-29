@@ -46,6 +46,7 @@ export const LAUNCHER_NAMES: Record<string, string> = {
 	amazon: 'Amazon Games',
 	ubisoft: 'Ubisoft Connect',
 	itch: 'itch.io',
+	riot: 'Riot Games',
 };
 
 export type ImageKind = 'grid' | 'wide' | 'hero' | 'logo' | 'icon';

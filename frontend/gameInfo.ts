@@ -50,13 +50,14 @@ export type Requirement = { label: string; value: string };
 type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
-const CACHE_VERSION = 14;
+const CACHE_VERSION = 15;
 
 type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
 
 const DAY = 24 * 60 * 60 * 1000;
-// Found: refreshed after a month; not found: tried again after a week (or when a RAWG key is added)
-const KEEP_FOUND = 30 * DAY;
+// Found: shown at once and read again behind it, at most every 10 minutes; not found: tried again
+// after a week (or when a RAWG key is added)
+const RECHECK = 10 * 60 * 1000;
 const KEEP_MISSING = 7 * DAY;
 
 async function getJson(url: string): Promise<any | null> {
@@ -119,7 +120,15 @@ function tidy(text: string): string {
 // followed by one starting in lowercase, belongs to the same paragraph
 const CONTINUES = /([^.!?:;…"»)\n])\n\n?(?=\p{Ll})/gu;
 
-const firstParagraph = (text: string) => text.split('\n\n').find((p) => p.length > 40 && !p.startsWith('# ')) ?? '';
+// The summary beside the media, about as long as Steam's (300 characters at most): the first
+// paragraph, cut after the last full sentence that fits
+function brief(text: string): string {
+	const first = text.split(/\n+/).map((p) => p.trim()).find((p) => p.length > 40 && !p.startsWith('# ')) ?? '';
+	if (first.length <= 300) return first;
+	const cut = first.slice(0, 300);
+	const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+	return end > 100 ? cut.slice(0, end + 1) : `${cut.slice(0, cut.lastIndexOf(' '))}…`;
+}
 
 const names = (list: any): string[] => (Array.isArray(list) ? list.map((x) => (typeof x === 'string' ? x : x?.name ?? x?.description)).filter(Boolean) : []);
 
@@ -220,7 +229,13 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 	const search = await getJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(name)}&l=${lang}&cc=${cc}`);
 	const match = (search?.items ?? []).find((item: any) => simplifyName(String(item.name ?? '')) === simplifyName(name));
 	if (!match) return null;
-	const details = (await getJson(`https://store.steampowered.com/api/appdetails?appids=${match.id}&l=${lang}`))?.[match.id];
+	const reviews = steamReviews(match.id).catch(() => undefined);
+	// The details are the one Steam request the client may make itself: alongside the backend's
+	const detailsUrl = `https://store.steampowered.com/api/appdetails?appids=${match.id}&l=${lang}`;
+	const direct = await fetch(detailsUrl)
+		.then((res) => (res.ok ? res.json() : null))
+		.catch(() => null);
+	const details = (direct ?? (await getJson(detailsUrl)))?.[match.id];
 	const d = details?.success ? details.data : null;
 	if (!d || d.type !== 'game') return null;
 	const description = htmlToText(d.about_the_game || d.detailed_description || '');
@@ -230,7 +245,7 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 	return {
 		source: 'steam',
 		url,
-		summary: decode(d.short_description || '') || firstParagraph(description),
+		summary: brief(decode(d.short_description || '') || description),
 		description,
 		developers: names(d.developers),
 		publishers: names(d.publishers),
@@ -240,7 +255,7 @@ async function fromSteam(name: string, locale: string): Promise<GameInfo | null>
 		videos: (d.movies ?? []).filter((m: any) => m.thumbnail).map((m: any) => ({ thumb: m.thumbnail, hls: m.hls_h264, page: url, name: m.name })),
 		links: steamLinks(d),
 		header: d.header_image || undefined,
-		reviews: await steamReviews(match.id).catch(() => undefined),
+		reviews: await reviews,
 		metacritic: d.metacritic?.score ? { score: d.metacritic.score, url: d.metacritic.url } : undefined,
 		features: (d.categories ?? []).filter((c: any) => c?.description).map((c: any) => steamFeature(c.id, c.description)),
 		languages: steamLanguages(d.supported_languages),
@@ -278,7 +293,7 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 	return {
 		source: 'gog',
 		url: d._links?.store?.href || `https://www.gog.com/game/${encodeURIComponent(id)}`,
-		summary: firstParagraph(description),
+		summary: brief(description),
 		description,
 		developers: names(e.developers),
 		publishers: names(e.publishers?.length ? e.publishers : e.publisher ? [e.publisher] : []),
@@ -305,15 +320,33 @@ async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
 }
 
 // Microsoft Store catalog entry of an installed Xbox game; the id is "<package family>!<app>"
-async function microsoftProduct(id: string, locale: string): Promise<any | null> {
+// (read once per game and language: information, store link and achievements all use it)
+const microsoftProducts = new Map<string, Promise<any | null>>();
+
+function microsoftProduct(id: string, locale: string): Promise<any | null> {
 	const family = id.split('!')[0] ?? '';
 	const market = locale === 'it' ? 'market=IT&languages=it-IT,en-US' : 'market=US&languages=en-US';
-	try {
-		const res = await fetch(`https://displaycatalog.mp.microsoft.com/v7.0/products/lookup?${market}&alternateId=PackageFamilyName&fieldsTemplate=details&value=${encodeURIComponent(family)}`);
-		return res.ok ? ((await res.json())?.Products?.[0] ?? null) : null;
-	} catch {
-		return null;
+	const key = `${family}|${market}`;
+	if (!microsoftProducts.has(key)) {
+		microsoftProducts.set(
+			key,
+			fetch(`https://displaycatalog.mp.microsoft.com/v7.0/products/lookup?${market}&alternateId=PackageFamilyName&fieldsTemplate=details&value=${encodeURIComponent(family)}`)
+				.then(async (res) => (res.ok ? ((await res.json())?.Products?.[0] ?? null) : null))
+				.catch(() => null),
+		);
 	}
+	return microsoftProducts.get(key)!;
+}
+
+// Xbox title id of an installed Xbox game (the key of its achievements)
+export async function xboxTitleId(id: string): Promise<string> {
+	const ids: any[] = (await microsoftProduct(id, uiLocale()))?.AlternateIds ?? [];
+	return String(ids.find((a) => a?.IdType === 'XboxTitleId')?.Value ?? '');
+}
+
+// Epic namespace of an installed Epic game (the sandbox of its achievements)
+export async function epicSandbox(appName: string, dir: string): Promise<string> {
+	return unquote(await epicNamespace({ a_app_name: appName, b_dir: dir }));
 }
 
 async function fromMicrosoft(id: string, locale: string): Promise<GameInfo | null> {
@@ -329,7 +362,7 @@ async function fromMicrosoft(id: string, locale: string): Promise<GameInfo | nul
 	return {
 		source: 'microsoft',
 		url: `https://apps.microsoft.com/detail/${p.ProductId}`,
-		summary: tidy(String(l.ShortDescription ?? '').replace(/\r/g, '')).split('\n\n')[0] || firstParagraph(description),
+		summary: brief(tidy(String(l.ShortDescription ?? '').replace(/\r/g, '')) || description),
 		description,
 		developers: l.DeveloperName ? [l.DeveloperName] : [],
 		publishers: l.PublisherName ? [l.PublisherName] : [],
@@ -366,7 +399,7 @@ async function fromEpic(appName: string, dir: string, locale: string): Promise<G
 	return {
 		source: 'epic',
 		url: `https://store.epicgames.com/p/${slug}`,
-		summary: markdownToText(d.about.shortDescription || '') || firstParagraph(description),
+		summary: brief(markdownToText(d.about.shortDescription || '') || description),
 		description,
 		developers: d.about.developerAttribution ? [d.about.developerAttribution] : [],
 		publishers: d.about.publisherAttribution ? [d.about.publisherAttribution] : [],
@@ -403,7 +436,7 @@ async function fromRawg(name: string, key: string, locale: string): Promise<Game
 	return {
 		source: 'rawg',
 		url: `https://rawg.io/games/${d.slug ?? match.slug}`,
-		summary: firstParagraph(description),
+		summary: brief(description),
 		description,
 		developers: names(d.developers),
 		publishers: names(d.publishers),
@@ -441,7 +474,7 @@ async function launcherStore(state: UgiState, launcher: string, id: string): Pro
 			return url ? { name: 'GOG', url } : null;
 		}
 		case 'xbox': {
-			const product = (await microsoftProduct(id, 'en'))?.ProductId;
+			const product = (await microsoftProduct(id, uiLocale()))?.ProductId;
 			return product ? { name: 'Microsoft Store', url: `https://apps.microsoft.com/detail/${product}` } : null;
 		}
 		case 'battlenet': {
@@ -455,6 +488,7 @@ async function launcherStore(state: UgiState, launcher: string, id: string): Pro
 async function lookup(state: UgiState, key: string, name: string, locale: string): Promise<GameInfo | null> {
 	const [launcher, ...rest] = key.split(':');
 	const id = rest.join(':');
+	const store = launcherStore(state, launcher ?? '', id).catch(() => null);
 	const info =
 		(await fromSteam(name, locale)) ??
 		(launcher === 'gog' ? await fromGog(id, locale) : null) ??
@@ -462,7 +496,7 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 		(launcher === 'xbox' ? await fromMicrosoft(id, locale) : null) ??
 		(state.settings.rawg_key ? await fromRawg(name, state.settings.rawg_key, locale) : null);
 	if (!info) return null;
-	const own = await launcherStore(state, launcher ?? '', id).catch(() => null);
+	const own = await store;
 	info.stores = [...(own ? [own] : []), ...(info.source === 'steam' ? [{ name: 'Steam', url: info.url }] : [])];
 	return info;
 }
@@ -470,23 +504,24 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 // ---------- Cache ----------
 
 const running = new Map<string, Promise<GameInfo | null>>();
+// The saved information, also kept here once read: a page doesn't wait for the backend while it is busy
+const memory = new Map<string, CacheEntry | null>();
 
-// key: the imported game's id, or "manual:<appid>" for a shortcut added by hand (looked up by name)
-export async function gameInfo(state: UgiState, key: string, name: string): Promise<GameInfo | null> {
-	const locale = uiLocale();
-	const rawg = !!state.settings.rawg_key;
+async function readCache(key: string): Promise<CacheEntry | null> {
+	if (memory.has(key)) return memory.get(key)!;
 	let cached: CacheEntry | null = null;
 	try {
 		cached = JSON.parse((await cacheLoad({ a_key: key })) || 'null');
 	} catch {}
 	if (cached && cached.version !== CACHE_VERSION) cached = null;
-	if (cached && cached.locale === locale) {
-		const age = Date.now() - cached.fetched;
-		if (cached.info ? age < KEEP_FOUND : age < KEEP_MISSING && cached.rawg === rawg) return cached.info;
-	}
+	memory.set(key, cached);
+	return cached;
+}
 
+function refresh(state: UgiState, key: string, name: string, locale: string, cached: CacheEntry | null): Promise<GameInfo | null> {
 	const id = `${key}|${locale}`;
 	if (!running.has(id)) {
+		const rawg = !!state.settings.rawg_key;
 		running.set(
 			id,
 			lookup(state, key, name, locale)
@@ -495,6 +530,7 @@ export async function gameInfo(state: UgiState, key: string, name: string): Prom
 					// Nothing found this time but something before: keep the old one
 					const kept = info ?? cached?.info ?? null;
 					const entry: CacheEntry = { version: CACHE_VERSION, fetched: Date.now(), locale, rawg, info: kept };
+					memory.set(key, entry);
 					await cacheSave({ a_key: key, b_json: JSON.stringify(entry) }).catch(() => false);
 					return kept;
 				})
@@ -502,4 +538,59 @@ export async function gameInfo(state: UgiState, key: string, name: string): Prom
 		);
 	}
 	return running.get(id)!;
+}
+
+// key: the imported game's id, or "manual:<appid>" for a shortcut added by hand (looked up by name).
+// What is saved comes back at once; it is then read again, and changed gets the new one.
+export async function gameInfo(state: UgiState, key: string, name: string, changed?: (info: GameInfo | null) => void): Promise<GameInfo | null> {
+	const locale = uiLocale();
+	const cached = await readCache(key);
+	if (cached && cached.locale === locale) {
+		const age = Date.now() - cached.fetched;
+		if (!cached.info) {
+			if (age < KEEP_MISSING && cached.rawg === !!state.settings.rawg_key) return null;
+		} else {
+			if (age >= RECHECK) {
+				const before = JSON.stringify(cached.info);
+				refresh(state, key, name, locale, cached).then((info) => {
+					if (info && JSON.stringify(info) !== before) changed?.(info);
+				});
+			}
+			return cached.info;
+		}
+	}
+	return refresh(state, key, name, locale, cached);
+}
+
+// What the page shows first, loaded into the client's cache: the header, the first picture (or
+// trailer frame) and the strip below it
+function preloadPictures(info: GameInfo): Promise<unknown> {
+	const urls = [info.header, info.videos?.[0]?.thumb ?? info.screenshots[0]?.full, ...(info.videos ?? []).map((v) => v.thumb), ...info.screenshots.map((p) => p.thumb)];
+	return Promise.all(
+		[...new Set(urls.filter((u): u is string => !!u))].map(
+			(url) =>
+				new Promise<void>((done) => {
+					const img = new Image();
+					img.onload = img.onerror = () => done();
+					img.src = url;
+				}),
+		),
+	);
+}
+
+// Imported games get their information and pictures while waiting in the library, one at a time
+// (the information only where nothing is saved yet): their page opens with all of it already there
+let queue: Promise<void> = Promise.resolve();
+
+export function prefetchInfo(state: UgiState, keys: string[]) {
+	const locale = uiLocale();
+	queue = queue.then(async () => {
+		for (const key of keys) {
+			const name = state.imported[key]?.name;
+			if (!name) continue;
+			const cached = await readCache(key);
+			const info = cached && cached.locale === locale ? cached.info : await refresh(state, key, name, locale, cached).catch(() => null);
+			if (info) await preloadPictures(info);
+		}
+	});
 }

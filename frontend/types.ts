@@ -66,6 +66,8 @@ export type UgiSettings = {
 	sgdb_key?: string;
 	// Optional: game descriptions from RAWG when the stores don't know the game
 	rawg_key?: string;
+	// Optional: Xbox achievements of every game through OpenXBL (xbl.io)
+	xbl_key?: string;
 	// Prefer animated images when SteamGridDB has them
 	animated?: boolean;
 	// Include WebP images (on by default, can be turned off)

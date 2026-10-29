@@ -26,6 +26,14 @@ It includes or is derived from the following third-party works, used under their
 - Used for: the project's starting point. The Xbox / Microsoft Store discovery script and the UWP launch helper in `backend/launchers/xbox.lua` are derived from it.
 - Changes: discovery reworked (game detection via `MicrosoftGame.config`, UTF-8 output, hidden system apps); the launch helper runs through `conhost --headless`; shortcuts are no longer written to `shortcuts.vdf` but added live through Steam's client API; the rest of the plugin was rewritten for UGI.
 
+## Legendary
+
+- Source: https://github.com/derrod/legendary
+- Authors: derrod and contributors
+- License: GPL-3.0 (same as UGI)
+- Used for: the Epic account sign-in in `backend/achievements.lua` and `frontend/Sections.tsx` (the launcher's client id, the sign-in page that shows an authorization code, the code / refresh token exchange for an access token).
+- Changes: rewritten in Lua for a Millennium plugin; only the sign-in is used, to read the player's achievements.
+
 ## hls.js
 
 - Source: https://github.com/video-dev/hls.js
