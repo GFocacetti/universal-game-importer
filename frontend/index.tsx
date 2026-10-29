@@ -9,6 +9,7 @@ import { mainDocument, waitForMainDocument } from 'overlay';
 import { startPeriodicCheck } from 'checker';
 import { startGameInfo } from 'GameInfoSection';
 import { prefetchInfo } from 'gameInfo';
+import { prefetchAchievements } from 'Achievements';
 
 declare global {
 	interface Window {
@@ -66,8 +67,16 @@ async function onStartup() {
 		Navigation.Navigate(UGI_ROUTE);
 	}
 	startPeriodicCheck().catch((err) => console.error('[UGI] periodic check failed', err));
-	// Games imported before their information was saved at import: once Steam has settled
-	setTimeout(() => loadState().then((current) => prefetchInfo(current, Object.keys(current.imported))), 30_000);
+	// Once Steam has settled: information for games imported before it was saved at import, then
+	// the achievements, again every day while Steam stays open
+	const prefetch = () =>
+		loadState()
+			.then((current) => prefetchInfo(current, Object.keys(current.imported)).then(() => prefetchAchievements(current)))
+			.catch((err) => console.error('[UGI] prefetch failed', err));
+	setTimeout(() => {
+		prefetch();
+		setInterval(prefetch, 24 * 60 * 60 * 1000);
+	}, 30_000);
 }
 
 export default definePlugin(async () => {

@@ -157,12 +157,14 @@ local function xbox_online(title, key, lang)
         method = "GET",
         headers = { ["X-Authorization"] = key, ["Accept-Language"] = lang, ["Accept"] = "application/json" },
     })
-    if status ~= 200 or type(body) ~= "table" or type(body.achievements) ~= "table" then
+    -- The list comes inside "content" (OpenXBL's wrapper), or on its own
+    local data = type(body) == "table" and (type(body.content) == "table" and body.content or body) or nil
+    if status ~= 200 or not data or type(data.achievements) ~= "table" then
         logger:error("achievements: OpenXBL answered " .. tostring(status))
         return nil
     end
     local items = {}
-    for _, a in ipairs(body.achievements) do
+    for _, a in ipairs(data.achievements) do
         local unlocked = value(a.progressState) == "Achieved"
         local image
         for _, asset in ipairs(value(a.mediaAssets) or {}) do

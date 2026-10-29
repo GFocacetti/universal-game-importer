@@ -582,9 +582,9 @@ function preloadPictures(info: GameInfo): Promise<unknown> {
 // (the information only where nothing is saved yet): their page opens with all of it already there
 let queue: Promise<void> = Promise.resolve();
 
-export function prefetchInfo(state: UgiState, keys: string[]) {
+export function prefetchInfo(state: UgiState, keys: string[]): Promise<void> {
 	const locale = uiLocale();
-	queue = queue.then(async () => {
+	return (queue = queue.then(async () => {
 		for (const key of keys) {
 			const name = state.imported[key]?.name;
 			if (!name) continue;
@@ -592,5 +592,5 @@ export function prefetchInfo(state: UgiState, keys: string[]) {
 			const info = cached && cached.locale === locale ? cached.info : await refresh(state, key, name, locale, cached).catch(() => null);
 			if (info) await preloadPictures(info);
 		}
-	});
+	}));
 }

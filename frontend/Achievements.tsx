@@ -23,7 +23,10 @@ export type Achievement = {
 	time?: string;
 	gamerscore?: number;
 };
-type Result = { source?: 'gog' | 'xbox' | 'epic'; items: Achievement[]; signed_out?: boolean };
+type Result = { source?: 'gog' | 'xbox' | 'epic'; items: Achievement[]; signed_out?: boolean; fetched?: number };
+
+// OpenXBL's free key allows 150 requests an hour: an Xbox game is asked again after 10 minutes at most
+const XBOX_RECHECK = 10 * 60 * 1000;
 
 const SOURCE_TEXT = { gog: 'ach.sourceGog', xbox: 'ach.sourceXbox', epic: 'ach.sourceEpic' } as const;
 
@@ -73,7 +76,7 @@ async function saved(id: string): Promise<Result | null> {
 	try {
 		result = JSON.parse(unquote(await savedLoad({ a_key: key })) || 'null') as Result | null;
 	} catch {}
-	if (!result || !Array.isArray(result.items) || !result.items.length) result = null;
+	if (!result || !Array.isArray(result.items)) result = null;
 	savedMemory.set(key, result);
 	return result;
 }
@@ -86,8 +89,9 @@ function load(state: UgiState, id: string): Promise<Result> {
 			.then((more) => readAchievements({ a_id: id, b_lang: lang, c_extra: JSON.stringify(more) }))
 			.then((raw) => {
 				const parsed = JSON.parse(unquote(raw)) as Result;
-				const result = { source: parsed.source, items: Array.isArray(parsed.items) ? parsed.items : [], signed_out: parsed.signed_out === true };
-				if (result.items.length) {
+				const result = { source: parsed.source, items: Array.isArray(parsed.items) ? parsed.items : [], signed_out: parsed.signed_out === true, fetched: Date.now() };
+				// An empty answer doesn't replace a saved list (launcher closed, offline)
+				if (result.items.length || !savedMemory.get(savedKey(id))?.items.length) {
 					savedMemory.set(savedKey(id), result);
 					savedSave({ a_key: savedKey(id), b_json: JSON.stringify(result) }).catch(() => false);
 				}
@@ -99,6 +103,21 @@ function load(state: UgiState, id: string): Promise<Result> {
 		setTimeout(() => cache.delete(key), 60_000);
 	}
 	return cache.get(key)!;
+}
+
+// Launchers whose achievements UGI reads
+const WITH_ACHIEVEMENTS = ['gog', 'xbox', 'epic'];
+const DAY = 24 * 60 * 60 * 1000;
+
+// Every imported game's achievements read again once a day, one at a time, behind the library;
+// opening a game's page reads them at once
+export async function prefetchAchievements(state: UgiState) {
+	for (const id of Object.keys(state.imported)) {
+		if (!WITH_ACHIEVEMENTS.includes(id.slice(0, id.indexOf(':')))) continue;
+		const last = await saved(id);
+		if (last?.fetched && Date.now() - last.fetched < DAY) continue;
+		await load(state, id);
+	}
 }
 
 const date = (iso: string) => new Date(iso).toLocaleDateString(uiLocale(), { day: 'numeric', month: 'long', year: 'numeric' });
@@ -148,6 +167,11 @@ export function AchievementsBlock({ appid, ready }: { appid: number; ready: bool
 			if (!ready) {
 				const found = await saved(key);
 				if (alive && found) setResult((now) => now ?? found);
+				return;
+			}
+			const last = await saved(key);
+			if (last?.source === 'xbox' && last.fetched && Date.now() - last.fetched < XBOX_RECHECK) {
+				if (alive) setResult((now) => now ?? last);
 				return;
 			}
 			const found = await load(state, key);
