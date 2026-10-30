@@ -17,14 +17,19 @@ A Millennium plugin that brings any game into your Steam library, not only the o
 * Any other game can be added from UGI's page ("Add a game"): pick its program, check the name UGI suggests, and it gets its pictures and game page like the others
    * Kept in an "Imported games" collection, and removed when its program or its Steam shortcut is gone
 * Games start through their own launcher, and Steam shows them as "In game" and counts the playtime
-   * Steam's overlay works by default; turned off for a game (in its UGI page), the game counts as closed as soon as you close it, even with its launcher still open
+   * Steam's overlay works by default; turned off for a game (its "Steam integration" tab in UGI's page), the game counts as closed as soon as you close it, even with its launcher still open
 * Keeps the library up to date by itself
    * New games are announced with a notification, ready to be added
    * Uninstalled games are removed, changed ones are updated
    * Games you had already added to Steam by hand are taken over, with their playtime, and put back as they were if UGI removes them
-* Pictures from SteamGridDB: grid, hero, logo and icon
+* Pictures from SteamGridDB: cover, wide cover, background, logo and icon
    * Chosen automatically for new games
+   * For your whole library, Steam games too, or one collection: check the missing ones, fill only those, replace all, or go back to the originals, with progress and a Stop button
    * "Customize (UGI)…" in a game's menu opens a gallery to pick others (animated ones too)
+* Every game has its own window in UGI's page
+   * Images: the game's pictures, with SteamGridDB's choices beside them
+   * Launch settings: its launcher and how it starts
+   * Steam integration: Steam's overlay on or off
 * A collection for every launcher, and shelves on the Home page (optional)
 * Game information on the game's page in the library, like a store page
    * Trailers and screenshots, summary, reviews, release date, developer and publisher
@@ -46,7 +51,13 @@ A Millennium plugin that brings any game into your Steam library, not only the o
 
 UGI's page is in Steam's **LIBRARY** menu (**UGI**). The first time, a short setup guides you through it.
 
-Optional keys and accounts, in UGI's **Settings**:
+In UGI's **Settings**:
+
+* How often UGI looks for new games: off (only "Scan now"), daily, weekly or monthly
+* Collections and Home shelves, animated pictures, WebP pictures
+* Language (follows Steam's by default) and theme (Steam or Modern)
+
+Optional keys and accounts, also in UGI's **Settings**:
 
 * SteamGridDB API key: needed for the pictures. Free key: https://www.steamgriddb.com/profile/preferences/api
 * RAWG API key: information for games not found on Steam, GOG or Epic (texts in English). Free key: https://rawg.io/apidocs
