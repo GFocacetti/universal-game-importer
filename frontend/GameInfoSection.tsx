@@ -8,13 +8,12 @@ import { AchievementsBlock } from 'Achievements';
 import { importedKeyFor, loadState } from 'backend';
 import { GameInfo, gameInfo, Requirement, Reviews, Video } from 'gameInfo';
 import { t } from 'i18n';
-import { gamepadDocument, gamepadWindow } from 'location';
+import { gamepadDocument, gamepadWindow, mainWindowPath } from 'location';
 import { mainDocument } from 'overlay';
 import { GamepadMode, Group, Pressable, Row, useGamepad } from 'Pressable';
 import { imageUrls, isShortcut, openUrl } from 'steamApps';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
-declare const MainWindowBrowserManager: { m_lastLocation?: { pathname?: string } } | undefined;
 
 const SOURCE_NAMES: Record<GameInfo['source'], string> = { steam: 'Steam', gog: 'GOG', epic: 'Epic Games Store', microsoft: 'Microsoft Store', rawg: 'RAWG' };
 
@@ -663,7 +662,7 @@ let searching = { appid: 0, since: 0, last: 0 };
 let aligned = 0;
 
 async function tick() {
-	const path = MainWindowBrowserManager?.m_lastLocation?.pathname ?? '';
+	const path = mainWindowPath();
 	const appid = Number(path.match(/^\/library\/app\/(\d+)/)?.[1] ?? 0);
 	// Every non-Steam game: imported by UGI or added by hand
 	if (!appid || !isShortcut(appid)) {
