@@ -123,6 +123,8 @@ export async function prefetchAchievements(state: UgiState) {
 		const last = await saved(id);
 		if (last?.fetched && Date.now() - last.fetched < DAY) continue;
 		await load(state, id);
+		// OpenXBL's free key allows 150 requests an hour: Xbox games one every 30 seconds at most
+		if (id.startsWith('xbox:') && state.settings.xbl_key) await new Promise((r) => setTimeout(r, 30_000));
 	}
 }
 

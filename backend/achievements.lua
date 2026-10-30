@@ -221,7 +221,7 @@ local function epic_token(form)
     })
     if status ~= 200 or type(body) ~= "table" or not value(body.access_token) then
         logger:error("achievements: Epic sign-in answered " .. tostring(status))
-        return nil
+        return nil, status
     end
     local account = {
         access_token = body.access_token,
@@ -249,7 +249,13 @@ local function epic_account()
     if not account then return nil end
     if os.time() < (tonumber(account.expires) or 0) then return account end
     if not account.refresh_token then return nil end
-    return epic_token("grant_type=refresh_token&refresh_token=" .. encode_form(account.refresh_token))
+    local renewed, status = epic_token("grant_type=refresh_token&refresh_token=" .. encode_form(account.refresh_token))
+    -- Refused by Epic (sign-in expired or revoked): signed out, so the settings say so too
+    if not renewed and status and status >= 400 and status < 500 then
+        local fs = require("fs")
+        if fs.exists(epic_file()) then fs.remove(epic_file()) end
+    end
+    return renewed
 end
 
 local function epic_graphql(account, query, variables)

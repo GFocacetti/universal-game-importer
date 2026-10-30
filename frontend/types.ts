@@ -42,6 +42,8 @@ export type ImportedEntry = {
 	manual?: ShortcutFields;
 	// false: Steam's overlay turned off for this game (see withOverlay)
 	overlay?: boolean;
+	// Games added in UGI's page: when (milliseconds)
+	added?: number;
 };
 
 export type ShortcutFields = { name: string; exe: string; start_dir: string; launch_options: string };

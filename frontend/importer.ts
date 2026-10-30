@@ -103,6 +103,8 @@ export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiS
 	// restart); nothing counts as deleted when the file couldn't be read
 	const listed = new Set(shortcuts.map((x) => x.appid));
 	const deleted = (appid: number) => shortcuts.length > 0 && !listed.has(appid);
+	// Steam saves that file a moment after a shortcut is added: a game just added isn't judged by it yet
+	const recent = (e: ImportedEntry) => !!e.added && Date.now() - e.added < 10 * 60 * 1000;
 	// Shortcuts not made by UGI, each taken over by one game at most; a game added by hand in UGI's
 	// page is taken over too when a launcher finds it
 	const used = new Set(Object.values(state.imported).filter((e) => e.launcher !== 'manual').map((e) => e.appid));
@@ -125,7 +127,7 @@ export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiS
 		gone: Object.entries(state.imported)
 			.filter(([id, e]) =>
 				e.launcher === 'manual'
-					? deleted(e.appid) || missing.has(unquotePath(e.exe).toLowerCase())
+					? (deleted(e.appid) && !recent(e)) || missing.has(unquotePath(e.exe).toLowerCase())
 					: !found.has(id) && reliable.has(e.launcher),
 			)
 			.map(([id]) => id),
@@ -204,7 +206,7 @@ export async function addManualGame(exe: string, name: string): Promise<number> 
 	const appid = await addShortcut(game);
 	const state = await loadState();
 	const id = `manual:${appid}`;
-	state.imported[id] = entryFor({ ...game, id }, appid);
+	state.imported[id] = { ...entryFor({ ...game, id }, appid), added: Date.now() };
 	await syncCollections(state);
 	await saveState(state);
 	if (state.settings.sgdb_key) fillInBackground(state, [appid]);
@@ -214,13 +216,14 @@ export async function addManualGame(exe: string, name: string): Promise<number> 
 
 async function fillInBackground(state: UgiState, appids: number[]) {
 	startImages(appids);
+	const before = { ids: { ...state.sgdb_ids }, icons: { ...state.custom_icons } };
 	try {
 		// fillMissing reports how many games are done before starting the next one
 		await fillMissing(state, appids, (done) => done > 0 && finishImages(appids[done - 1]!), { stop: false });
 		// The state may have changed meanwhile: keep it and add only what the images step learned
 		const current = await loadState();
-		Object.assign(current.sgdb_ids, state.sgdb_ids);
-		Object.assign(current.custom_icons, state.custom_icons);
+		for (const [key, id] of Object.entries(state.sgdb_ids)) if (before.ids[key] !== id) current.sgdb_ids[key] = id;
+		for (const [key, on] of Object.entries(state.custom_icons)) if (before.icons[key] !== on) current.custom_icons[key] = on;
 		await saveState(current);
 	} catch (err) {
 		console.error('[UGI] automatic images failed', err);

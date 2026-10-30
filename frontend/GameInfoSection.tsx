@@ -748,35 +748,44 @@ let stickMoved = 0; // pointer mode: pixels to scroll still pending
 let lastPointer: number | null = null;
 let lastMessage = 0;
 let stickListening = false;
+let stickLoop = false;
 
 function listenToStick() {
-	if (stickListening) return;
-	stickListening = true;
-	// (the typings describe another signature than the one Steam calls)
-	const input = SteamClient.Input as any;
-	try {
-		input.EnableControllerAnalogInputMessages(true);
-		input.RegisterForControllerAnalogInputMessages((_controller: number, source: number, _active: boolean, x: number, y: number) => {
-			if (source !== RIGHT_STICK) return;
-			lastMessage = performance.now();
-			if (x === 0 && y === 0) {
-				stickSpeed = 0;
-				lastPointer = null;
-			} else if (Math.abs(y) <= 1) {
-				stickSpeed = y;
-				lastPointer = null;
-			} else {
-				if (lastPointer !== null) stickMoved += (y - lastPointer) * 0.4;
-				lastPointer = y;
-			}
-		});
-	} catch (err) {
-		console.error('[UGI] right stick', err);
-		return;
+	if (!stickListening) {
+		stickListening = true;
+		// (the typings describe another signature than the one Steam calls)
+		const input = SteamClient.Input as any;
+		try {
+			input.EnableControllerAnalogInputMessages(true);
+			input.RegisterForControllerAnalogInputMessages((_controller: number, source: number, _active: boolean, x: number, y: number) => {
+				if (source !== RIGHT_STICK) return;
+				lastMessage = performance.now();
+				if (x === 0 && y === 0) {
+					stickSpeed = 0;
+					lastPointer = null;
+				} else if (Math.abs(y) <= 1) {
+					stickSpeed = y;
+					lastPointer = null;
+				} else {
+					if (lastPointer !== null) stickMoved += (y - lastPointer) * 0.4;
+					lastPointer = y;
+				}
+			});
+		} catch (err) {
+			console.error('[UGI] right stick', err);
+			return;
+		}
 	}
+	// Each frame while UGI is in Big Picture's page; started again when it comes back
+	if (stickLoop) return;
+	stickLoop = true;
 	let last = performance.now();
 	let scrolled = false;
 	const step = (now: number) => {
+		if (!big) {
+			stickLoop = false;
+			return;
+		}
 		const elapsed = Math.min(now - last, 50);
 		last = now;
 		// No news from the stick: it was let go
