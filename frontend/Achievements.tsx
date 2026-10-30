@@ -4,6 +4,7 @@ import { callable } from '@steambrew/client';
 import React, { useEffect, useState } from 'react';
 import { importedKeyFor, loadState, unquote } from 'backend';
 import { epicSandbox, xboxTitleId } from 'gameInfo';
+import { Pressable } from 'Pressable';
 import { t, uiLocale } from 'i18n';
 import { UgiState } from 'types';
 
@@ -136,6 +137,7 @@ function Item({ item }: { item: Achievement }) {
 	const hidden = item.secret && !item.unlocked && !revealed;
 	const image = item.unlocked ? item.image : item.image_locked ?? item.image;
 	return (
+		<Pressable block ring onPress={hidden ? () => setRevealed(true) : undefined}>
 		<div className={`ugi-ach-item${item.unlocked ? '' : ' locked'}${hidden ? ' hidden' : ''}`} onClick={hidden ? () => setRevealed(true) : undefined}>
 			{image && !hidden ? <img src={image} /> : <div className="ugi-ach-blank" />}
 			<div className="ugi-ach-text">
@@ -150,6 +152,7 @@ function Item({ item }: { item: Achievement }) {
 				{!!item.gamerscore && <div>{item.gamerscore} G</div>}
 			</div>
 		</div>
+		</Pressable>
 	);
 }
 
@@ -203,9 +206,11 @@ export function AchievementsBlock({ appid, ready }: { appid: number; ready: bool
 					))}
 				</div>
 			)}
-			<span className="ugi-ach-toggle" onClick={() => setAll(!all)}>
-				{all ? t('ach.showLess') : t('ach.showAll', { n: items.length })}
-			</span>
+			<Pressable onPress={() => setAll(!all)}>
+				<span className="ugi-ach-toggle" onClick={() => setAll(!all)}>
+					{all ? t('ach.showLess') : t('ach.showAll', { n: items.length })}
+				</span>
+			</Pressable>
 			{all && (
 				<div className="ugi-ach-list">
 					{items.map((a) => (

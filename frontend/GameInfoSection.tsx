@@ -8,7 +8,9 @@ import { AchievementsBlock } from 'Achievements';
 import { importedKeyFor, loadState } from 'backend';
 import { GameInfo, gameInfo, Requirement, Reviews, Video } from 'gameInfo';
 import { t } from 'i18n';
+import { gamepadDocument, gamepadWindow } from 'location';
 import { mainDocument } from 'overlay';
+import { GamepadMode, Group, Pressable, Row, useGamepad } from 'Pressable';
 import { imageUrls, isShortcut, openUrl } from 'steamApps';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
@@ -101,6 +103,9 @@ const CSS = `
 .ugi-meta { display: flex; align-items: center; gap: 10px; }
 .ugi-meta b { width: 40px; height: 40px; flex: none; display: grid; place-items: center; color: #ffffff; font-size: 18px; border-radius: 3px; }
 .ugi-meta a { color: #66c0f4; cursor: pointer; font-size: 12px; }
+.ugi-pad-inline { display: inline-block; }
+.ugi-pad-block { display: block; }
+.ugi-bpm .ugi-info-side { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 16px; margin-top: 18px; }
 `;
 
 const Chevron = ({ left }: { left?: boolean }) => (
@@ -153,10 +158,12 @@ function MediaView({ item, onZoom }: { item: Media; onZoom?: () => void }) {
 		<>
 			<img src={video.thumb} />
 			{video.page && (
-				<div className="ugi-play" onClick={() => openUrl(video.page!)}>
-					<PlayIcon />
-					<span>{t('info.watchTrailer')}</span>
-				</div>
+				<Pressable block onPress={() => openUrl(video.page!)}>
+					<div className="ugi-play" onClick={() => openUrl(video.page!)}>
+						<PlayIcon />
+						<span>{t('info.watchTrailer')}</span>
+					</div>
+				</Pressable>
 			)}
 		</>
 	);
@@ -164,6 +171,7 @@ function MediaView({ item, onZoom }: { item: Media; onZoom?: () => void }) {
 
 // Like the store's media player: big picture or trailer, thumbnails below, full screen on click
 function Player({ media }: { media: Media[] }) {
+	const pad = useGamepad();
 	const [index, setIndex] = useState(0);
 	const [full, setFull] = useState(false);
 	const box = useRef<HTMLDivElement>(null);
@@ -199,19 +207,23 @@ function Player({ media }: { media: Media[] }) {
 	return (
 		<div className="ugi-player" ref={box}>
 			<div className={`ugi-player-main${current.video ? '' : ' image'}`}>
-				<MediaView item={current} onZoom={() => setFull(true)} />
+				{/* Big Picture: no full screen view (Steam's navigation can't reach it) */}
+				<MediaView item={current} onZoom={pad ? undefined : () => setFull(true)} />
 			</div>
 			<div className="ugi-player-strip">
-				<button className="ugi-player-arrow" onClick={() => go(-1)}><Chevron left /></button>
-				<div className="ugi-player-thumbs" ref={strip}>
+				{/* Big Picture: the D-pad moves along the thumbnails, the arrows aren't needed */}
+				{!pad && <button className="ugi-player-arrow" onClick={() => go(-1)}><Chevron left /></button>}
+				<Row className="ugi-player-thumbs" ref={strip}>
 					{media.map((m, i) => (
-						<div key={m.thumb + i} className={`ugi-thumb${i === index ? ' on' : ''}`} onClick={() => setIndex(i)}>
-							<img src={m.thumb} />
-							{m.video && <PlayIcon />}
-						</div>
+						<Pressable key={m.thumb + i} onPress={() => setIndex(i)} onFocus={() => setIndex(i)}>
+							<div className={`ugi-thumb${i === index ? ' on' : ''}`} onClick={() => setIndex(i)}>
+								<img src={m.thumb} />
+								{m.video && <PlayIcon />}
+							</div>
+						</Pressable>
 					))}
-				</div>
-				<button className="ugi-player-arrow" onClick={() => go(1)}><Chevron /></button>
+				</Row>
+				{!pad && <button className="ugi-player-arrow" onClick={() => go(1)}><Chevron /></button>}
 			</div>
 			{full && box.current &&
 				createPortal(
@@ -255,20 +267,25 @@ function SidePanels({ info }: { info: GameInfo }) {
 	const languages = info.languages ?? [];
 	const anyAudio = languages.some((l) => l.audio);
 	return (
-		<div className="ugi-info-side">
+		<Row className="ugi-info-side">
 			<style>{CSS}</style>
 			{!!info.features?.length && (
+				<Group enterable={info.features.some((f) => f.url)}>
 				<div className="ugi-side-panel">
 					<h3>{t('info.features')}</h3>
 					{info.features.map((f) => (
-						<div key={f.name} className={`ugi-feature${f.url ? ' link' : ''}`} onClick={f.url ? () => openUrl(f.url!) : undefined}>
-							<span>{f.icon ? <img src={f.icon} /> : <i />}</span>
-							{f.name}
-						</div>
+						<Pressable key={f.name} block onPress={f.url ? () => openUrl(f.url!) : undefined}>
+							<div className={`ugi-feature${f.url ? ' link' : ''}`} onClick={f.url ? () => openUrl(f.url!) : undefined}>
+								<span>{f.icon ? <img src={f.icon} /> : <i />}</span>
+								{f.name}
+							</div>
+						</Pressable>
 					))}
 				</div>
+				</Group>
 			)}
 			{languages.length > 0 && (
+				<Group>
 				<div className="ugi-side-panel">
 					<h3>{t('info.languages')}</h3>
 					<table className="ugi-langs">
@@ -290,26 +307,35 @@ function SidePanels({ info }: { info: GameInfo }) {
 						</tbody>
 					</table>
 				</div>
+				</Group>
 			)}
 			{info.age && (
-				<div className="ugi-side-panel">
-					<h3>{t('info.age')}</h3>
-					<div className="ugi-age">
-						<b>{info.age.label}</b>
-						{info.age.descriptors && <span>{info.age.descriptors}</span>}
+				<Group>
+					<div className="ugi-side-panel">
+						<h3>{t('info.age')}</h3>
+						<div className="ugi-age">
+							<b>{info.age.label}</b>
+							{info.age.descriptors && <span>{info.age.descriptors}</span>}
+						</div>
 					</div>
-				</div>
+				</Group>
 			)}
 			{info.metacritic && (
+				<Group enterable={!!info.metacritic.url}>
 				<div className="ugi-side-panel">
 					<h3>Metacritic</h3>
 					<div className="ugi-meta">
 						<b style={{ background: metacriticColor(info.metacritic.score) }}>{info.metacritic.score}</b>
-						{info.metacritic.url && <a onClick={() => openUrl(info.metacritic!.url!)}>{t('info.metacriticRead')}</a>}
+						{info.metacritic.url && (
+							<Pressable onPress={() => openUrl(info.metacritic!.url!)}>
+								<a onClick={() => openUrl(info.metacritic!.url!)}>{t('info.metacriticRead')}</a>
+							</Pressable>
+						)}
 					</div>
 				</div>
+				</Group>
 			)}
-		</div>
+		</Row>
 	);
 }
 
@@ -327,6 +353,7 @@ function Blocks({ appid, side, top }: { appid: number; side: HTMLElement | null;
 }
 
 function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHost: HTMLElement | null; topHost: HTMLElement | null; onDone: () => void }) {
+	const pad = useGamepad();
 	const [info, setInfo] = useState<GameInfo | null | undefined>(undefined);
 
 	useEffect(() => {
@@ -361,7 +388,13 @@ function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHo
 		list.map((name, i) => (
 			<React.Fragment key={name}>
 				{i > 0 && ', '}
-				{info.links?.[name] ? <a onClick={() => openUrl(info.links![name]!)}>{name}</a> : name}
+				{info.links?.[name] ? (
+					<Pressable onPress={() => openUrl(info.links![name]!)}>
+						<a onClick={() => openUrl(info.links![name]!)}>{name}</a>
+					</Pressable>
+				) : (
+					name
+				)}
 			</React.Fragment>
 		));
 	const verdict = info.reviews && reviewVerdict(info.reviews);
@@ -382,7 +415,9 @@ function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHo
 			info.stores.map((store, i) => (
 				<React.Fragment key={store.url}>
 					{i > 0 && ', '}
-					<a onClick={() => openUrl(store.url)}>{store.name}</a>
+					<Pressable onPress={() => openUrl(store.url)}>
+						<a onClick={() => openUrl(store.url)}>{store.name}</a>
+					</Pressable>
 				</React.Fragment>
 			)),
 		]);
@@ -406,28 +441,37 @@ function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHo
 		<div className="ugi-top">
 			{media.length > 0 && <Player media={media} />}
 			<div className="ugi-glance">
-				<FirstImage urls={headers} className="ugi-glance-header" />
-				{info.summary && <p className="ugi-glance-summary">{info.summary}</p>}
+				{/* Big Picture: picture and summary, details, genres are one stop each */}
+				<Group>
+					<FirstImage urls={headers} className="ugi-glance-header" />
+					{info.summary && <p className="ugi-glance-summary">{info.summary}</p>}
+				</Group>
 				{rows.length > 0 && (
-					<div className="ugi-glance-grid">
-						{rows.map(([label, value]) => (
-							<React.Fragment key={label}>
-								<div className="ugi-glance-label">{label}</div>
-								<div className="ugi-glance-value">{value}</div>
-							</React.Fragment>
-						))}
-					</div>
+					<Group enterable>
+						<div className="ugi-glance-grid">
+							{rows.map(([label, value]) => (
+								<React.Fragment key={label}>
+									<div className="ugi-glance-label">{label}</div>
+									<div className="ugi-glance-value">{value}</div>
+								</React.Fragment>
+							))}
+						</div>
+					</Group>
 				)}
 				{info.genres.length > 0 && (
+					<Group enterable>
 					<div className="ugi-chips">
 						{info.genres.map((g) =>
 							info.links?.[g] ? (
-								<span key={g} className="ugi-chip" onClick={() => openUrl(info.links![g]!)}>{g}</span>
+								<Pressable key={g} onPress={() => openUrl(info.links![g]!)}>
+									<span className="ugi-chip" onClick={() => openUrl(info.links![g]!)}>{g}</span>
+								</Pressable>
 							) : (
 								<span key={g} className="ugi-chip plain">{g}</span>
 							),
 						)}
 					</div>
+					</Group>
 				)}
 			</div>
 		</div>
@@ -446,20 +490,34 @@ function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHo
 				: top}
 			<h2 className="first">{t('info.title')}</h2>
 			<div className="ugi-info-text">
-				{info.description.split('\n\n').filter(Boolean).map((p, i) => (p.startsWith('# ') ? <h3 key={i}>{p.slice(2)}</h3> : <p key={i}>{p}</p>))}
+				{info.description
+					.split('\n\n')
+					.filter(Boolean)
+					.map((p, i) => (
+						<Pressable key={i} block>
+							{p.startsWith('# ') ? <h3>{p.slice(2)}</h3> : <p>{p}</p>}
+						</Pressable>
+					))}
 			</div>
 			{(minimum.length > 0 || recommended.length > 0) && (
 				<>
 					<h2>{t('info.requirements')}</h2>
-					<div className="ugi-req">
-						{requirementList(t('info.minimum'), minimum)}
-						{requirementList(t('info.recommended'), recommended)}
-					</div>
+					<Pressable block>
+						<div className="ugi-req">
+							{requirementList(t('info.minimum'), minimum)}
+							{requirementList(t('info.recommended'), recommended)}
+						</div>
+					</Pressable>
 				</>
 			)}
 			{sideHost && createPortal(<SidePanels info={info} />, sideHost)}
+			{/* Big Picture has no right column: the panels follow the description */}
+			{!sideHost && pad && <SidePanels info={info} />}
 			<div className="ugi-info-source">
-				{t('info.source')} <a onClick={() => openUrl(info.url)}>{SOURCE_NAMES[info.source]}</a>
+				{t('info.source')}{' '}
+				<Pressable onPress={() => openUrl(info.url)}>
+					<a onClick={() => openUrl(info.url)}>{SOURCE_NAMES[info.source]}</a>
+				</Pressable>
 			</div>
 		</div>
 	);
@@ -673,9 +731,161 @@ async function tick() {
 	}
 }
 
+// ---------- Big Picture ----------
+
+// Big Picture's game page has no right column: the blocks go in its "Game info" tab, in place of
+// Steam's notice for non-Steam shortcuts and the portrait beside it. They are drawn inside Steam's
+// own React contexts (controller navigation, scrolling, focus ring), so the D-pad reaches them.
+type BigMounted = { host: HTMLElement; root: Root; appid: number; box: HTMLElement };
+let big: BigMounted | null = null;
+
+// The right stick scrolls the page like a mouse wheel (Steam leaves it free on this page; the left one
+// moves the focus). Steam sends every stick's position; 47 is the right stick.
+const RIGHT_STICK = 47;
+// Steam reports the stick in two ways: its position (-1 to 1, up is positive), or a running
+// position like a mouse pointer's (thousands, growing downwards), reset to 0 on release
+let stickSpeed = 0; // position mode
+let stickMoved = 0; // pointer mode: pixels to scroll still pending
+let lastPointer: number | null = null;
+let lastMessage = 0;
+let stickListening = false;
+
+function listenToStick() {
+	if (stickListening) return;
+	stickListening = true;
+	// (the typings describe another signature than the one Steam calls)
+	const input = SteamClient.Input as any;
+	try {
+		input.EnableControllerAnalogInputMessages(true);
+		input.RegisterForControllerAnalogInputMessages((_controller: number, source: number, _active: boolean, x: number, y: number) => {
+			if (source !== RIGHT_STICK) return;
+			lastMessage = performance.now();
+			if (x === 0 && y === 0) {
+				stickSpeed = 0;
+				lastPointer = null;
+			} else if (Math.abs(y) <= 1) {
+				stickSpeed = y;
+				lastPointer = null;
+			} else {
+				if (lastPointer !== null) stickMoved += (y - lastPointer) * 0.4;
+				lastPointer = y;
+			}
+		});
+	} catch (err) {
+		console.error('[UGI] right stick', err);
+		return;
+	}
+	let last = performance.now();
+	let scrolled = false;
+	const step = (now: number) => {
+		const elapsed = Math.min(now - last, 50);
+		last = now;
+		// No news from the stick: it was let go
+		if (now - lastMessage > 120) {
+			stickSpeed = 0;
+			lastPointer = null;
+		}
+		let delta = 0;
+		if (Math.abs(stickSpeed) > 0.15) delta = -stickSpeed * Math.abs(stickSpeed) * elapsed * 2.2;
+		delta += stickMoved;
+		stickMoved = 0;
+		if (big && Math.abs(delta) >= 0.5) {
+			scrollPage(big.host, delta);
+			scrolled = true;
+		} else if (big && scrolled && now - lastMessage > 120) {
+			scrolled = false;
+			focusOnScreen(big.host);
+		}
+		requestAnimationFrame(step);
+	};
+	requestAnimationFrame(step);
+}
+
+// The D-pad goes on from where the page was scrolled to, not from where its focus was left: the
+// focus moves to UGI's first element on screen (unless it is on screen already)
+function focusOnScreen(host: HTMLElement) {
+	const view = host.ownerDocument.defaultView;
+	if (!view) return;
+	const height = view.innerHeight;
+	const visible = (el: Element) => {
+		const r = el.getBoundingClientRect();
+		return r.height > 0 && r.top >= 0 && r.top < height * 0.8;
+	};
+	const active = host.ownerDocument.activeElement;
+	if (active && active !== host.ownerDocument.body && visible(active)) return;
+	const target = [...host.querySelectorAll<HTMLElement>('.ugi-pad-block, .ugi-pad-inline')].find(visible);
+	target?.focus({ preventScroll: true });
+}
+
+// Down: first Steam's header goes up, then the tab's contents; up the other way round
+function scrollPage(from: HTMLElement, delta: number) {
+	const scrollers: HTMLElement[] = [];
+	for (let el = from.parentElement; el; el = el.parentElement) if (el.scrollHeight > el.clientHeight + 1) scrollers.push(el);
+	if (delta > 0) scrollers.reverse();
+	for (const el of scrollers) {
+		const before = el.scrollTop;
+		el.scrollTop = before + delta;
+		const moved = el.scrollTop - before;
+		delta -= moved;
+		if (Math.abs(delta) < 0.5) return;
+	}
+}
+
+function unmountBig() {
+	if (!big) return;
+	try {
+		big.root.unmount();
+	} catch {}
+	big.host.remove();
+	showNotice(big.box);
+	big = null;
+}
+
+// The contexts around an element in Steam's page, innermost first
+function steamContexts(el: HTMLElement): { type: any; value: unknown }[] {
+	const key = Object.keys(el).find((k) => k.startsWith('__reactFiber$'));
+	const list: { type: any; value: unknown }[] = [];
+	for (let f = key ? (el as any)[key] : null; f; f = f.return) {
+		if (f.type?.$$typeof === Symbol.for('react.context')) list.push({ type: f.type, value: f.memoizedProps?.value });
+	}
+	return list;
+}
+
+function tickBigPicture() {
+	const path: string = gamepadWindow()?.m_history?.location?.pathname ?? '';
+	const appid = Number(path.match(/^\/library\/app\/(\d+)\/tab\/GameInfo/)?.[1] ?? 0);
+	if (!appid || !isShortcut(appid)) return unmountBig();
+	if (big && big.appid === appid && big.host.isConnected && big.box.isConnected) return;
+	const doc = gamepadDocument();
+	// Steam's notice and the portrait beside it, in one box
+	const box = doc?.querySelector<HTMLElement>('.AppGameInfoContainer .Shortcut')?.parentElement;
+	unmountBig();
+	if (!doc || !box) return;
+
+	const host = doc.createElement('div');
+	host.className = 'ugi-bpm';
+	box.insertAdjacentElement('beforebegin', host);
+	hideNotice(box);
+	let tree: React.ReactNode = (
+		<GamepadMode.Provider value={true}>
+			<Blocks appid={appid} side={null} top={null} />
+		</GamepadMode.Provider>
+	);
+	for (const context of steamContexts(box)) tree = React.createElement(context.type, { value: context.value }, tree);
+	const root = createRoot(host);
+	root.render(tree);
+	big = { host, root, appid, box };
+	listenToStick();
+}
+
 export function startGameInfo() {
 	let busy = false;
 	setInterval(() => {
+		try {
+			tickBigPicture();
+		} catch (err) {
+			console.error('[UGI] game info (Big Picture)', err);
+		}
 		if (busy) return;
 		busy = true;
 		tick()
