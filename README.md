@@ -1,6 +1,7 @@
 # UGI – Universal Game Importer
 
-A Millennium plugin that brings any game into your Steam library, not only the ones from other launchers: games from the supported launchers are imported automatically, and every non-Steam game, even one added by hand, gets its pictures, store information and achievements where available.
+A Millennium plugin that brings any game into your Steam library and gets its pictures, store information and achievements where available.
+It works with every game from the supported launchers (imported automatically) and with every other non-Steam game, even the ones you add by hand.
 
 ## Features
 
