@@ -31,11 +31,16 @@ export function shortcutExists(appid: number): boolean {
 	return !!appStore.GetAppOverviewByAppID(appid);
 }
 
+// Games started through UGI's launch helper have Steam's overlay unless it is turned off: then the
+// launcher starts outside what Steam follows, and the game no longer stays "running" while it is open
+export const usesLaunchHelper = (options: string | undefined) => !!options?.includes('ugi_launch.ps1') && options.includes('-WaitDir');
+export const withOverlay = (options: string, overlay?: boolean) => (overlay === false && usesLaunchHelper(options) ? `${options} -Detached` : options);
+
 function applyShortcutSettings(appid: number, game: Game) {
 	SteamClient.Apps.SetShortcutName(appid, game.name);
 	SteamClient.Apps.SetShortcutExe(appid, quote(game.exe));
 	SteamClient.Apps.SetShortcutStartDir(appid, quote(game.start_dir));
-	SteamClient.Apps.SetShortcutLaunchOptions(appid, game.launch_options);
+	SteamClient.Apps.SetShortcutLaunchOptions(appid, withOverlay(game.launch_options, game.overlay));
 	if (game.icon) SteamClient.Apps.SetShortcutIcon(appid, game.icon);
 }
 
@@ -57,6 +62,7 @@ async function addShortcut(game: Game): Promise<number> {
 const entryFor = (game: Game, appid: number, manual?: ShortcutFields): ImportedEntry => ({
 	appid, name: game.name, launcher: game.launcher, exe: game.exe, start_dir: game.start_dir, launch_options: game.launch_options,
 	...(manual ? { manual } : {}),
+	...(game.overlay === false ? { overlay: false } : {}),
 });
 
 const changed = (entry: ImportedEntry, game: Game) =>
@@ -163,8 +169,8 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 	for (const game of plan.outdated) {
 		const entry = state.imported[game.id];
 		if (!entry) continue;
-		applyShortcutSettings(entry.appid, game);
-		state.imported[game.id] = entryFor(game, entry.appid, entry.manual);
+		applyShortcutSettings(entry.appid, { ...game, overlay: entry.overlay });
+		state.imported[game.id] = entryFor({ ...game, overlay: entry.overlay }, entry.appid, entry.manual);
 		updated++;
 	}
 
@@ -232,5 +238,6 @@ export function recreateShortcut(id: string, entry: ImportedEntry): Promise<numb
 		exe: entry.exe ?? '',
 		start_dir: entry.start_dir ?? '',
 		launch_options: entry.launch_options ?? '',
+		overlay: entry.overlay,
 	});
 }

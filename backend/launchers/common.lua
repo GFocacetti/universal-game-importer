@@ -12,20 +12,48 @@ M.POWERSHELL = [[C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe]]
 -- so Steam still sees the game running (and counts playtime)
 M.CONHOST = [[C:\Windows\System32\conhost.exe]]
 
--- Starts a game through its launcher, then waits until no process from the game folder is running.
--- Following the folder (not one exe) handles bootstrappers that hand over to the real game.
+-- Starts a game through its launcher, then waits while a program from the game folder has a window.
+-- Following the folder (not one exe) handles bootstrappers that hand over to the real game; looking at
+-- windows ignores what a game leaves running in the background after closing (a crash reporter, a
+-- process that never exits), which would keep Steam counting forever and lose the session.
+-- Steam counts every program started from the shortcut as the game, launcher included: that gives
+-- Steam's overlay, but a launcher left open (GOG Galaxy, Epic) keeps the game "running". -Detached
+-- (Steam's overlay turned off for the game in UGI's page) starts the launcher through Windows (WMI)
+-- instead, outside what Steam follows.
 local LAUNCH_SCRIPT = [==[
-param([string]$Start, [string]$Arguments = '', [string]$WaitDir = '', [int]$StartTimeout = 180)
-if ($Arguments) { Start-Process -FilePath $Start -ArgumentList $Arguments } else { Start-Process -FilePath $Start }
+param([string]$Start, [string]$Arguments = '', [string]$WaitDir = '', [int]$StartTimeout = 180, [int]$Closed = 60, [switch]$Detached)
+$created = $null
+if ($Detached) {
+  if ($Start -match '^[a-z][a-z0-9+.-]*://') { $line = 'explorer.exe "' + $Start + '"'; $from = $env:SystemRoot }
+  else { $line = '"' + $Start + '"' + $(if ($Arguments) { ' ' + $Arguments } else { '' }); $from = Split-Path -Parent $Start }
+  $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $line; CurrentDirectory = $from }
+}
+if (-not $created -or $created.ReturnValue -ne 0) {
+  if ($Arguments) { Start-Process -FilePath $Start -ArgumentList $Arguments } else { Start-Process -FilePath $Start }
+}
 if (-not $WaitDir) { exit 0 }
 $dir = $WaitDir.TrimEnd('\') + '\'
 function Get-GameProcesses {
-  Get-CimInstance Win32_Process -Filter 'ExecutablePath IS NOT NULL' |
-    Where-Object { $_.ExecutablePath.StartsWith($dir, [System.StringComparison]::OrdinalIgnoreCase) }
+  Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($dir, [System.StringComparison]::OrdinalIgnoreCase) }
 }
+# The game starts: up to StartTimeout seconds for its first program
 $waited = 0
 while (-not (Get-GameProcesses) -and $waited -lt $StartTimeout) { Start-Sleep -Seconds 2; $waited += 2 }
-while (Get-GameProcesses) { Start-Sleep -Seconds 3 }
+# Then it runs while one of its programs has a window (minimized and full screen included). Closed
+# once none has had one for Closed seconds; before the first window (loading), StartTimeout at most.
+$seenWindow = $false
+$without = 0
+while ($true) {
+  $running = @(Get-GameProcesses)
+  if (-not $running) { break }
+  if ($running | Where-Object { $_.MainWindowHandle -ne 0 }) { $seenWindow = $true; $without = 0 }
+  else {
+    $without += 3
+    if ($seenWindow -and $without -ge $Closed) { break }
+    if (-not $seenWindow -and $without -ge $StartTimeout) { break }
+  }
+  Start-Sleep -Seconds 3
+}
 ]==]
 
 local function launch_script_path()

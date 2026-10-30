@@ -6,6 +6,7 @@ import { t } from 'i18n';
 import { missingFor, replaceGame } from 'sgdb';
 import { ImageKind, launcherName, launchShortcut } from 'steamApps';
 import { syncCollections } from 'collections';
+import { usesLaunchHelper, withOverlay } from 'importer';
 import { ImportedEntry, UgiState } from 'types';
 import { ImagesProgress, watchImages } from 'imagesProgress';
 
@@ -36,6 +37,17 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 		}
 		await refresh();
 		setBusy(false);
+	};
+	const [overlay, setOverlay] = useState(row.overlay !== false);
+	const changeOverlay = async (on: boolean) => {
+		const state = await loadState();
+		const entry = state.imported[row.id];
+		if (!entry) return;
+		if (on) delete entry.overlay;
+		else entry.overlay = false;
+		SteamClient.Apps.SetShortcutLaunchOptions(row.appid, withOverlay(entry.launch_options ?? '', on));
+		await saveState(state);
+		setOverlay(on);
 	};
 	const remove = async () => {
 		const state = await loadState();
@@ -78,6 +90,17 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 					<br />
 					{t('detail.command')}: <code>{row.launch_options ?? ''}</code>
 				</div>
+				{usesLaunchHelper(row.launch_options) && (
+					<div className="ugi-set">
+						<div>
+							<strong>{t('detail.overlay')}</strong>
+							<small>{t('detail.overlayText')}</small>
+						</div>
+						<span className={`ugi-switch${overlay ? ' on' : ''}`} onClick={() => changeOverlay(!overlay)}>
+							<span className="ugi-tog" />
+						</span>
+					</div>
+				)}
 				<div className="ugi-foot left">
 					<button className="ugi-btn primary" onClick={() => launchShortcut(row.appid)}>{t('detail.play')}</button>
 					<button className="ugi-btn secondary" disabled={busy} onClick={autoPick}>{t('auto.button')}</button>

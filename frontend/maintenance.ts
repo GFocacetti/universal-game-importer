@@ -2,7 +2,7 @@ import { callable } from '@steambrew/client';
 import { loadState, saveState, unquote } from 'backend';
 import { removeCollections, syncCollections } from 'collections';
 import { setLanguage } from 'i18n';
-import { recreateShortcut, restoreManual, shortcutExists, SteamShortcut, steamShortcuts, unquotePath } from 'importer';
+import { recreateShortcut, restoreManual, shortcutExists, SteamShortcut, steamShortcuts, unquotePath, withOverlay } from 'importer';
 import { resetImages } from 'sgdb';
 import { isSteamApp } from 'steamApps';
 import { UgiState } from 'types';
@@ -39,8 +39,8 @@ async function waitJob(name: string, flag?: CancelFlag): Promise<'ok' | 'cancell
 	}
 }
 
-const sameShortcut = (a: SteamShortcut, b: { name: string; exe?: string; launch_options?: string }) =>
-	a.name === b.name && unquotePath(a.exe) === unquotePath(b.exe) && a.launch_options === (b.launch_options ?? '');
+const sameShortcut = (a: SteamShortcut, b: { name: string; exe?: string; launch_options?: string; overlay?: boolean }) =>
+	a.name === b.name && unquotePath(a.exe) === unquotePath(b.exe) && a.launch_options === withOverlay(b.launch_options ?? '', b.overlay);
 
 
 export type Step = (text: string) => void;

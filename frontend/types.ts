@@ -10,6 +10,8 @@ export type Game = {
 	kind?: 'game' | 'uncertain' | 'app';
 	// Microsoft Store package family, used to classify Xbox entries
 	store_family?: string;
+	// false: Steam's overlay turned off for this game (kept from the imported entry)
+	overlay?: boolean;
 };
 
 export type LauncherStatus = {
@@ -38,6 +40,8 @@ export type ImportedEntry = {
 	launch_options?: string;
 	// A shortcut the user had added by hand and UGI took over: how it was, to put it back
 	manual?: ShortcutFields;
+	// false: Steam's overlay turned off for this game (see withOverlay)
+	overlay?: boolean;
 };
 
 export type ShortcutFields = { name: string; exe: string; start_dir: string; launch_options: string };

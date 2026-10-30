@@ -17,6 +17,7 @@ A Millennium plugin that brings any game into your Steam library, not only the o
 * Any other game can be added from UGI's page ("Add a game"): pick its program, check the name UGI suggests, and it gets its pictures and game page like the others
    * Kept in an "Imported games" collection, and removed when its program or its Steam shortcut is gone
 * Games start through their own launcher, and Steam shows them as "In game" and counts the playtime
+   * Steam's overlay works by default; turned off for a game (in its UGI page), the game counts as closed as soon as you close it, even with its launcher still open
 * Keeps the library up to date by itself
    * New games are announced with a notification, ready to be added
    * Uninstalled games are removed, changed ones are updated
