@@ -27,6 +27,8 @@ export type LaunchSettings = {
 	args?: string;
 	closed?: number;
 	fields?: { exe: string; start_dir: string; launch_options: string };
+	// The command written by hand: used as it is, in place of everything above and the overlay switch
+	command?: { exe: string; launch_options: string };
 };
 
 export type LauncherStatus = {

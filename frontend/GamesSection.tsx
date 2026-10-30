@@ -34,7 +34,8 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 	const [draft, setDraft] = useState<LaunchSettings>(row.launch ?? {});
 	const [saved, setSaved] = useState<LaunchSettings>(row.launch ?? {});
 	const [busy, setBusy] = useState(false);
-	const set = (part: Partial<LaunchSettings>) => setDraft((d) => ({ ...d, ...part }));
+	// Changing a setting makes the command again from the settings
+	const set = (part: Partial<LaunchSettings>) => setDraft((d) => ({ ...d, command: undefined, ...part }));
 	const pickExe = async () => {
 		try {
 			const picked = JSON.parse(unquote(await pickProgram()) || 'null');
@@ -44,6 +45,10 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 	const pickDir = async () => {
 		const picked = unquote(await pickFolder());
 		if (picked) set({ start_dir: picked });
+	};
+	const commandOf = (launch: LaunchSettings) => {
+		const fields = launchFields({ ...row, exe: row.exe ?? '', start_dir: row.start_dir ?? '', launch_options: row.launch_options ?? '', overlay: overlay ? undefined : false, launch: { ...launch, command: undefined } });
+		return { exe: fields.exe, launch_options: fields.launch_options };
 	};
 	const save = async (next: LaunchSettings) => {
 		setBusy(true);
@@ -57,6 +62,13 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 				clean.direct = true;
 				const dir = clean.start_dir ?? clean.exe.slice(0, clean.exe.lastIndexOf('\\'));
 				clean.fields = JSON.parse(unquote(await directFields({ a_exe: clean.exe, b_args: clean.args ?? '', c_dir: dir })));
+			}
+			// A command written by hand is kept only when it differs from the one the settings make
+			if (next.command) {
+				const made = commandOf(clean);
+				if (next.command.exe.trim() !== made.exe || next.command.launch_options.trim() !== made.launch_options) {
+					clean.command = { exe: next.command.exe.trim(), launch_options: next.command.launch_options.trim() };
+				}
 			}
 			const state = await loadState();
 			const entry = state.imported[row.id];
@@ -75,7 +87,9 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 		}
 	};
 	const changed = JSON.stringify({ ...draft, fields: undefined }) !== JSON.stringify({ ...saved, fields: undefined });
-	const command = launchFields({ ...row, exe: row.exe ?? '', start_dir: row.start_dir ?? '', launch_options: row.launch_options ?? '', overlay: overlay ? undefined : false, launch: saved });
+	// The command shown: the one written by hand, or the one the saved settings make
+	const shown = draft.command ?? commandOf(saved);
+	const editCommand = (part: Partial<{ exe: string; launch_options: string }>) => set({ command: { ...shown, ...part } });
 	const program = (
 		<>
 			<div className="ugi-set compact column">
@@ -132,14 +146,23 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 			) : (
 				<p className="ugi-muted">{t('launch.none')}</p>
 			)}
-			{(manual || helper) && (
-				<div className="ugi-foot left">
-					<button className="ugi-btn primary" disabled={busy || !changed || (!!draft.direct && !draft.exe?.trim())} onClick={() => save(draft)}>{t('launch.save')}</button>
-					<button className="ugi-btn secondary" disabled={busy || !Object.keys(saved).length} onClick={() => save({})}>{t('launch.reset')}</button>
+			<div className="ugi-set compact column">
+				<strong>{t('launch.target')}</strong>
+				<div className="ugi-field">
+					<input type="text" value={shown.exe} onChange={(e) => editCommand({ exe: e.target.value })} />
 				</div>
-			)}
-			<div className="ugi-kv">
-				{t('detail.command')}: <code>{`"${command.exe}" ${command.launch_options}`.trim()}</code>
+			</div>
+			<div className="ugi-set compact column">
+				<strong>{t('launch.options')}</strong>
+				<small>{t('launch.optionsText')}</small>
+				<div className="ugi-field">
+					<textarea rows={3} value={shown.launch_options} onChange={(e) => editCommand({ launch_options: e.target.value })} />
+				</div>
+			</div>
+			{saved.command && <p className="ugi-muted">{t('launch.byHand')}</p>}
+			<div className="ugi-foot left">
+				<button className="ugi-btn primary" disabled={busy || !changed || (!!draft.direct && !draft.exe?.trim() && !draft.command) || (!!draft.command && !draft.command.exe.trim())} onClick={() => save(draft)}>{t('launch.save')}</button>
+				<button className="ugi-btn secondary" disabled={busy || !Object.keys(saved).length} onClick={() => save({})}>{t('launch.reset')}</button>
 			</div>
 		</div>
 	);

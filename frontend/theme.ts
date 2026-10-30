@@ -88,6 +88,7 @@ export const UGI_CSS = `
 .ugi-dialog h2 { margin: 0 0 10px; color: var(--ugi-head); font-weight: 500; }
 .ugi-dialog p, .ugi-dialog ol { color: var(--ugi-muted); line-height: 1.6; }
 .ugi-field { display: flex; gap: 8px; margin-top: 8px; }
+.ugi-field textarea { flex: 1; min-width: 0; resize: vertical; background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 9px 10px; font: 12px monospace; }
 .ugi-field input { flex: 1; min-width: 0; background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 9px 10px; font: inherit; }
 .ugi-foot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
 .ugi-foot.left { justify-content: flex-start; }

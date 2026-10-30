@@ -41,6 +41,10 @@ const folderOf = (path: string) => path.slice(0, path.lastIndexOf('\\'));
 // The shortcut's fields once the user's launch settings and the overlay switch are applied
 export function launchFields(game: Pick<Game, 'launcher' | 'exe' | 'start_dir' | 'launch_options' | 'overlay' | 'launch'>) {
 	const l = game.launch ?? {};
+	if (l.command) {
+		const exe = unquotePath(l.command.exe);
+		return { exe, start_dir: l.start_dir || folderOf(exe) || game.start_dir, launch_options: l.command.launch_options };
+	}
 	if (game.launcher === 'manual') {
 		return { exe: l.exe || game.exe, start_dir: l.start_dir || (l.exe ? folderOf(l.exe) : game.start_dir), launch_options: l.args ?? '' };
 	}
