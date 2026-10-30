@@ -44,6 +44,7 @@ export async function syncCollections(state: UgiState): Promise<void> {
 		(byLauncher[entry.launcher] ??= []).push(entry.appid);
 	}
 
+	const everyImported = new Set(Object.values(state.imported).map((e) => e.appid));
 	for (const [launcher, appids] of Object.entries(byLauncher)) {
 		const info = (state.collections[launcher] ??= {});
 		if (!state.settings.collections || info.off_collection) continue;
@@ -63,13 +64,16 @@ export async function syncCollections(state: UgiState): Promise<void> {
 		const wanted = new Set(appids);
 		const present = new Set(collection.allApps.map((a) => a.appid));
 		const toAdd = (await Promise.all(appids.filter((id) => !present.has(id)).map(overviewOf))).filter(Boolean);
-		const toRemove = [...present].filter((id) => !wanted.has(id)).map((id) => appStore.GetAppOverviewByAppID(id)).filter(Boolean);
+		// Only games UGI put there (or now another launcher's): what the user added stays
+		const ours = new Set(info.apps ?? []);
+		const toRemove = [...present].filter((id) => !wanted.has(id) && (ours.has(id) || everyImported.has(id))).map((id) => appStore.GetAppOverviewByAppID(id)).filter(Boolean);
 		if (toAdd.length || toRemove.length) {
 			const editable = collection.AsEditableCollection();
 			if (toAdd.length) editable.AddApps(toAdd);
 			if (toRemove.length) editable.RemoveApps(toRemove);
 			await collection.Save();
 		}
+		info.apps = appids;
 
 		if (!state.settings.shelves || info.off_shelf) continue;
 		// Deleted in Steam: create it again
@@ -96,6 +100,7 @@ export async function syncCollections(state: UgiState): Promise<void> {
 			await collectionStore.GetCollection(info.collection_id)?.Delete();
 			delete info.collection_id;
 		}
+		delete info.apps;
 	}
 }
 

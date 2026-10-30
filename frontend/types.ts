@@ -96,4 +96,6 @@ type CollectionInfo = {
 	shelf_id?: number;
 	off_collection?: boolean;
 	off_shelf?: boolean;
+	// The games UGI put in the collection (others added by the user stay)
+	apps?: number[];
 };
