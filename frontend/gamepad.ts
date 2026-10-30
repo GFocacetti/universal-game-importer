@@ -88,9 +88,14 @@ function nearest(from: HTMLElement, list: HTMLElement[], dir: number): HTMLEleme
 	return best;
 }
 
+// The highlighted element, also kept here: React rewrites the class of an element whose look
+// changes when pressed (a switch), and the highlight class goes with it
+let focused: HTMLElement | null = null;
+
 function setFocus(doc: Document, el: HTMLElement) {
 	doc.querySelectorAll(`.${FOCUS}`).forEach((old) => old.classList.remove(FOCUS));
 	el.classList.add(FOCUS);
+	focused = el;
 	el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 	const active = doc.activeElement as HTMLElement | null;
 	if (active && active !== el && active.matches('input, textarea')) active.blur();
@@ -152,7 +157,7 @@ function onButton(doc: Document, evt: Event) {
 	if (!layer || keyboardShown()) return;
 	const list = targets(layer);
 	if (!list.length) return;
-	let current = doc.querySelector<HTMLElement>(`.${FOCUS}`);
+	let current = doc.querySelector<HTMLElement>(`.${FOCUS}`) ?? (focused?.isConnected ? focused : null);
 	if (current && !list.includes(current)) current = null;
 	let handled = true;
 
@@ -171,7 +176,12 @@ function onButton(doc: Document, evt: Event) {
 				if (list[0]) setFocus(doc, list[0]);
 			} else if (current.matches('input:not([type=checkbox]):not([type=radio]), textarea')) typeInto(current);
 			else if (current.tagName === 'SELECT') openPicker(doc, layer, current as HTMLSelectElement);
-			else current.click();
+			else {
+				current.click();
+				// Still highlighted once React has drawn the change
+				const pressed = current;
+				setTimeout(() => pressed.isConnected && focused === pressed && pressed.classList.add(FOCUS), 50);
+			}
 			break;
 		case CANCEL: {
 			const active = doc.activeElement as HTMLElement | null;
@@ -190,6 +200,7 @@ function onButton(doc: Document, evt: Event) {
 			if (tab) {
 				tab.click();
 				doc.querySelectorAll(`.${FOCUS}`).forEach((old) => old.classList.remove(FOCUS));
+				focused = null;
 			}
 			break;
 		}

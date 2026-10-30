@@ -195,7 +195,7 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-win header h2 + .ugi-muted { font-size: 13px; }
 .ugi-mosaic { width: 340px; flex: none; padding: 14px 16px; border-right: 1px solid var(--ugi-panel-border); overflow: auto; }
 .ugi-mosaic .ugi-imgs { margin: 0 0 10px; grid-template-areas: "grid wide" "grid logo" "grid icon" "hero hero"; align-items: start; }
-.ugi-mosaic .ugi-im.grid { grid-area: grid; grid-row: grid; }
+.ugi-mosaic .ugi-im.grid { grid-area: grid; grid-row: grid; aspect-ratio: auto; align-self: stretch; }
 .ugi-mosaic .ugi-im.wide { grid-area: wide; }
 .ugi-mosaic .ugi-im.logo { grid-area: logo; }
 .ugi-mosaic .ugi-im.icon { grid-area: icon; }
