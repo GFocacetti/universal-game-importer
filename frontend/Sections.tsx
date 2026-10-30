@@ -375,6 +375,10 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 			</div>
 			<EpicAccount />
 			<div className="ugi-set">
+				<div><strong>{t('settings.achToasts')}</strong><small>{t('settings.achToastsText')}</small></div>
+				<Toggle on={state.settings.achievement_toasts !== false} onChange={(v) => set({ achievement_toasts: v })} />
+			</div>
+			<div className="ugi-set">
 				<div><strong>{t('settings.animated')}</strong><small>{t('settings.animatedText')}</small></div>
 				<Toggle on={!!state.settings.animated} onChange={(v) => set({ animated: v })} />
 			</div>

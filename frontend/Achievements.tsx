@@ -1,6 +1,6 @@
 // "Achievements" section on the library page of imported games, below the game information:
 // progress, the latest unlocked, and the full list on request
-import { callable } from '@steambrew/client';
+import { callable, toaster } from '@steambrew/client';
 import React, { useEffect, useState } from 'react';
 import { importedKeyFor, loadState, unquote } from 'backend';
 import { epicSandbox, xboxTitleId } from 'gameInfo';
@@ -82,23 +82,28 @@ async function saved(id: string): Promise<Result | null> {
 	return result;
 }
 
-function load(state: UgiState, id: string): Promise<Result> {
+// Reads the launcher now (and saves what it got)
+function fetchFresh(state: UgiState, id: string): Promise<Result> {
 	const lang = language();
-	const key = `${id}|${lang}`;
+	return extra(state, id)
+		.then((more) => readAchievements({ a_id: id, b_lang: lang, c_extra: JSON.stringify(more) }))
+		.then((raw) => {
+			const parsed = JSON.parse(unquote(raw)) as Result;
+			const result = { source: parsed.source, items: Array.isArray(parsed.items) ? parsed.items : [], signed_out: parsed.signed_out === true, fetched: Date.now() };
+			// An empty answer doesn't replace a saved list (launcher closed, offline)
+			if (result.items.length || !savedMemory.get(savedKey(id))?.items.length) {
+				savedMemory.set(savedKey(id), result);
+				savedSave({ a_key: savedKey(id), b_json: JSON.stringify(result) }).catch(() => false);
+			}
+			return result;
+		})
+		.catch(() => ({ items: [] }));
+}
+
+function load(state: UgiState, id: string): Promise<Result> {
+	const key = `${id}|${language()}`;
 	if (!cache.has(key)) {
-		const request = extra(state, id)
-			.then((more) => readAchievements({ a_id: id, b_lang: lang, c_extra: JSON.stringify(more) }))
-			.then((raw) => {
-				const parsed = JSON.parse(unquote(raw)) as Result;
-				const result = { source: parsed.source, items: Array.isArray(parsed.items) ? parsed.items : [], signed_out: parsed.signed_out === true, fetched: Date.now() };
-				// An empty answer doesn't replace a saved list (launcher closed, offline)
-				if (result.items.length || !savedMemory.get(savedKey(id))?.items.length) {
-					savedMemory.set(savedKey(id), result);
-					savedSave({ a_key: savedKey(id), b_json: JSON.stringify(result) }).catch(() => false);
-				}
-				return result;
-			})
-			.catch(() => ({ items: [] }));
+		const request = fetchFresh(state, id);
 		cache.set(key, request);
 		// A game played since gets read again next time
 		setTimeout(() => cache.delete(key), 60_000);
@@ -119,6 +124,92 @@ export async function prefetchAchievements(state: UgiState) {
 		if (last?.fetched && Date.now() - last.fetched < DAY) continue;
 		await load(state, id);
 	}
+}
+
+// ---------- Unlocked while playing ----------
+
+// While an imported game runs, its achievements are read again now and then; each new one shows
+// Steam's own notification. GOG comes from Galaxy's database, which has an unlock at once; Epic and
+// Xbox from their services, less often (OpenXBL's free key allows 150 requests an hour).
+const EVERY: Record<string, number> = { gog: 20_000, epic: 120_000, xbox: 300_000 };
+
+declare const SteamUIStore: { RunningApps?: { appid: number }[] } | undefined;
+
+function runningAppids(): Set<number> {
+	try {
+		return new Set((SteamUIStore?.RunningApps ?? []).map((a) => a.appid));
+	} catch {
+		return new Set();
+	}
+}
+
+// Per running game: the achievements it had, and when to look again. known is false until a first
+// answer came (a launcher that didn't answer at the start must not make everything look new).
+type Watched = { name: string; unlocked: Set<string>; known: boolean; next: number };
+const watched = new Map<string, Watched>();
+
+function notify(item: Achievement, game: string) {
+	toaster.toast({
+		title: item.name,
+		body: item.description ?? '',
+		subtext: t('ach.toast', { game }),
+		logo: item.image ? <img src={item.image} style={{ width: 48, height: 48, borderRadius: 3 }} /> : undefined,
+		duration: 6000,
+	});
+}
+
+async function check(state: UgiState, id: string, w: Watched) {
+	const result = await fetchFresh(state, id);
+	if (!result.items.length) return;
+	for (const item of result.items) {
+		if (!item.unlocked || w.unlocked.has(item.id)) continue;
+		w.unlocked.add(item.id);
+		if (w.known) notify(item, w.name);
+	}
+	w.known = true;
+}
+
+async function watchTick() {
+	const state = await loadState();
+	if (state.settings.achievement_toasts === false) {
+		watched.clear();
+		return;
+	}
+	const running = runningAppids();
+	const now = Date.now();
+	for (const [id, entry] of Object.entries(state.imported)) {
+		const launcher = id.slice(0, id.indexOf(':'));
+		const every = EVERY[launcher];
+		if (!every) continue;
+		const w = watched.get(id);
+		if (!running.has(entry.appid)) {
+			// Just closed: one last look, for what was unlocked right before quitting
+			if (w) {
+				watched.delete(id);
+				await check(state, id, w);
+			}
+			continue;
+		}
+		if (!w) {
+			const started: Watched = { name: entry.name, unlocked: new Set(), known: false, next: now + every };
+			watched.set(id, started);
+			await check(state, id, started);
+		} else if (now >= w.next) {
+			w.next = now + every;
+			await check(state, id, w);
+		}
+	}
+}
+
+export function watchAchievements() {
+	let busy = false;
+	setInterval(() => {
+		if (busy) return;
+		busy = true;
+		watchTick()
+			.catch((err) => console.error('[UGI] achievements while playing', err))
+			.finally(() => (busy = false));
+	}, 10_000);
 }
 
 const date = (iso: string) => new Date(iso).toLocaleDateString(uiLocale(), { day: 'numeric', month: 'long', year: 'numeric' });

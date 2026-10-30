@@ -74,6 +74,8 @@ export type UgiSettings = {
 	xbl_key?: string;
 	// Prefer animated images when SteamGridDB has them
 	animated?: boolean;
+	// A Steam notification for each achievement unlocked while playing (on unless turned off)
+	achievement_toasts?: boolean;
 	// Include WebP images (on by default, can be turned off)
 	webp?: boolean;
 	theme?: 'steam' | 'modern';

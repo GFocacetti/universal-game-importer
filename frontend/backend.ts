@@ -50,6 +50,7 @@ export async function loadState(): Promise<UgiState> {
 			rawg_key: typeof settings.rawg_key === 'string' ? settings.rawg_key : '',
 			xbl_key: typeof settings.xbl_key === 'string' ? settings.xbl_key : '',
 			animated: settings.animated === true,
+			achievement_toasts: settings.achievement_toasts !== false,
 			// WebP included unless the user turned it off
 			webp: settings.webp !== false,
 			theme: settings.theme === 'modern' ? 'modern' : 'steam',

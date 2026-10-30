@@ -9,7 +9,7 @@ import { mainDocument, waitForMainDocument } from 'overlay';
 import { startPeriodicCheck } from 'checker';
 import { startGameInfo } from 'GameInfoSection';
 import { prefetchInfo } from 'gameInfo';
-import { prefetchAchievements } from 'Achievements';
+import { prefetchAchievements, watchAchievements } from 'Achievements';
 
 declare global {
 	interface Window {
@@ -90,6 +90,7 @@ export default definePlugin(async () => {
 	if (!window.__ugi_game_info__) {
 		window.__ugi_game_info__ = true;
 		startGameInfo();
+		watchAchievements();
 	}
 	if (!window.__ugi_started__) {
 		window.__ugi_started__ = true;
