@@ -137,6 +137,8 @@ export const UGI_CSS = `
 .ugi-tog::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
 .ugi-switch.on .ugi-tog { background: var(--ugi-accent); }
 .ugi-switch.on .ugi-tog::after { left: 21px; }
+.ugi-win.large { width: 90%; height: 90%; max-width: none; max-height: none; }
+.ugi-pick-bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--ugi-panel-border); }
 .ugi-win-body { flex: 1; display: flex; min-height: 0; }
 .ugi-types { width: 200px; flex: none; padding: 12px 8px; border-right: 1px solid var(--ugi-panel-border); display: flex; flex-direction: column; gap: 4px; }
 .ugi-current { margin-top: auto; padding: 10px 12px; font-size: 12px; color: var(--ugi-muted); }
@@ -184,6 +186,22 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-set small { color: var(--ugi-muted); }
 .ugi-set > :last-child { justify-self: end; }
 .ugi-set .ugi-field { width: 100%; margin: 0; }
+.ugi-set.compact { grid-template-columns: 1fr auto; }
+.ugi-tabs { display: flex; gap: 4px; margin: 14px 0 16px; border-bottom: 1px solid var(--ugi-panel-border); }
+.ugi-tabs span { padding: 8px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--ugi-muted); font-size: 14px; cursor: pointer; }
+.ugi-tabs span:hover { color: var(--ugi-text); }
+.ugi-tabs span.on { color: var(--ugi-head); border-bottom-color: var(--ugi-accent); }
+.ugi-tabs.pad { margin: 0; padding: 0 18px; }
+.ugi-win header h2 + .ugi-muted { font-size: 13px; }
+.ugi-mosaic { width: 340px; flex: none; padding: 14px 16px; border-right: 1px solid var(--ugi-panel-border); overflow: auto; }
+.ugi-mosaic .ugi-imgs { margin: 0 0 10px; grid-template-areas: "grid wide" "grid logo" "grid icon" "hero hero"; align-items: start; }
+.ugi-mosaic .ugi-im.grid { grid-area: grid; grid-row: grid; }
+.ugi-mosaic .ugi-im.wide { grid-area: wide; }
+.ugi-mosaic .ugi-im.logo { grid-area: logo; }
+.ugi-mosaic .ugi-im.icon { grid-area: icon; }
+.ugi-mosaic .ugi-im.hero { grid-area: hero; grid-column: hero; }
+.ugi-im.on { outline: 2px solid var(--ugi-accent); }
+.ugi-win-pane { flex: 1; overflow: auto; padding: 16px 18px; }
 .ugi-switch.disabled { opacity: .4; cursor: default; }
 .ugi-onboarding { position: relative; min-height: 440px; display: flex; flex-direction: column; }
 .ugi-ob-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }

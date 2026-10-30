@@ -10,7 +10,7 @@ import { UgiState } from 'types';
 import { bigPicture, libraryVisible } from 'location';
 import { watchGamepad } from 'gamepad';
 
-const TYPES: { type: ImageType; kind: ImageKind; label: () => string }[] = [
+export const IMAGE_TYPES: { type: ImageType; kind: ImageKind; label: () => string }[] = [
 	{ type: 0, kind: 'grid', label: () => t('image.grid') },
 	{ type: 3, kind: 'wide', label: () => t('image.wide') },
 	{ type: 1, kind: 'hero', label: () => t('image.hero') },
@@ -18,7 +18,9 @@ const TYPES: { type: ImageType; kind: ImageKind; label: () => string }[] = [
 	{ type: 4, kind: 'icon', label: () => t('image.icon') },
 ];
 
-function Gallery({ appid, name, onClose }: { appid: number; name: string; onClose: () => void }) {
+// Everything the gallery shows and does for one game: used by the gallery window (from Steam's menu)
+// and by the Images tab of a game's window in UGI's page. onChanged: after an image was applied.
+export function useGallery(appid: number, onChanged?: () => void) {
 	const [state, setState] = useState<UgiState | null>(null);
 	const [type, setType] = useState<ImageType>(0);
 	const [animated, setAnimated] = useState(false);
@@ -27,20 +29,19 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 	const [status, setStatus] = useState('');
 	const [busy, setBusy] = useState(false);
 	const [version, setVersion] = useState(0);
+	const changed = () => {
+		setVersion((v) => v + 1);
+		onChanged?.();
+	};
 
 	useEffect(() => {
 		loadState().then((s) => {
 			setState(s);
 			setAnimated(!!s.settings.animated);
 		});
-		// Leaving the library (e.g. to the store) would hide the gallery while it still catches clicks
-		const timer = setInterval(() => {
-			if (!libraryVisible()) onClose();
-		}, 1000);
-		return () => clearInterval(timer);
 	}, []);
 
-	// Loads the lists for all five types (the counts are shown on the left)
+	// Loads the lists for all five types (their counts are shown)
 	const loadAll = async (s: UgiState, anim: boolean) => {
 		setStatus(t('gallery.loading'));
 		try {
@@ -51,7 +52,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 				return;
 			}
 			const lists: Record<string, SgdbImage[]> = {};
-			for (const { type: ty } of TYPES) lists[ty] = await imagesFor(s, id, ty, anim ? 'animated' : 'static');
+			for (const { type: ty } of IMAGE_TYPES) lists[ty] = await imagesFor(s, id, ty, anim ? 'animated' : 'static');
 			setImages(lists);
 			await saveState(s);
 			setStatus('');
@@ -77,13 +78,13 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 		setStatus(t('gallery.applying'));
 		const ok = await applyImage(appid, type, image.url);
 		setStatus(ok ? '' : t('gallery.applyFailed'));
-		setVersion(version + 1);
+		changed();
 		setBusy(false);
 	};
 
 	const reset = async () => {
 		await resetImage(appid, type);
-		setVersion(version + 1);
+		changed();
 	};
 
 	// Every type at once, with the images UGI would pick by itself
@@ -99,7 +100,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 		} catch (err) {
 			setStatus(String(err).includes('API key') ? t('gallery.keyError') : t('gallery.error'));
 		}
-		setVersion(version + 1);
+		changed();
 		setBusy(false);
 	};
 
@@ -114,91 +115,135 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 		if (gameId) openUrl(`https://www.steamgriddb.com/game/${gameId}`);
 	};
 
-	const options = FILTER_OPTIONS[type];
-	const current = TYPES.find((x) => x.type === type)!;
-	const list = images[type] ?? [];
+	return { appid, state, type, setType, animated, setAnimated, images, gameId, status, busy, version, filter, setFilter, apply, reset, autoPick, clearCache, openWebsite };
+}
 
+export type GalleryModel = ReturnType<typeof useGallery>;
+
+const currentType = (g: GalleryModel) => IMAGE_TYPES.find((x) => x.type === g.type)!;
+
+// Animated images and SteamGridDB's page
+export function GalleryOptions({ g }: { g: GalleryModel }) {
+	return (
+		<>
+			<label className={`ugi-switch${g.animated ? ' on' : ''}`} onClick={() => g.setAnimated(!g.animated)}>
+				<span className="ugi-tog" />
+				{t('gallery.animated')}
+			</label>
+			<button className="ugi-btn secondary" disabled={!g.gameId} onClick={g.openWebsite}>{t('gallery.website')}</button>
+		</>
+	);
+}
+
+// The filters and the images to pick for the chosen type; top: a bar above the filters
+export function GalleryPicker({ g, top }: { g: GalleryModel; top?: React.ReactNode }) {
+	const options = FILTER_OPTIONS[g.type];
+	const current = currentType(g);
+	const list = g.images[g.type] ?? [];
+	const filter = g.filter;
+	return (
+		<div className="ugi-pick">
+			{top && <div className="ugi-pick-bar">{top}</div>}
+			<details className="ugi-filters" open>
+				<summary>{t('gallery.filters', { type: current.label() })}</summary>
+				<div className="ugi-filter-row">
+					<select value={filter.style ?? ''} onChange={(e) => g.setFilter({ style: e.target.value })}>
+						<option value="">{t('gallery.styleAll')}</option>
+						{options.styles.map((s) => <option key={s} value={s}>{s}</option>)}
+					</select>
+					{options.dimensions.length > 0 && (
+						<select value={filter.dimension ?? 'default'} onChange={(e) => g.setFilter({ dimension: e.target.value === 'default' ? undefined : e.target.value })}>
+							<option value="default">{t('gallery.dimDefault')}</option>
+							<option value="">{t('gallery.dimAll')}</option>
+							{options.dimensions.map((d) => <option key={d} value={d}>{d}</option>)}
+						</select>
+					)}
+					{g.type !== 4 && (
+						<select value={(filter.webp ?? g.state?.settings.webp) ? 'webp' : 'basic'} onChange={(e) => g.setFilter({ webp: e.target.value === 'webp' })}>
+							<option value="basic">{t('gallery.formatBasic')}</option>
+							<option value="webp">{t('gallery.formatWebp')}</option>
+						</select>
+					)}
+					<select value={filter.nsfw ?? ''} onChange={(e) => g.setFilter({ nsfw: e.target.value })}>
+						<option value="">{t('gallery.nsfwNo')}</option>
+						<option value="true">{t('gallery.nsfwOnly')}</option>
+						<option value="any">{t('gallery.nsfwAny')}</option>
+					</select>
+					<select value={filter.humor ?? ''} onChange={(e) => g.setFilter({ humor: e.target.value })}>
+						<option value="">{t('gallery.humorAny')}</option>
+						<option value="false">{t('gallery.humorNo')}</option>
+						<option value="true">{t('gallery.humorOnly')}</option>
+					</select>
+				</div>
+			</details>
+			<div className={`ugi-thumbs ${current.kind}`}>
+				{list.map((image) =>
+					// Animated images come with a video preview
+					/\.(webm|mp4)(\?|$)/i.test(image.thumb) ? (
+						<video key={image.id} className="ugi-thumb" src={image.thumb} autoPlay loop muted playsInline onClick={() => !g.busy && g.apply(image)} />
+					) : (
+						<img key={image.id} className="ugi-thumb" src={image.thumb} onClick={() => !g.busy && g.apply(image)} />
+					),
+				)}
+				{!list.length && !g.status && <p className="ugi-muted">{t('gallery.empty')}</p>}
+			</div>
+		</div>
+	);
+}
+
+// What is going on, and the actions on all images or the chosen type
+export function GalleryActions({ g }: { g: GalleryModel }) {
+	return (
+		<>
+			<span className="ugi-muted">{g.status || t('gallery.hint')}</span>
+			<span className="ugi-sp" />
+			<button className="ugi-link" onClick={g.clearCache}>{t('gallery.clearCache')}</button>
+			<button className="ugi-btn secondary" disabled={g.busy} onClick={g.autoPick}>{t('auto.button')}</button>
+			<button className="ugi-btn secondary" onClick={g.reset}>{t('gallery.reset')}</button>
+		</>
+	);
+}
+
+function Gallery({ appid, name, onClose }: { appid: number; name: string; onClose: () => void }) {
+	const g = useGallery(appid);
+
+	useEffect(() => {
+		// Leaving the library (e.g. to the store) would hide the gallery while it still catches clicks
+		const timer = setInterval(() => {
+			if (!libraryVisible()) onClose();
+		}, 1000);
+		return () => clearInterval(timer);
+	}, []);
+
+	const current = currentType(g);
 	return (
 		<div className="ugi-overlay" onClick={onClose}>
-			<div className="ugi-win" onClick={(e) => e.stopPropagation()}>
+			<div className="ugi-win large" onClick={(e) => e.stopPropagation()}>
 				<header>
 					<h2>{name} · {t('gallery.title')}</h2>
 					<span className="ugi-sp" />
-					<label className={`ugi-switch${animated ? ' on' : ''}`} onClick={() => setAnimated(!animated)}>
-						<span className="ugi-tog" />
-						{t('gallery.animated')}
-					</label>
-					<span className="ugi-sp" />
-					<button className="ugi-btn secondary" disabled={!gameId} onClick={openWebsite}>{t('gallery.website')}</button>
+					<GalleryOptions g={g} />
 					<button className="ugi-btn secondary" onClick={onClose}>✕</button>
 				</header>
 				<div className="ugi-win-body">
 					<nav className="ugi-types">
-						{TYPES.map((x) => (
-							<div key={x.type} className={`ugi-nav${x.type === type ? ' on' : ''}`} onClick={() => setType(x.type)}>
+						{IMAGE_TYPES.map((x) => (
+							<div key={x.type} className={`ugi-nav${x.type === g.type ? ' on' : ''}`} onClick={() => g.setType(x.type)}>
 								<span>{x.label()}</span>
-								<small>{images[x.type]?.length ?? ''}</small>
+								<small>{g.images[x.type]?.length ?? ''}</small>
 							</div>
 						))}
 						<div className="ugi-current">
 							{t('gallery.current')}
-							<div className={`ugi-im ${current.kind}`} key={`${type}-${version}`}>
+							<div className={`ugi-im ${current.kind}`} key={`${g.type}-${g.version}`}>
 								<SteamImage appid={appid} kind={current.kind} />
 							</div>
 						</div>
 					</nav>
-					<div className="ugi-pick">
-						<details className="ugi-filters" open>
-							<summary>{t('gallery.filters', { type: current.label() })}</summary>
-							<div className="ugi-filter-row">
-								<select value={filter.style ?? ''} onChange={(e) => setFilter({ style: e.target.value })}>
-									<option value="">{t('gallery.styleAll')}</option>
-									{options.styles.map((s) => <option key={s} value={s}>{s}</option>)}
-								</select>
-								{options.dimensions.length > 0 && (
-									<select value={filter.dimension ?? 'default'} onChange={(e) => setFilter({ dimension: e.target.value === 'default' ? undefined : e.target.value })}>
-										<option value="default">{t('gallery.dimDefault')}</option>
-										<option value="">{t('gallery.dimAll')}</option>
-										{options.dimensions.map((d) => <option key={d} value={d}>{d}</option>)}
-									</select>
-								)}
-								{type !== 4 && (
-									<select value={(filter.webp ?? state?.settings.webp) ? 'webp' : 'basic'} onChange={(e) => setFilter({ webp: e.target.value === 'webp' })}>
-										<option value="basic">{t('gallery.formatBasic')}</option>
-										<option value="webp">{t('gallery.formatWebp')}</option>
-									</select>
-								)}
-								<select value={filter.nsfw ?? ''} onChange={(e) => setFilter({ nsfw: e.target.value })}>
-									<option value="">{t('gallery.nsfwNo')}</option>
-									<option value="true">{t('gallery.nsfwOnly')}</option>
-									<option value="any">{t('gallery.nsfwAny')}</option>
-								</select>
-								<select value={filter.humor ?? ''} onChange={(e) => setFilter({ humor: e.target.value })}>
-									<option value="">{t('gallery.humorAny')}</option>
-									<option value="false">{t('gallery.humorNo')}</option>
-									<option value="true">{t('gallery.humorOnly')}</option>
-								</select>
-							</div>
-						</details>
-						<div className={`ugi-thumbs ${current.kind}`}>
-							{list.map((image) =>
-								// Animated images come with a video preview
-								/\.(webm|mp4)(\?|$)/i.test(image.thumb) ? (
-									<video key={image.id} className="ugi-thumb" src={image.thumb} autoPlay loop muted playsInline onClick={() => !busy && apply(image)} />
-								) : (
-									<img key={image.id} className="ugi-thumb" src={image.thumb} onClick={() => !busy && apply(image)} />
-								),
-							)}
-							{!list.length && !status && <p className="ugi-muted">{t('gallery.empty')}</p>}
-						</div>
-					</div>
+					<GalleryPicker g={g} />
 				</div>
 				<footer>
-					<span className="ugi-muted">{status || t('gallery.hint')}</span>
-					<span className="ugi-sp" />
-					<button className="ugi-link" onClick={clearCache}>{t('gallery.clearCache')}</button>
-					<button className="ugi-btn secondary" disabled={busy} onClick={autoPick}>{t('auto.button')}</button>
-					<button className="ugi-btn secondary" onClick={reset}>{t('gallery.reset')}</button>
+					<GalleryActions g={g} />
 				</footer>
 			</div>
 		</div>

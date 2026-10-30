@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SteamImage } from 'SteamImage';
-import { openGallery } from 'Gallery';
+import { GalleryActions, GalleryOptions, GalleryPicker, IMAGE_TYPES, useGallery } from 'Gallery';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
-import { missingFor, replaceGame } from 'sgdb';
+import { missingFor } from 'sgdb';
 import { ImageKind, launcherName, launchShortcut } from 'steamApps';
 import { syncCollections } from 'collections';
 import { usesLaunchHelper, withOverlay } from 'importer';
@@ -12,32 +12,22 @@ import { ImagesProgress, watchImages } from 'imagesProgress';
 
 type Row = ImportedEntry & { id: string };
 
+// A game's window: its pictures, how it starts, what Steam does with it
+const TABS = ['images', 'launch', 'steam'] as const;
+
+// The mosaic's order (the cover spans two rows)
+const MOSAIC: ImageKind[] = ['grid', 'wide', 'logo', 'hero', 'icon'];
+
 function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; missing: number[]; onClose: () => void; onRemoved: () => void; onImages: () => void }) {
-	const [version, setVersion] = useState(0);
 	const [missingNow, setMissingNow] = useState(missing);
-	const [status, setStatus] = useState('');
-	const [busy, setBusy] = useState(false);
+	const [tab, setTab] = useState<(typeof TABS)[number]>('images');
 	const refresh = async () => {
-		setVersion((v) => v + 1);
 		onImages();
 		// Steam writes the new images in the background: count the missing ones once they are there
 		await new Promise((r) => setTimeout(r, 2000));
 		setMissingNow((await missingFor([row.appid]))[String(row.appid)] ?? []);
 	};
-	const autoPick = async () => {
-		setBusy(true);
-		setStatus(t('auto.busy'));
-		try {
-			const state = await loadState();
-			const n = await replaceGame(state, row.appid);
-			await saveState(state);
-			setStatus(t('auto.done', { n }));
-		} catch (err) {
-			setStatus(String(err).includes('API key') ? t('gallery.keyError') : t('gallery.error'));
-		}
-		await refresh();
-		setBusy(false);
-	};
+	const g = useGallery(row.appid, refresh);
 	const [overlay, setOverlay] = useState(row.overlay !== false);
 	const changeOverlay = async (on: boolean) => {
 		const state = await loadState();
@@ -60,52 +50,72 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 		await saveState(state);
 		onRemoved();
 	};
-	const tile = (kind: ImageKind, label: string) => (
-		<div className={`ugi-im ${kind} clickable`} title={t('detail.changeImage')} key={`${kind}-${version}`}
-			onClick={(e) => openGallery(row.appid, row.name, e.currentTarget.ownerDocument, refresh)}>
-			<SteamImage appid={row.appid} kind={kind} />
-			<span>{label}</span>
-		</div>
-	);
+	// A picture of the mosaic: clicked, the images on the right are for its type
+	const tile = (kind: ImageKind) => {
+		const info = IMAGE_TYPES.find((x) => x.kind === kind)!;
+		return (
+			<div className={`ugi-im ${kind} clickable${g.type === info.type ? ' on' : ''}`} title={t('detail.changeImage')} key={`${kind}-${g.version}`} onClick={() => g.setType(info.type)}>
+				<SteamImage appid={row.appid} kind={kind} />
+				<span>{info.label()}</span>
+			</div>
+		);
+	};
 	return (
-		<div className="ugi-overlay right" onClick={onClose}>
-			<div className="ugi-drawer" onClick={(e) => e.stopPropagation()}>
-				<div className="ugi-drawer-head">
+		<div className="ugi-overlay" onClick={onClose}>
+			<div className="ugi-win large" onClick={(e) => e.stopPropagation()}>
+				<header>
 					<div>
 						<h2>{row.name}</h2>
 						<span className="ugi-muted">{launcherName(row.launcher)}</span>
 					</div>
+					<span className="ugi-sp" />
+					<button className="ugi-btn primary" onClick={() => launchShortcut(row.appid)}>{t('detail.play')}</button>
+					<button className="ugi-btn danger" onClick={remove}>{t('detail.remove')}</button>
 					<button className="ugi-btn secondary" onClick={onClose}>✕</button>
+				</header>
+				<div className="ugi-tabs pad">
+					{TABS.map((id) => (
+						<span key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{t(`detail.tab.${id}`)}</span>
+					))}
 				</div>
-				<div className="ugi-imgs">
-					{tile('grid', t('image.grid'))}
-					{tile('wide', t('image.wide'))}
-					{tile('logo', t('image.logo'))}
-					{tile('hero', t('image.hero'))}
-					{tile('icon', t('image.icon'))}
-				</div>
-				<p className="ugi-muted">{status || (missingNow.length ? t('detail.missing', { n: missingNow.length }) : t('detail.complete'))}</p>
-				<div className="ugi-kv">
-					{t('detail.launcher')}: <code>{launcherName(row.launcher)}</code>
-					<br />
-					{t('detail.command')}: <code>{row.launch_options ?? ''}</code>
-				</div>
-				{usesLaunchHelper(row.launch_options) && (
-					<div className="ugi-set">
-						<div>
-							<strong>{t('detail.overlay')}</strong>
-							<small>{t('detail.overlayText')}</small>
+				{tab === 'images' && (
+					<>
+						<div className="ugi-win-body">
+							<div className="ugi-mosaic">
+								<div className="ugi-imgs">{MOSAIC.map(tile)}</div>
+								<p className="ugi-muted">{missingNow.length ? t('detail.missing', { n: missingNow.length }) : t('detail.complete')}</p>
+							</div>
+							<GalleryPicker g={g} top={<GalleryOptions g={g} />} />
 						</div>
-						<span className={`ugi-switch${overlay ? ' on' : ''}`} onClick={() => changeOverlay(!overlay)}>
-							<span className="ugi-tog" />
-						</span>
+						<footer>
+							<GalleryActions g={g} />
+						</footer>
+					</>
+				)}
+				{tab === 'launch' && (
+					<div className="ugi-win-pane ugi-kv">
+						{t('detail.launcher')}: <code>{launcherName(row.launcher)}</code>
+						<br />
+						{t('detail.command')}: <code>{withOverlay(row.launch_options ?? '', overlay ? undefined : false)}</code>
 					</div>
 				)}
-				<div className="ugi-foot left">
-					<button className="ugi-btn primary" onClick={() => launchShortcut(row.appid)}>{t('detail.play')}</button>
-					<button className="ugi-btn secondary" disabled={busy} onClick={autoPick}>{t('auto.button')}</button>
-					<button className="ugi-btn danger" onClick={remove}>{t('detail.remove')}</button>
-				</div>
+				{tab === 'steam' && (
+					<div className="ugi-win-pane">
+						{usesLaunchHelper(row.launch_options) ? (
+							<div className="ugi-set compact">
+								<div>
+									<strong>{t('detail.overlay')}</strong>
+									<small>{t('detail.overlayText')}</small>
+								</div>
+								<span className={`ugi-switch${overlay ? ' on' : ''}`} onClick={() => changeOverlay(!overlay)}>
+									<span className="ugi-tog" />
+								</span>
+							</div>
+						) : (
+							<p className="ugi-muted">{t('detail.noSteamSettings')}</p>
+						)}
+					</div>
+				)}
 			</div>
 		</div>
 	);
