@@ -23,7 +23,7 @@ It includes or is derived from the following third-party works, used under their
 - Source: https://github.com/xwxfox/millennium-uwp-library-sync
 - Author: xwxfox
 - License: MIT — full text in `LICENSES/MIT-millennium-uwp-library-sync.txt`
-- Used for: the project's starting point. The Xbox / Microsoft Store discovery script and the UWP launch helper in `backend/launchers/xbox.lua` are derived from it.
+- Used for: the project's starting point. The Xbox / Microsoft Store discovery script and the UWP launch helper in `backend/launchers/xbox.lua` are derived from it; the type definitions of Millennium's Lua modules in `backend/types/` come from it unchanged.
 - Changes: discovery reworked (game detection via `MicrosoftGame.config`, UTF-8 output, hidden system apps); the launch helper runs through `conhost --headless`; shortcuts are no longer written to `shortcuts.vdf` but added live through Steam's client API; the rest of the plugin was rewritten for UGI.
 
 ## Legendary

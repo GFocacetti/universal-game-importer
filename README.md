@@ -112,6 +112,14 @@ Optional keys and accounts, also in UGI's **Settings**:
 * Linux and Steam Deck/Steam Machine compatibility
 * Rockstar Games Launcher
 
+## Support
+
+UGI is free and always will be. If it made your library a little nicer, you can buy me a coffee:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T6U429QJ67)
+
+A ⭐ on GitHub helps too: it makes UGI easier for others to find.
+
 ## License
 
 GNU General Public License v3.0 — see [LICENSE](LICENSE).
