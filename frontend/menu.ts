@@ -1,17 +1,21 @@
 import { Millennium, Navigation } from '@steambrew/client';
 import { t } from 'i18n';
 
-// Adds a "UGI" entry to Steam's LIBRARY menu, right below the Library home entry.
+// Adds "UGI" to Steam's LIBRARY menu, at the end below Downloads, after a line like
+// the one Steam draws above Downloads.
 // The menu items are a fixed list inside Steam's code, so the entry is added to the menu window's DOM.
 const MARK = 'ugi-library-menu-item';
+const LINE = 'ugi-library-menu-line';
 export const UGI_ROUTE = '/ugi';
 
 function inject(popup: any) {
 	const doc: Document | undefined = popup?.m_popup?.document;
 	if (!doc || doc.querySelector(`.${MARK}`)) return;
-	const home = doc.querySelector('.MenuItem');
-	if (!home) return;
-	const item = home.cloneNode(true) as HTMLElement;
+	const items = [...doc.querySelectorAll<HTMLElement>('.MenuItem')];
+	const last = items[items.length - 1];
+	if (!last) return;
+	doc.querySelector('.' + LINE)?.remove();
+	const item = items[0]!.cloneNode(true) as HTMLElement;
 	item.classList.add(MARK);
 	item.textContent = t('menu.item');
 	item.addEventListener('click', () => {
@@ -20,7 +24,20 @@ function inject(popup: any) {
 			popup.m_popup.SteamClient?.Window?.HideWindow?.();
 		} catch {}
 	});
-	home.after(item);
+	// Steam's line: an element of its own before Downloads, or a border on Downloads itself
+	const steamLine = last.previousElementSibling;
+	let line: HTMLElement;
+	if (steamLine && !steamLine.classList.contains('MenuItem')) {
+		line = steamLine.cloneNode(true) as HTMLElement;
+	} else {
+		line = doc.createElement('div');
+		const style = doc.defaultView?.getComputedStyle(last);
+		line.style.borderTop = style && style.borderTopWidth !== '0px' ? style.borderTop : '1px solid rgba(255,255,255,.15)';
+		line.style.margin = '4px 0';
+	}
+	line.classList.add(LINE);
+	last.after(line);
+	line.after(item);
 }
 
 function watch(popup: any) {
