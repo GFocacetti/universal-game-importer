@@ -5,7 +5,7 @@ local launchers = require("launchers.registry")
 local state = require("state")
 require("images") -- registers the ugi_sgdb_* / ugi_download* / ugi_missing_images calls
 require("info") -- registers the ugi_http_get / ugi_epic_namespace / ugi_info_* calls
-require("backup") -- registers the ugi_backup_* / ugi_cleanup / ugi_custom_* / ugi_open_folder / ugi_shortcuts calls
+require("backup") -- registers the ugi_backup_* / ugi_cleanup / ugi_custom_* / ugi_open_folder / ugi_shortcuts / ugi_pick_game calls
 require("achievements") -- registers the ugi_achievements call
 
 -- Frontend calls. Arguments arrive by name; JSON strings keep complex data intact.
@@ -20,6 +20,22 @@ function ugi_scan(a_options)
     local json = cjson.encode(result)
     logger:info("scan: result encoded, " .. #json .. " bytes")
     return json
+end
+
+-- a_paths: JSON list of programs; returns the JSON list of those that are gone. A program on a drive
+-- that isn't there (an external disk unplugged) is not counted as gone.
+function ugi_missing_files(a_paths)
+    local fs = require("fs")
+    local ok, paths = pcall(cjson.decode, a_paths or "[]")
+    local missing = {}
+    if ok and type(paths) == "table" then
+        for _, path in ipairs(paths) do
+            path = tostring(path)
+            local drive = path:match("^%a:\\") or path:match("^\\\\[^\\]+\\[^\\]+\\")
+            if drive and fs.exists(drive) and not fs.exists(path) then missing[#missing + 1] = path end
+        end
+    end
+    return #missing > 0 and cjson.encode(missing) or "[]"
 end
 
 function ugi_get_state()

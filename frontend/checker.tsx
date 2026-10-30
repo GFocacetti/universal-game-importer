@@ -9,7 +9,7 @@ import { UGI_ROUTE } from 'menu';
 import { setPendingReview } from 'pending';
 import { libraryVisible, waitForLibrary } from 'location';
 import { runScan } from 'scanner';
-import { LAUNCHER_NAMES } from 'steamApps';
+import { launcherName } from 'steamApps';
 
 const INTERVAL_MS = { daily: 864e5, weekly: 7 * 864e5, monthly: 30 * 864e5 } as const;
 // Wait a little after Steam starts, so the check doesn't slow down loading
@@ -30,7 +30,7 @@ function Toast({ plan, onOpen, onClose }: { plan: SyncPlan; onOpen: () => void; 
 	}, []);
 	const counts: Record<string, number> = {};
 	plan.newGames.filter((g) => g.kind !== 'app').forEach((g) => (counts[g.launcher] = (counts[g.launcher] ?? 0) + 1));
-	const detail = Object.entries(counts).map(([l, n]) => `${LAUNCHER_NAMES[l] ?? l} (${n})`).join(', ');
+	const detail = Object.entries(counts).map(([l, n]) => `${launcherName(l)} (${n})`).join(', ');
 	const total = Object.values(counts).reduce((a, b) => a + b, 0);
 	return (
 		<div className="ugi-toast" onClick={onOpen}>

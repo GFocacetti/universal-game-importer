@@ -1,5 +1,5 @@
 import { UgiState } from 'types';
-import { LAUNCHER_NAMES } from 'steamApps';
+import { launcherName } from 'steamApps';
 
 // Steam client stores (globals in Steam's UI context)
 type SteamCollection = {
@@ -36,7 +36,8 @@ async function overviewOf(appid: number) {
 
 // Keeps one collection (and optionally one Home shelf) per launcher in line with the imported games.
 // A collection or shelf deleted by hand in Steam is created again; one turned off in the
-// Launcher section (off_collection / off_shelf) is not.
+// Launcher section (off_collection / off_shelf) is not. A launcher left without games loses its
+// collection and shelf, made again when one of its games comes back.
 export async function syncCollections(state: UgiState): Promise<void> {
 	const byLauncher: Record<string, number[]> = {};
 	for (const entry of Object.values(state.imported)) {
@@ -54,7 +55,7 @@ export async function syncCollections(state: UgiState): Promise<void> {
 			delete info.shelf_id;
 		}
 		if (!collection) {
-			collection = collectionStore.NewUnsavedCollection(LAUNCHER_NAMES[launcher] ?? launcher, undefined, []);
+			collection = collectionStore.NewUnsavedCollection(launcherName(launcher), undefined, []);
 			await collection.Save();
 			info.collection_id = collection.id;
 		}
@@ -81,6 +82,19 @@ export async function syncCollections(state: UgiState): Promise<void> {
 			showcaseStore.AddNewShowcase(collection.id);
 			const shelf = showcaseStore.showcases.find((s) => s.strCollectionId === collection!.id);
 			if (shelf) info.shelf_id = shelf.nShowcaseId;
+		}
+	}
+
+	if (!state.settings.collections) return;
+	for (const [launcher, info] of Object.entries(state.collections)) {
+		if (byLauncher[launcher]?.length) continue;
+		if (info.shelf_id !== undefined) {
+			if (shelfExists(info.shelf_id)) showcaseStore.DeleteShowcase(info.shelf_id);
+			delete info.shelf_id;
+		}
+		if (info.collection_id) {
+			await collectionStore.GetCollection(info.collection_id)?.Delete();
+			delete info.collection_id;
 		}
 	}
 }

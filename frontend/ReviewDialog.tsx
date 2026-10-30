@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { applySync, SyncPlan } from 'importer';
 import { t } from 'i18n';
-import { LAUNCHER_NAMES } from 'steamApps';
+import { launcherName } from 'steamApps';
 import { Game } from 'types';
 
 // List of found games to confirm before importing (first install, "Scan now", new-games notice)
@@ -48,21 +48,21 @@ export default function ReviewDialog({ plan, onClose, onDone }: { plan: SyncPlan
 				<div className="ugi-review-list">
 					{byLauncher(games).map(([launcher, list]) => (
 						<div key={launcher}>
-							<h3>{LAUNCHER_NAMES[launcher] ?? launcher} · {list.length}</h3>
+							<h3>{launcherName(launcher)} · {list.length}</h3>
 							{list.map((g) => row(g))}
 						</div>
 					))}
 					{apps.length > 0 && (
 						<details className="ugi-excl">
 							<summary>{t('review.otherApps', { n: apps.length })}</summary>
-							{apps.map((g) => row(g, LAUNCHER_NAMES[g.launcher] ?? g.launcher))}
+							{apps.map((g) => row(g, launcherName(g.launcher)))}
 						</details>
 					)}
 					{plan.previouslyExcluded.length > 0 && (
 						<details className="ugi-excl">
 							<summary>{t('review.excluded', { n: plan.previouslyExcluded.length })}</summary>
 							<p className="ugi-muted">{t('review.excludedHint')}</p>
-							{plan.previouslyExcluded.map((g) => row(g, LAUNCHER_NAMES[g.launcher] ?? g.launcher))}
+							{plan.previouslyExcluded.map((g) => row(g, launcherName(g.launcher)))}
 						</details>
 					)}
 				</div>

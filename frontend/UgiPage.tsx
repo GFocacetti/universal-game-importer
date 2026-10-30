@@ -8,7 +8,9 @@ import GamesSection from 'GamesSection';
 import { ImagesSection, LaunchersSection, SettingsSection } from 'Sections';
 import ReviewDialog from 'ReviewDialog';
 import { runScan } from 'scanner';
-import { SyncPlan } from 'importer';
+import { addManualGame, SyncPlan } from 'importer';
+import { callable } from '@steambrew/client';
+import { unquote } from 'backend';
 import Onboarding from 'Onboarding';
 import { takePendingReview } from 'pending';
 import UninstallSection from 'UninstallSection';
@@ -60,6 +62,44 @@ function ApiKeyDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 	);
 }
 
+const pickGame = callable<[], string>('ugi_pick_game');
+
+// After picking a game's program: the name UGI guessed, to correct before adding it
+function AddGameDialog({ picked, onClose, onAdded }: { picked: { path: string; name: string }; onClose: () => void; onAdded: () => void }) {
+	const [name, setName] = useState(picked.name);
+	const [busy, setBusy] = useState(false);
+	const [failed, setFailed] = useState(false);
+	const add = async () => {
+		setBusy(true);
+		setFailed(false);
+		try {
+			await addManualGame(picked.path, name.trim());
+			onAdded();
+		} catch (err) {
+			console.error('[UGI] add game failed', err);
+			setFailed(true);
+			setBusy(false);
+		}
+	};
+	return (
+		<div className="ugi-overlay" onClick={onClose}>
+			<div className="ugi-dialog" onClick={(e) => e.stopPropagation()}>
+				<h2>{t('add.title')}</h2>
+				<p>{t('add.text')}</p>
+				<p className="ugi-muted"><code>{picked.path}</code></p>
+				<div className="ugi-field">
+					<input value={name} placeholder={t('add.name')} onChange={(e) => setName(e.target.value)} />
+				</div>
+				{failed && <p className="ugi-launcher-warn">{t('add.failed')}</p>}
+				<div className="ugi-foot">
+					<button className="ugi-btn secondary" onClick={onClose}>{t('common.cancel')}</button>
+					<button className="ugi-btn primary" disabled={!name.trim() || busy} onClick={add}>{t('add.button')}</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 export default function UgiPage() {
 	const [state, setState] = useState<UgiState | null>(null);
 	const [section, setSection] = useState<Section>('games');
@@ -68,6 +108,17 @@ export default function UgiPage() {
 	const [plan, setPlan] = useState<SyncPlan | null>(null);
 	const [message, setMessage] = useState('');
 	const [setup, setSetup] = useState(false);
+	const [picked, setPicked] = useState<{ path: string; name: string } | null>(null);
+
+	const addGame = async () => {
+		try {
+			const raw = unquote(await pickGame());
+			const game = raw ? JSON.parse(raw) : null;
+			if (game?.path) setPicked({ path: String(game.path), name: String(game.name ?? '') });
+		} catch (err) {
+			console.error('[UGI] pick game failed', err);
+		}
+	};
 
 	const reload = () => loadState().then(setState);
 	useEffect(() => {
@@ -122,6 +173,7 @@ export default function UgiPage() {
 					<h1>{SECTIONS.find((s) => s.id === section)?.label()}</h1>
 					<span className="ugi-sp" />
 					<span className="ugi-muted">{message || (state?.last_check ? t('header.lastCheck', { when: relativeTime(state.last_check) }) : t('header.never'))}</span>
+					{section === 'games' && <button className="ugi-btn secondary" onClick={addGame}>{t('header.add')}</button>}
 					<button className="ugi-btn primary" disabled={scanning} onClick={scanNow}>{scanning ? t('header.scanning') : t('header.scan')}</button>
 				</div>
 				{state && !state.settings.sgdb_key && (
@@ -148,6 +200,16 @@ export default function UgiPage() {
 					Made with ❤️ by <span className="ugi-link" onClick={() => openUrl('https://github.com/GFocacetti')}>Ryu</span>
 				</footer>
 			</section>
+			{picked && (
+				<AddGameDialog
+					picked={picked}
+					onClose={() => setPicked(null)}
+					onAdded={() => {
+						setPicked(null);
+						reload();
+					}}
+				/>
+			)}
 			{keyDialog && (
 				<ApiKeyDialog
 					onClose={() => setKeyDialog(false)}

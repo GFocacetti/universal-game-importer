@@ -1,4 +1,5 @@
 // Helpers around Steam's app store for the UI (shortcuts, image URLs, launching, links)
+import { t } from 'i18n';
 
 type Overview = { appid: number; display_name?: string; app_type?: number };
 declare const appStore: {
@@ -48,6 +49,9 @@ export const LAUNCHER_NAMES: Record<string, string> = {
 	itch: 'itch.io',
 	riot: 'Riot Games',
 };
+
+// Games added by hand in UGI's page are listed under their own name
+export const launcherName = (id: string) => (id === 'manual' ? t('launcher.manual') : (LAUNCHER_NAMES[id] ?? id));
 
 export type ImageKind = 'grid' | 'wide' | 'hero' | 'logo' | 'icon';
 

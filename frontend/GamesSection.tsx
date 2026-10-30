@@ -4,7 +4,8 @@ import { openGallery } from 'Gallery';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
 import { missingFor, replaceGame } from 'sgdb';
-import { ImageKind, LAUNCHER_NAMES, launchShortcut } from 'steamApps';
+import { ImageKind, launcherName, launchShortcut } from 'steamApps';
+import { syncCollections } from 'collections';
 import { ImportedEntry, UgiState } from 'types';
 import { ImagesProgress, watchImages } from 'imagesProgress';
 
@@ -42,6 +43,8 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 		delete state.imported[row.id];
 		// Removed on purpose: don't offer it again as a new game
 		state.excluded[row.id] = true;
+		// Its launcher's collection may be left empty
+		await syncCollections(state).catch((err) => console.error('[UGI] collections', err));
 		await saveState(state);
 		onRemoved();
 	};
@@ -58,7 +61,7 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 				<div className="ugi-drawer-head">
 					<div>
 						<h2>{row.name}</h2>
-						<span className="ugi-muted">{LAUNCHER_NAMES[row.launcher] ?? row.launcher}</span>
+						<span className="ugi-muted">{launcherName(row.launcher)}</span>
 					</div>
 					<button className="ugi-btn secondary" onClick={onClose}>✕</button>
 				</div>
@@ -71,7 +74,7 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 				</div>
 				<p className="ugi-muted">{status || (missingNow.length ? t('detail.missing', { n: missingNow.length }) : t('detail.complete'))}</p>
 				<div className="ugi-kv">
-					{t('detail.launcher')}: <code>{LAUNCHER_NAMES[row.launcher] ?? row.launcher}</code>
+					{t('detail.launcher')}: <code>{launcherName(row.launcher)}</code>
 					<br />
 					{t('detail.command')}: <code>{row.launch_options ?? ''}</code>
 				</div>
@@ -127,7 +130,7 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 				<span className={`ugi-chip${filter === 'all' ? ' on' : ''}`} onClick={() => setFilter('all')}>{t('games.all')} {rows.length}</span>
 				{launchers.map((l) => (
 					<span key={l} className={`ugi-chip${filter === l ? ' on' : ''}`} onClick={() => setFilter(l)}>
-						{LAUNCHER_NAMES[l] ?? l} {rows.filter((r) => r.launcher === l).length}
+						{launcherName(l)} {rows.filter((r) => r.launcher === l).length}
 					</span>
 				))}
 				<input className="ugi-search" placeholder={t('games.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -142,7 +145,7 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 						<div key={`${r.id}-${version}-${images.round}`} className="ugi-game" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-cover" label={r.name} />
 							{loading(r)}
-							<span className="ugi-badge">{LAUNCHER_NAMES[r.launcher] ?? r.launcher}</span>
+							<span className="ugi-badge">{launcherName(r.launcher)}</span>
 						</div>
 					))}
 				</div>
@@ -152,7 +155,7 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 						<div key={`${r.id}-${version}-${images.round}`} className="ugi-row" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-mini" />
 							<span>{r.name}</span>
-							<span className="ugi-muted">{LAUNCHER_NAMES[r.launcher] ?? r.launcher}</span>
+							<span className="ugi-muted">{launcherName(r.launcher)}</span>
 							<span className="ugi-muted">{images.pending.includes(r.appid) ? t('cover.downloading') : missingOf(r).length ? t('games.imagesMissing') : t('games.imagesComplete')}</span>
 						</div>
 					))}

@@ -84,15 +84,22 @@ function findManual(game: Game, shortcuts: SteamShortcut[]): SteamShortcut | und
 // Compares what the launchers report with what UGI already manages.
 // Only launchers scanned successfully (or disabled) can mark games as gone: a failed scan removes nothing.
 // shortcuts: the non-Steam shortcuts in Steam, to recognise games the user had added by hand.
-export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiState, shortcuts: SteamShortcut[] = []): SyncPlan {
+// missing: programs of games added by hand that are gone (lowercase); such a game, or one whose
+// shortcut was deleted in Steam, goes too.
+export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiState, shortcuts: SteamShortcut[] = [], missing = new Set<string>()): SyncPlan {
 	const found = new Set(games.map((g) => g.id));
 	const reliable = new Set(launchers.filter((l) => !l.error).map((l) => l.id));
 	const managed = (g: Game) => {
 		const entry = state.imported[g.id];
 		return !!entry && shortcutExists(entry.appid);
 	};
-	// Shortcuts not made by UGI, each taken over by one game at most
-	const used = new Set(Object.values(state.imported).map((e) => e.appid));
+	// A shortcut deleted in Steam: gone from its shortcuts file (Steam's app list may keep it until a
+	// restart); nothing counts as deleted when the file couldn't be read
+	const listed = new Set(shortcuts.map((x) => x.appid));
+	const deleted = (appid: number) => shortcuts.length > 0 && !listed.has(appid);
+	// Shortcuts not made by UGI, each taken over by one game at most; a game added by hand in UGI's
+	// page is taken over too when a launcher finds it
+	const used = new Set(Object.values(state.imported).filter((e) => e.launcher !== 'manual').map((e) => e.appid));
 	const adopt: Record<string, SteamShortcut> = {};
 	for (const game of games.filter((g) => !managed(g))) {
 		const manual = findManual(game, shortcuts.filter((s) => !used.has(s.appid)));
@@ -109,7 +116,13 @@ export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiS
 			const entry = state.imported[g.id];
 			return !!entry && managed(g) && changed(entry, g);
 		}),
-		gone: Object.entries(state.imported).filter(([id, e]) => !found.has(id) && reliable.has(e.launcher)).map(([id]) => id),
+		gone: Object.entries(state.imported)
+			.filter(([id, e]) =>
+				e.launcher === 'manual'
+					? deleted(e.appid) || missing.has(unquotePath(e.exe).toLowerCase())
+					: !found.has(id) && reliable.has(e.launcher),
+			)
+			.map(([id]) => id),
 	};
 }
 
@@ -124,8 +137,14 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 			try {
 				const manual = plan.adopt[game.id];
 				const appid = manual ? manual.appid : await addShortcut(game);
+				// Added by hand in UGI's page: now the launcher's (UGI made it, nothing to put back)
+				const byHand = Object.entries(state.imported).find(([, e]) => e.launcher === 'manual' && e.appid === appid);
+				if (byHand) {
+					delete state.imported[byHand[0]];
+					applyShortcutSettings(appid, game);
+				}
 				state.imported[game.id] = entryFor(game, appid);
-				if (manual) {
+				if (manual && !byHand) {
 					const { appid: _, ...fields } = manual;
 					state.imported[game.id]!.manual = fields;
 					applyShortcutSettings(appid, game);
@@ -169,6 +188,22 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 	const newIds = [...plan.newGames, ...plan.previouslyExcluded].filter((g) => chosen.has(g.id) && state.imported[g.id]).map((g) => g.id);
 	if (newIds.length) prefetchInfo(state, newIds);
 	return { added, removed, updated };
+}
+
+// A game added by hand from its program: a shortcut like the imported ones, with its pictures and
+// information fetched the same way. Its id is "manual:<appid>", the key game information already
+// uses for shortcuts added by hand.
+export async function addManualGame(exe: string, name: string): Promise<number> {
+	const game: Game = { id: '', launcher: 'manual', name, exe, start_dir: exe.slice(0, exe.lastIndexOf('\\')), launch_options: '' };
+	const appid = await addShortcut(game);
+	const state = await loadState();
+	const id = `manual:${appid}`;
+	state.imported[id] = entryFor({ ...game, id }, appid);
+	await syncCollections(state);
+	await saveState(state);
+	if (state.settings.sgdb_key) fillInBackground(state, [appid]);
+	prefetchInfo(state, [id]);
+	return appid;
 }
 
 async function fillInBackground(state: UgiState, appids: number[]) {

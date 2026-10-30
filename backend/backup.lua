@@ -220,6 +220,45 @@ ConvertTo-Json @($picked) | Out-File -FilePath %s -Encoding utf8
     return ok and type(list) == "table" and tostring(list[1] or "") or ""
 end
 
+-- Lets the user pick a game's program (Windows' own dialog, above Steam). Returns JSON
+-- {"path": "...", "name": "..."} with the name the game probably has, or "" if cancelled.
+-- The name: the product name written in the program, unless it is an engine's or a launcher's;
+-- otherwise the game's folder (above "bin", "Binaries\Win64" and the like); otherwise the file name.
+function ugi_pick_game()
+    local dir = paths.data_dir()
+    local script = fs.join(dir, "game_pick.ps1")
+    local out = fs.join(dir, "game_pick.json")
+    utils.write_file(script, string.format([[
+Add-Type -AssemblyName System.Windows.Forms
+$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Filter = 'Program (*.exe)|*.exe'
+if (-not $dialog.ShowDialog($owner).Equals([System.Windows.Forms.DialogResult]::OK)) { '' | Out-File -FilePath %s -Encoding utf8; return }
+$path = $dialog.FileName
+$generic = '^(unity|unityplayer|unreal|unreal engine|ue4|ue5|ue4game|ue5game|game|launcher|bootstrap(per)?|main|app|application|client|win64|x64|.*shipping.*)$'
+$marks = "[" + [char]0xAE + [char]0x2122 + [char]0xA9 + "]"
+$clean = { param($t) if ($t) { ($t -replace $marks, "" -replace '\s+', ' ').Trim() } else { "" } }
+$info = (Get-Item -LiteralPath $path).VersionInfo
+$name = ''
+foreach ($candidate in @((& $clean $info.ProductName), (& $clean $info.FileDescription))) {
+  if ($candidate -and $candidate.Length -ge 2 -and $candidate -notmatch $generic) { $name = $candidate; break }
+}
+if (-not $name) {
+  $folder = Split-Path -Parent $path
+  while ($folder -and (Split-Path -Leaf $folder) -match '^(bin|bin64|bin32|binaries|win64|win32|x64|x86|game|release|retail|shipping)$') { $folder = Split-Path -Parent $folder }
+  if ($folder -and (Split-Path -Parent $folder)) { $name = Split-Path -Leaf $folder }
+}
+if (-not $name) { $name = [System.IO.Path]::GetFileNameWithoutExtension($path) }
+@{ path = $path; name = $name } | ConvertTo-Json -Compress | Out-File -FilePath %s -Encoding utf8
+]], ps_quote(out), ps_quote(out)))
+    if fs.exists(out) then fs.remove(out) end
+    -- The dialog needs a single-threaded apartment
+    utils.exec(string.format([[%s -STA -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File "%s"]], common.POWERSHELL, script))
+    local raw = fs.exists(out) and (utils.read_file(out) or "") or ""
+    raw = raw:gsub("^\239\187\191", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return raw:match("^{") and raw or ""
+end
+
 -- Starts the "unzip" job for a backup; ugi_backup_state then reads what it holds
 function ugi_backup_open(a_zip)
     local dir = staging("restore")
