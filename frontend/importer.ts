@@ -36,12 +36,31 @@ export function shortcutExists(appid: number): boolean {
 export const usesLaunchHelper = (options: string | undefined) => !!options?.includes('ugi_launch.ps1') && options.includes('-WaitDir');
 export const withOverlay = (options: string, overlay?: boolean) => (overlay === false && usesLaunchHelper(options) ? `${options} -Detached` : options);
 
+const folderOf = (path: string) => path.slice(0, path.lastIndexOf('\\'));
+
+// The shortcut's fields once the user's launch settings and the overlay switch are applied
+export function launchFields(game: Pick<Game, 'launcher' | 'exe' | 'start_dir' | 'launch_options' | 'overlay' | 'launch'>) {
+	const l = game.launch ?? {};
+	if (game.launcher === 'manual') {
+		return { exe: l.exe || game.exe, start_dir: l.start_dir || (l.exe ? folderOf(l.exe) : game.start_dir), launch_options: l.args ?? '' };
+	}
+	const base = l.direct && l.fields ? l.fields : { exe: game.exe, start_dir: game.start_dir, launch_options: game.launch_options };
+	const options = usesLaunchHelper(base.launch_options) && l.closed ? `${base.launch_options} -Closed ${l.closed}` : base.launch_options;
+	return { ...base, launch_options: withOverlay(options, game.overlay) };
+}
+
 function applyShortcutSettings(appid: number, game: Game) {
+	const fields = launchFields(game);
 	SteamClient.Apps.SetShortcutName(appid, game.name);
-	SteamClient.Apps.SetShortcutExe(appid, quote(game.exe));
-	SteamClient.Apps.SetShortcutStartDir(appid, quote(game.start_dir));
-	SteamClient.Apps.SetShortcutLaunchOptions(appid, withOverlay(game.launch_options, game.overlay));
+	SteamClient.Apps.SetShortcutExe(appid, quote(fields.exe));
+	SteamClient.Apps.SetShortcutStartDir(appid, quote(fields.start_dir));
+	SteamClient.Apps.SetShortcutLaunchOptions(appid, fields.launch_options);
 	if (game.icon) SteamClient.Apps.SetShortcutIcon(appid, game.icon);
+}
+
+// An imported game's shortcut set again from its entry (after changing its launch settings or overlay)
+export function applyEntry(id: string, entry: ImportedEntry) {
+	applyShortcutSettings(entry.appid, { id, launcher: entry.launcher, name: entry.name, exe: entry.exe ?? '', start_dir: entry.start_dir ?? '', launch_options: entry.launch_options ?? '', overlay: entry.overlay, launch: entry.launch });
 }
 
 // Puts back a shortcut the user had made, as it was before UGI took it over
@@ -63,6 +82,7 @@ const entryFor = (game: Game, appid: number, manual?: ShortcutFields): ImportedE
 	appid, name: game.name, launcher: game.launcher, exe: game.exe, start_dir: game.start_dir, launch_options: game.launch_options,
 	...(manual ? { manual } : {}),
 	...(game.overlay === false ? { overlay: false } : {}),
+	...(game.launch ? { launch: game.launch } : {}),
 });
 
 const changed = (entry: ImportedEntry, game: Game) =>
@@ -127,7 +147,7 @@ export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiS
 		gone: Object.entries(state.imported)
 			.filter(([id, e]) =>
 				e.launcher === 'manual'
-					? (deleted(e.appid) && !recent(e)) || missing.has(unquotePath(e.exe).toLowerCase())
+					? (deleted(e.appid) && !recent(e)) || missing.has(unquotePath(e.launch?.exe || e.exe).toLowerCase())
 					: !found.has(id) && reliable.has(e.launcher),
 			)
 			.map(([id]) => id),
@@ -171,8 +191,9 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 	for (const game of plan.outdated) {
 		const entry = state.imported[game.id];
 		if (!entry) continue;
-		applyShortcutSettings(entry.appid, { ...game, overlay: entry.overlay });
-		state.imported[game.id] = entryFor({ ...game, overlay: entry.overlay }, entry.appid, entry.manual);
+		const kept = { ...game, overlay: entry.overlay, launch: entry.launch };
+		applyShortcutSettings(entry.appid, kept);
+		state.imported[game.id] = entryFor(kept, entry.appid, entry.manual);
 		updated++;
 	}
 
@@ -242,5 +263,6 @@ export function recreateShortcut(id: string, entry: ImportedEntry): Promise<numb
 		start_dir: entry.start_dir ?? '',
 		launch_options: entry.launch_options ?? '',
 		overlay: entry.overlay,
+		launch: entry.launch,
 	});
 }

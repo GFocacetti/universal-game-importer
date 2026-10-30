@@ -12,7 +12,7 @@ const missingFiles = callable<[{ a_paths: string }], string>('ugi_missing_files'
 
 // Programs of games added by hand that are no longer there (lowercase)
 async function missingPrograms(state: UgiState): Promise<Set<string>> {
-	const exes = Object.values(state.imported).filter((e) => e.launcher === 'manual' && e.exe).map((e) => unquotePath(e.exe));
+	const exes = Object.values(state.imported).filter((e) => e.launcher === 'manual' && e.exe).map((e) => unquotePath(e.launch?.exe || e.exe));
 	if (!exes.length) return new Set();
 	try {
 		const list = JSON.parse(unquote(await missingFiles({ a_paths: JSON.stringify(exes) })));

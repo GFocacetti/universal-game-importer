@@ -6,8 +6,10 @@ import { t } from 'i18n';
 import { missingFor } from 'sgdb';
 import { ImageKind, launcherName, launchShortcut } from 'steamApps';
 import { syncCollections } from 'collections';
-import { usesLaunchHelper, withOverlay } from 'importer';
-import { ImportedEntry, UgiState } from 'types';
+import { callable } from '@steambrew/client';
+import { applyEntry, launchFields, usesLaunchHelper } from 'importer';
+import { unquote } from 'backend';
+import { ImportedEntry, LaunchSettings, UgiState } from 'types';
 import { ImagesProgress, watchImages } from 'imagesProgress';
 
 type Row = ImportedEntry & { id: string };
@@ -17,6 +19,131 @@ const TABS = ['images', 'launch', 'steam'] as const;
 
 // The mosaic's order (the cover spans two rows)
 const MOSAIC: ImageKind[] = ['grid', 'wide', 'logo', 'hero', 'icon'];
+
+const pickProgram = callable<[], string>('ugi_pick_game');
+const pickFolder = callable<[], string>('ugi_pick_folder');
+const directFields = callable<[{ a_exe: string; b_args: string; c_dir: string }], string>('ugi_launch_fields');
+
+const DEFAULT_CLOSED = 60;
+
+// How the game starts. Launcher games: through their launcher, or their own program directly; games
+// added by hand: their program, folder and arguments. Saved and applied to the shortcut at once.
+function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
+	const manual = row.launcher === 'manual';
+	const helper = usesLaunchHelper(row.launch_options);
+	const [draft, setDraft] = useState<LaunchSettings>(row.launch ?? {});
+	const [saved, setSaved] = useState<LaunchSettings>(row.launch ?? {});
+	const [busy, setBusy] = useState(false);
+	const set = (part: Partial<LaunchSettings>) => setDraft((d) => ({ ...d, ...part }));
+	const pickExe = async () => {
+		try {
+			const picked = JSON.parse(unquote(await pickProgram()) || 'null');
+			if (picked?.path) set({ exe: picked.path });
+		} catch {}
+	};
+	const pickDir = async () => {
+		const picked = unquote(await pickFolder());
+		if (picked) set({ start_dir: picked });
+	};
+	const save = async (next: LaunchSettings) => {
+		setBusy(true);
+		try {
+			const clean: LaunchSettings = {};
+			if (next.exe?.trim()) clean.exe = next.exe.trim();
+			if (next.start_dir?.trim()) clean.start_dir = next.start_dir.trim();
+			if (next.args?.trim()) clean.args = next.args.trim();
+			if (next.closed && next.closed !== DEFAULT_CLOSED) clean.closed = Math.max(5, Math.round(next.closed));
+			if (!manual && next.direct && clean.exe) {
+				clean.direct = true;
+				const dir = clean.start_dir ?? clean.exe.slice(0, clean.exe.lastIndexOf('\\'));
+				clean.fields = JSON.parse(unquote(await directFields({ a_exe: clean.exe, b_args: clean.args ?? '', c_dir: dir })));
+			}
+			const state = await loadState();
+			const entry = state.imported[row.id];
+			if (!entry) return;
+			if (Object.keys(clean).length) entry.launch = clean;
+			else delete entry.launch;
+			applyEntry(row.id, entry);
+			await saveState(state);
+			row.launch = entry.launch;
+			setSaved(clean);
+			setDraft(clean);
+		} catch (err) {
+			console.error('[UGI] launch settings', err);
+		} finally {
+			setBusy(false);
+		}
+	};
+	const changed = JSON.stringify({ ...draft, fields: undefined }) !== JSON.stringify({ ...saved, fields: undefined });
+	const command = launchFields({ ...row, exe: row.exe ?? '', start_dir: row.start_dir ?? '', launch_options: row.launch_options ?? '', overlay: overlay ? undefined : false, launch: saved });
+	const program = (
+		<>
+			<div className="ugi-set compact column">
+				<strong>{t('launch.program')}</strong>
+				<div className="ugi-field">
+					<input type="text" value={draft.exe ?? ''} placeholder={manual ? row.exe : t('launch.programHint')} onChange={(e) => set({ exe: e.target.value })} />
+					<button className="ugi-btn secondary" onClick={pickExe}>{t('launch.choose')}</button>
+				</div>
+			</div>
+			<div className="ugi-set compact column">
+				<strong>{t('launch.folder')}</strong>
+				<div className="ugi-field">
+					<input type="text" value={draft.start_dir ?? ''} placeholder={t('launch.folderHint')} onChange={(e) => set({ start_dir: e.target.value })} />
+					<button className="ugi-btn secondary" onClick={pickDir}>{t('launch.choose')}</button>
+				</div>
+			</div>
+			<div className="ugi-set compact column">
+				<strong>{t('launch.args')}</strong>
+				<div className="ugi-field">
+					<input type="text" value={draft.args ?? ''} placeholder="-windowed" onChange={(e) => set({ args: e.target.value })} />
+				</div>
+			</div>
+		</>
+	);
+	return (
+		<div className="ugi-win-pane">
+			<div className="ugi-kv">
+				{t('detail.launcher')}: <code>{launcherName(row.launcher)}</code>
+			</div>
+			{manual ? (
+				program
+			) : helper ? (
+				<>
+					<div className="ugi-set compact">
+						<div>
+							<strong>{t('launch.direct')}</strong>
+							<small>{t('launch.directText', { launcher: launcherName(row.launcher) })}</small>
+						</div>
+						<span className={`ugi-switch${draft.direct ? ' on' : ''}`} onClick={() => set({ direct: !draft.direct })}>
+							<span className="ugi-tog" />
+						</span>
+					</div>
+					{draft.direct && program}
+					<div className="ugi-set compact">
+						<div>
+							<strong>{t('launch.closed')}</strong>
+							<small>{t('launch.closedText')}</small>
+						</div>
+						<div className="ugi-field narrow">
+							<input type="number" min={5} value={draft.closed ?? DEFAULT_CLOSED} onChange={(e) => set({ closed: Number(e.target.value) || DEFAULT_CLOSED })} />
+						</div>
+					</div>
+				</>
+			) : (
+				<p className="ugi-muted">{t('launch.none')}</p>
+			)}
+			{(manual || helper) && (
+				<div className="ugi-foot left">
+					<button className="ugi-btn primary" disabled={busy || !changed || (!!draft.direct && !draft.exe?.trim())} onClick={() => save(draft)}>{t('launch.save')}</button>
+					<button className="ugi-btn secondary" disabled={busy || !Object.keys(saved).length} onClick={() => save({})}>{t('launch.reset')}</button>
+				</div>
+			)}
+			<div className="ugi-kv">
+				{t('detail.command')}: <code>{`"${command.exe}" ${command.launch_options}`.trim()}</code>
+			</div>
+		</div>
+	);
+}
 
 function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; missing: number[]; onClose: () => void; onRemoved: () => void; onImages: () => void }) {
 	const [missingNow, setMissingNow] = useState(missing);
@@ -35,7 +162,7 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 		if (!entry) return;
 		if (on) delete entry.overlay;
 		else entry.overlay = false;
-		SteamClient.Apps.SetShortcutLaunchOptions(row.appid, withOverlay(entry.launch_options ?? '', on));
+		applyEntry(row.id, entry);
 		await saveState(state);
 		setOverlay(on);
 	};
@@ -92,13 +219,7 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 						</footer>
 					</>
 				)}
-				{tab === 'launch' && (
-					<div className="ugi-win-pane ugi-kv">
-						{t('detail.launcher')}: <code>{launcherName(row.launcher)}</code>
-						<br />
-						{t('detail.command')}: <code>{withOverlay(row.launch_options ?? '', overlay ? undefined : false)}</code>
-					</div>
-				)}
+				{tab === 'launch' && <LaunchTab row={row} overlay={overlay} />}
 				{tab === 'steam' && (
 					<div className="ugi-win-pane">
 						{usesLaunchHelper(row.launch_options) ? (

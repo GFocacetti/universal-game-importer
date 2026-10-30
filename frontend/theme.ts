@@ -187,6 +187,9 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-set > :last-child { justify-self: end; }
 .ugi-set .ugi-field { width: 100%; margin: 0; }
 .ugi-set.compact { grid-template-columns: 1fr auto; }
+.ugi-set.column { grid-template-columns: 1fr; gap: 6px; }
+.ugi-set.column > :last-child { justify-self: stretch; }
+.ugi-set .ugi-field.narrow { width: 90px; }
 .ugi-tabs { display: flex; gap: 4px; margin: 14px 0 16px; border-bottom: 1px solid var(--ugi-panel-border); }
 .ugi-tabs span { padding: 8px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--ugi-muted); font-size: 14px; cursor: pointer; }
 .ugi-tabs span:hover { color: var(--ugi-text); }

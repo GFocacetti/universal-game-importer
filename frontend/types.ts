@@ -12,6 +12,21 @@ export type Game = {
 	store_family?: string;
 	// false: Steam's overlay turned off for this game (kept from the imported entry)
 	overlay?: boolean;
+	// The user's launch settings (kept from the imported entry)
+	launch?: LaunchSettings;
+};
+
+// Set in the game's window. direct: start exe instead of the launcher, through UGI's launch helper
+// (fields: the shortcut fields for that, made by the backend). For games added by hand exe,
+// start_dir and args change the shortcut itself. closed: seconds without a window before the game
+// counts as closed (launch helper only; 60 when not set).
+export type LaunchSettings = {
+	direct?: boolean;
+	exe?: string;
+	start_dir?: string;
+	args?: string;
+	closed?: number;
+	fields?: { exe: string; start_dir: string; launch_options: string };
 };
 
 export type LauncherStatus = {
@@ -44,6 +59,7 @@ export type ImportedEntry = {
 	overlay?: boolean;
 	// Games added in UGI's page: when (milliseconds)
 	added?: number;
+	launch?: LaunchSettings;
 };
 
 export type ShortcutFields = { name: string; exe: string; start_dir: string; launch_options: string };
