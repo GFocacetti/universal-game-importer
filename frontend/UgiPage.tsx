@@ -197,7 +197,7 @@ export default function UgiPage() {
 				</div>
 				{/* Credits: a fixed bar under every section */}
 				<footer className="ugi-credit">
-					Made with ❤️ by <span className="ugi-link" onClick={() => openUrl('https://github.com/GFocacetti')}>Ryu</span>
+					Made with ❤️ by <span className="ugi-link" onClick={() => openUrl('https://github.com/GFocacetti/universal-game-importer')}>Ryu</span>
 				</footer>
 			</section>
 			{picked && (
