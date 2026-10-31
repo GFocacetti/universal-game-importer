@@ -92,7 +92,9 @@ export async function removalSummary(state: UgiState): Promise<{ games: number; 
 // from now on it goes in the backups and is reset by "Remove everything"
 async function adoptExistingArtwork() {
 	const found = json<unknown>(unquote(await customScan()), []);
-	const known = new Set(json<unknown[]>(unquote(await customList()), []));
+	// An empty Lua list arrives as {}
+	const listed = json<unknown>(unquote(await customList()), []);
+	const known = new Set(Array.isArray(listed) ? listed : []);
 	const adopted = (Array.isArray(found) ? found : []).filter((appid) => !known.has(appid) && isSteamApp(appid));
 	if (adopted.length) await customMarkMany({ a_appids: JSON.stringify(adopted) });
 }

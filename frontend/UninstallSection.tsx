@@ -49,6 +49,12 @@ export default function UninstallSection({ onChanged }: { onChanged: () => void 
 		refresh();
 	}, []);
 
+	// The error message with what went wrong, so it can be told apart (and reported)
+	const failed = (reason?: string) => {
+		const detail = (reason ?? '').replace(/^error:\s*/i, '').trim();
+		return detail ? `${t('maint.error')} ${t('maint.reason', { reason: detail })}` : t('maint.error');
+	};
+
 	const run = async (label: string, job: () => Promise<string>) => {
 		setBusy(label);
 		setResult('');
@@ -56,7 +62,7 @@ export default function UninstallSection({ onChanged }: { onChanged: () => void 
 			setResult(await job());
 		} catch (err) {
 			console.error('[UGI]', err);
-			setResult(t('maint.error'));
+			setResult(failed(err instanceof Error ? err.message : String(err)));
 		}
 		setBusy('');
 		refresh();
@@ -69,7 +75,7 @@ export default function UninstallSection({ onChanged }: { onChanged: () => void 
 			setBackupFlag(flag);
 			try {
 				const out = await exportBackup(flag);
-				return out.cancelled ? t('maint.backupCancelled') : out.path ? t('maint.backupDone', { path: out.path }) : t('maint.error');
+				return out.cancelled ? t('maint.backupCancelled') : out.path ? t('maint.backupDone', { path: out.path }) : failed(out.error);
 			} finally {
 				setBackupFlag(null);
 			}

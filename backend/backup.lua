@@ -18,12 +18,31 @@ local function ps_quote(text)
     return "'" .. tostring(text):gsub("'", "''") .. "'"
 end
 
+-- Where backups go: "UGI backup" in Documents, or in the user's own folder when Documents can't be
+-- written (moved to OneDrive, or protected by Windows' controlled folder access or an antivirus).
+-- Tried by PowerShell, the program that writes the backups. Returns the folder and every existing one.
+local function backup_dirs()
+    local found = common.run_powershell_json("documents", [[
+$dirs = @((Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'UGI backup'), (Join-Path $env:USERPROFILE 'UGI backup'))
+$usable = $null
+foreach ($dir in $dirs) {
+  try {
+    New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop | Out-Null
+    $probe = Join-Path $dir ('.ugi-write-test-' + $PID)
+    [IO.File]::WriteAllText($probe, 'ok'); Remove-Item -LiteralPath $probe -Force
+    $usable = $dir; break
+  } catch {}
+}
+ConvertTo-Json -Compress @{ usable = $usable; all = @($dirs | Where-Object { Test-Path -LiteralPath $_ }) }
+]])
+    local result = type(found[1]) == "table" and found[1] or {}
+    local fallback = fs.join(utils.getenv("USERPROFILE") or "C:\\", "UGI backup")
+    local all = type(result.all) == "table" and result.all or {}
+    return type(result.usable) == "string" and result.usable or fallback, all
+end
+
 local function backup_dir()
-    local found = common.run_powershell_json("documents", "ConvertTo-Json @([Environment]::GetFolderPath('MyDocuments'))")
-    local documents = found[1] or fs.join(utils.getenv("USERPROFILE") or "C:\\", "Documents")
-    local dir = fs.join(documents, "UGI backup")
-    if not fs.exists(dir) then fs.create_directories(dir) end
-    return dir
+    return (backup_dirs())
 end
 
 local function staging(name)
@@ -157,7 +176,9 @@ function ugi_backup_export(a_state, b_appids)
             "  foreach ($f in " .. ps_list(files) .. ") { Check-Stop; Copy-Item -LiteralPath $f -Destination $grid -Force }",
             "  if (Test-Path -LiteralPath " .. ps_quote(icons) .. ") { Copy-Item -LiteralPath " .. ps_quote(icons) .. " -Destination (Join-Path $dir 'icons') -Recurse -Force }",
             "  if (Test-Path -LiteralPath " .. ps_quote(partial) .. ") { Remove-Item -LiteralPath " .. ps_quote(partial) .. " -Force }",
-            "  Compress-Archive -Path (Join-Path $dir '*') -DestinationPath " .. ps_quote(partial),
+            -- Windows' own zip writer: Compress-Archive is missing or broken on some PCs
+            "  Add-Type -AssemblyName System.IO.Compression.FileSystem",
+            "  [IO.Compression.ZipFile]::CreateFromDirectory($dir, " .. ps_quote(partial) .. ")",
             "  Check-Stop",
             "  Move-Item -LiteralPath " .. ps_quote(partial) .. " -Destination " .. ps_quote(zip) .. " -Force",
             "  Remove-Item -LiteralPath $dir -Recurse -Force",
@@ -175,13 +196,16 @@ function ugi_backup_export(a_state, b_appids)
     return cjson.encode(result)
 end
 
--- The backups in Documents\UGI backup, newest first: {"dir": "...", "files": [{"name", "path"}]}
+-- The backups in every backup folder, newest first: {"dir": "...", "files": [{"name", "path"}]}
 function ugi_backup_list()
-    local dir = backup_dir()
-    local files = {}
-    for _, entry in ipairs(fs.list(dir) or {}) do
-        if entry.is_file and entry.name:lower():match("%.zip$") then
-            files[#files + 1] = { name = entry.name, path = entry.path }
+    local dir, all = backup_dirs()
+    local files, seen = {}, {}
+    for _, folder in ipairs(all) do
+        for _, entry in ipairs(fs.list(folder) or {}) do
+            if entry.is_file and entry.name:lower():match("%.zip$") and not seen[entry.path] then
+                seen[entry.path] = true
+                files[#files + 1] = { name = entry.name, path = entry.path }
+            end
         end
     end
     table.sort(files, function(a, b) return a.name > b.name end)
@@ -317,7 +341,8 @@ end
 -- Starts the "unzip" job for a backup; ugi_backup_state then reads what it holds
 function ugi_backup_open(a_zip)
     local dir = staging("restore")
-    start_job("unzip", "  Expand-Archive -LiteralPath " .. ps_quote(a_zip) .. " -DestinationPath " .. ps_quote(dir) .. " -Force")
+    start_job("unzip", "  Add-Type -AssemblyName System.IO.Compression.FileSystem\n  [IO.Compression.ZipFile]::ExtractToDirectory("
+        .. ps_quote(a_zip) .. ", " .. ps_quote(dir) .. ")")
     return true
 end
 
