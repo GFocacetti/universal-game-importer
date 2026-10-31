@@ -3,6 +3,7 @@ import { applySync, SyncPlan } from 'importer';
 import { t } from 'i18n';
 import { launcherName } from 'steamApps';
 import { Game } from 'types';
+import { backdrop } from 'backdrop';
 
 // List of found games to confirm before importing (first install, "Scan now", new-games notice)
 export default function ReviewDialog({ plan, onClose, onDone }: { plan: SyncPlan; onClose: () => void; onDone: (added: number) => void }) {
@@ -38,7 +39,7 @@ export default function ReviewDialog({ plan, onClose, onDone }: { plan: SyncPlan
 
 
 	return (
-		<div className="ugi-overlay" onClick={busy ? undefined : onClose}>
+		<div className="ugi-overlay" {...backdrop(busy ? undefined : onClose)}>
 			<div className="ugi-dialog ugi-review" onClick={(e) => e.stopPropagation()}>
 				<h2>{plan.newGames.length ? t('review.title', { n: plan.newGames.length }) : plan.gone.length || plan.outdated.length ? t('review.nothingNewChanges') : t('review.nothingNew')}</h2>
 				<p>{t('review.intro')}</p>

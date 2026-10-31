@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { loadState } from 'backend';
 import { t } from 'i18n';
 import { Backup, CancelFlag, deleteBackup, exportBackup, listBackups, openBackupFolder, pickBackup, readBackup, removalSummary, removeEverything, restoreBackup } from 'maintenance';
+import { backdrop } from 'backdrop';
 
 // "Backup and uninstall": a .zip backup of everything UGI keeps, and the removal of all it did
 // before the plugin is uninstalled. Both changes are confirmed first.
@@ -13,7 +14,7 @@ type Confirm = { title: string; text: string; lines: string[]; button: string; d
 
 function ConfirmDialog({ confirm, onClose }: { confirm: Confirm; onClose: () => void }) {
 	return (
-		<div className="ugi-overlay" onClick={onClose}>
+		<div className="ugi-overlay" {...backdrop(onClose)}>
 			<div className="ugi-dialog" onClick={(e) => e.stopPropagation()}>
 				<h2>{confirm.title}</h2>
 				<p>{confirm.text}</p>

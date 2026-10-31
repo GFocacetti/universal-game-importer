@@ -16,8 +16,8 @@ export type Game = {
 	launch?: LaunchSettings;
 };
 
-// Set in the game's window. direct: start exe instead of the launcher, through UGI's launch helper
-// (fields: the shortcut fields for that, made by the backend). For games added by hand exe,
+// Set in the game's window. direct: start exe instead of the launcher, through UGI's launch helper.
+// For games added by hand exe,
 // start_dir and args change the shortcut itself. closed: seconds without a window before the game
 // counts as closed (launch helper only; 60 when not set).
 export type LaunchSettings = {
@@ -26,7 +26,6 @@ export type LaunchSettings = {
 	start_dir?: string;
 	args?: string;
 	closed?: number;
-	fields?: { exe: string; start_dir: string; launch_options: string };
 	// The command written by hand: used as it is, in place of everything above and the overlay switch
 	command?: { exe: string; launch_options: string };
 };

@@ -17,6 +17,7 @@ import UninstallSection from 'UninstallSection';
 import { openUrl } from 'steamApps';
 import { bigPicture, gamepadDocument } from 'location';
 import { watchGamepad } from 'gamepad';
+import { backdrop } from 'backdrop';
 
 // Big Picture draws its top bar (search, clock) and its button hints over the page: keep the page between them
 const BIG_PICTURE_BARS: React.CSSProperties = { paddingTop: 40, paddingBottom: 40, boxSizing: 'border-box' };
@@ -40,7 +41,7 @@ function ApiKeyDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 		onSaved();
 	};
 	return (
-		<div className="ugi-overlay" onClick={onClose}>
+		<div className="ugi-overlay" {...backdrop(onClose)}>
 			<div className="ugi-dialog" onClick={(e) => e.stopPropagation()}>
 				<h2>{t('apikey.title')}</h2>
 				<p>{t('apikey.intro')}</p>
@@ -82,7 +83,7 @@ function AddGameDialog({ picked, onClose, onAdded }: { picked: { path: string; n
 		}
 	};
 	return (
-		<div className="ugi-overlay" onClick={onClose}>
+		<div className="ugi-overlay" {...backdrop(onClose)}>
 			<div className="ugi-dialog" onClick={(e) => e.stopPropagation()}>
 				<h2>{t('add.title')}</h2>
 				<p>{t('add.text')}</p>

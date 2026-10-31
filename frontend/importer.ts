@@ -38,6 +38,16 @@ export const withOverlay = (options: string, overlay?: boolean) => (overlay === 
 
 const folderOf = (path: string) => path.slice(0, path.lastIndexOf('\\'));
 
+// An argument for the launch helper's command line, quoted like the backend does (see common.lua)
+const helperQuote = (value: string) => '"' + value.replace(/(\\*)"/g, (_, bs: string) => bs + bs + '\\"').replace(/(\\+)$/, '$1$1') + '"';
+
+// The helper's command starting the program itself instead of the launcher: same helper, new -Start
+function directOptions(options: string, exe: string, args: string | undefined, dir: string): string | null {
+	const at = options.indexOf(' -Start ');
+	if (at < 0) return null;
+	return `${options.slice(0, at)} -Start ${helperQuote(exe)}${args ? ` -Arguments ${helperQuote(args)}` : ''} -WaitDir ${helperQuote(dir)}`;
+}
+
 // The shortcut's fields once the user's launch settings and the overlay switch are applied
 export function launchFields(game: Pick<Game, 'launcher' | 'exe' | 'start_dir' | 'launch_options' | 'overlay' | 'launch'>) {
 	const l = game.launch ?? {};
@@ -48,7 +58,12 @@ export function launchFields(game: Pick<Game, 'launcher' | 'exe' | 'start_dir' |
 	if (game.launcher === 'manual') {
 		return { exe: l.exe || game.exe, start_dir: l.start_dir || (l.exe ? folderOf(l.exe) : game.start_dir), launch_options: l.args ?? '' };
 	}
-	const base = l.direct && l.fields ? l.fields : { exe: game.exe, start_dir: game.start_dir, launch_options: game.launch_options };
+	let base = { exe: game.exe, start_dir: game.start_dir, launch_options: game.launch_options };
+	if (l.direct && l.exe) {
+		const dir = l.start_dir || folderOf(l.exe);
+		const options = directOptions(game.launch_options, l.exe, l.args, dir);
+		if (options) base = { exe: game.exe, start_dir: dir, launch_options: options };
+	}
 	const options = usesLaunchHelper(base.launch_options) && l.closed ? `${base.launch_options} -Closed ${l.closed}` : base.launch_options;
 	return { ...base, launch_options: withOverlay(options, game.overlay) };
 }

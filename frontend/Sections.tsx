@@ -7,6 +7,7 @@ import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag
 import { isGameOrShortcut, LAUNCHER_NAMES, openUrl } from 'steamApps';
 import { CancelFlag, exportBackup } from 'maintenance';
 import { UgiState } from 'types';
+import { backdrop } from 'backdrop';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 declare const collectionStore: {
@@ -204,7 +205,7 @@ export function ImagesSection({ state, onChanged }: { state: UgiState; onChanged
 				</div>
 			)}
 			{ask && (
-				<div className="ugi-overlay" onClick={() => setAsk(null)}>
+				<div className="ugi-overlay" {...backdrop(() => setAsk(null))}>
 					<div className="ugi-dialog" onClick={(e) => e.stopPropagation()}>
 						<h2>{ask.title}</h2>
 						<p>{t('images.confirmText', { n: appids().length })}</p>

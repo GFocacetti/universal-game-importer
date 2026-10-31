@@ -9,6 +9,7 @@ import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
 import { bigPicture, libraryVisible } from 'location';
 import { watchGamepad } from 'gamepad';
+import { backdrop } from 'backdrop';
 
 export const IMAGE_TYPES: { type: ImageType; kind: ImageKind; label: () => string }[] = [
 	{ type: 0, kind: 'grid', label: () => t('image.grid') },
@@ -217,7 +218,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 
 	const current = currentType(g);
 	return (
-		<div className="ugi-overlay" onClick={onClose}>
+		<div className="ugi-overlay" {...backdrop(onClose)}>
 			<div className="ugi-win large" onClick={(e) => e.stopPropagation()}>
 				<header>
 					<h2>{name} · {t('gallery.title')}</h2>

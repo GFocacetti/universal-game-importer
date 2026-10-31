@@ -37,7 +37,7 @@ In Big Picture mode, game information and achievements sit in the "Game info" ta
 
 ### Everything else
 
-Each game has its own window in UGI's page, with tabs for its pictures, its launch settings and Steam's overlay. There you can start a DRM-free game straight from its own program instead of its launcher, add launch arguments, change its program or start folder, and choose how long after its last window closes Steam counts it as closed. Settings, imported games and pictures can be backed up and restored at any time. UGI speaks English and Italian, and follows Steam's language by default.
+Each game has its own window in UGI's page, with tabs for its pictures, its launch settings and Steam's overlay. There you can start a DRM-free game straight from its own program instead of its launcher (its achievements may then not be recorded), add launch arguments, change its program or start folder, and choose how long after its last window closes Steam counts it as closed. Settings, imported games and pictures can be backed up and restored at any time. UGI speaks English and Italian, and follows Steam's language by default.
 
 ### What works where
 

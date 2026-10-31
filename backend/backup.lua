@@ -267,19 +267,16 @@ function ugi_pick_folder()
     utils.write_file(script, string.format([[
 Add-Type -AssemblyName System.Windows.Forms
 $owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$picked = if ($dialog.ShowDialog($owner).Equals([System.Windows.Forms.DialogResult]::OK)) { $dialog.SelectedPath } else { '' }
+# The file dialog (the one "Choose" for a program uses, which comes to the front), set to pick a
+# folder: the folder dialog opens behind Steam and blocks UGI until it is closed
+$dialog = New-Object System.Windows.Forms.OpenFileDialog -Property @{ ValidateNames = $false; CheckFileExists = $false; CheckPathExists = $true; FileName = 'Folder' }
+$picked = if ($dialog.ShowDialog($owner).Equals([System.Windows.Forms.DialogResult]::OK)) { Split-Path -Parent $dialog.FileName } else { '' }
 $picked | Out-File -FilePath %s -Encoding utf8
 ]], ps_quote(out)))
     if fs.exists(out) then fs.remove(out) end
     utils.exec(string.format([[%s -STA -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File "%s"]], common.POWERSHELL, script))
     local raw = fs.exists(out) and (utils.read_file(out) or "") or ""
     return (raw:gsub("^\239\187\191", ""):gsub("^%s+", ""):gsub("%s+$", ""))
-end
-
--- The shortcut fields that start a program directly through UGI's launch helper, as JSON
-function ugi_launch_fields(a_exe, b_args, c_dir)
-    return cjson.encode(common.launch_through(tostring(a_exe or ""), tostring(b_args or ""), tostring(c_dir or "")))
 end
 
 -- Starts the "unzip" job for a backup; ugi_backup_state then reads what it holds

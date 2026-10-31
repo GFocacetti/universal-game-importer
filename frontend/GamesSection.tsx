@@ -11,6 +11,7 @@ import { applyEntry, launchFields, usesLaunchHelper } from 'importer';
 import { unquote } from 'backend';
 import { ImportedEntry, LaunchSettings, UgiState } from 'types';
 import { ImagesProgress, watchImages } from 'imagesProgress';
+import { backdrop } from 'backdrop';
 
 type Row = ImportedEntry & { id: string };
 
@@ -22,7 +23,6 @@ const MOSAIC: ImageKind[] = ['grid', 'wide', 'logo', 'hero', 'icon'];
 
 const pickProgram = callable<[], string>('ugi_pick_game');
 const pickFolder = callable<[], string>('ugi_pick_folder');
-const directFields = callable<[{ a_exe: string; b_args: string; c_dir: string }], string>('ugi_launch_fields');
 
 const DEFAULT_CLOSED = 60;
 
@@ -58,11 +58,7 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 			if (next.start_dir?.trim()) clean.start_dir = next.start_dir.trim();
 			if (next.args?.trim()) clean.args = next.args.trim();
 			if (next.closed && next.closed !== DEFAULT_CLOSED) clean.closed = Math.max(5, Math.round(next.closed));
-			if (!manual && next.direct && clean.exe) {
-				clean.direct = true;
-				const dir = clean.start_dir ?? clean.exe.slice(0, clean.exe.lastIndexOf('\\'));
-				clean.fields = JSON.parse(unquote(await directFields({ a_exe: clean.exe, b_args: clean.args ?? '', c_dir: dir })));
-			}
+			if (!manual && next.direct && clean.exe) clean.direct = true;
 			// A command written by hand is kept only when it differs from the one the settings make
 			if (next.command) {
 				const made = commandOf(clean);
@@ -86,7 +82,7 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 			setBusy(false);
 		}
 	};
-	const changed = JSON.stringify({ ...draft, fields: undefined }) !== JSON.stringify({ ...saved, fields: undefined });
+	const changed = JSON.stringify(draft) !== JSON.stringify(saved);
 	// The command shown: the one written by hand, or the one the saved settings make
 	const shown = draft.command ?? commandOf(saved);
 	const editCommand = (part: Partial<{ exe: string; launch_options: string }>) => set({ command: { ...shown, ...part } });
@@ -211,7 +207,7 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 		);
 	};
 	return (
-		<div className="ugi-overlay" onClick={onClose}>
+		<div className="ugi-overlay" {...backdrop(onClose)}>
 			<div className="ugi-win large" onClick={(e) => e.stopPropagation()}>
 				<header>
 					<div>
