@@ -79,6 +79,9 @@ export const sgdbCacheKey = (state: UgiState, appid: number) => importedKeyFor(s
 // SteamGridDB game id for a Steam app or shortcut (cached in the state)
 export async function gameIdFor(state: UgiState, appid: number): Promise<number | null> {
 	const key = sgdbCacheKey(state, appid);
+	// The game chosen in the game's window comes first
+	const chosen = state.imported[key]?.profile?.sgdb?.id;
+	if (chosen) return chosen;
 	if (state.sgdb_ids[key]) return state.sgdb_ids[key];
 	let id: number | null = null;
 	if (!isShortcut(appid)) {
@@ -103,6 +106,13 @@ export async function gameIdFor(state: UgiState, appid: number): Promise<number 
 	}
 	if (id) state.sgdb_ids[key] = id;
 	return id;
+}
+
+// SteamGridDB's games with a name like this one, with the year they came out (to choose from)
+export async function searchGames(state: UgiState, name: string): Promise<{ id: number; name: string; year?: string }[]> {
+	const res = await api(state, `search/autocomplete/${encodeURIComponent(name)}`);
+	const results: { id: number; name: string; release_date?: number }[] = res?.success && Array.isArray(res.data) ? res.data : [];
+	return results.map((r) => ({ id: r.id, name: r.name, year: r.release_date ? String(new Date(r.release_date * 1000).getFullYear()) : undefined }));
 }
 
 // Images for one type, in SteamGridDB's order. "auto" puts animated first when preferred;

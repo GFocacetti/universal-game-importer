@@ -59,9 +59,11 @@ function M.scan(enabled, paths)
         if entry.enabled then
             local custom = paths[launcher.id]
             if custom == "" then custom = nil end
-            local ok, games = pcall(launcher.discover, custom)
+            local ok, games, problems = pcall(launcher.discover, custom)
             if ok then
                 entry.count = #games
+                -- Some of the launcher's files couldn't be read: shown, and its games aren't removed
+                if type(problems) == "table" and problems.unreadable then entry.unreadable = problems.unreadable end
                 for _, game in ipairs(games) do
                     result.games[#result.games + 1] = game
                 end

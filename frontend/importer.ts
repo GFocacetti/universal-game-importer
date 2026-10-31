@@ -125,7 +125,7 @@ function findManual(game: Game, shortcuts: SteamShortcut[]): SteamShortcut | und
 // shortcut was deleted in Steam, goes too.
 export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiState, shortcuts: SteamShortcut[] = [], missing = new Set<string>()): SyncPlan {
 	const found = new Set(games.map((g) => g.id));
-	const reliable = new Set(launchers.filter((l) => !l.error).map((l) => l.id));
+	const reliable = new Set(launchers.filter((l) => !l.error && !l.unreadable).map((l) => l.id));
 	const managed = (g: Game) => {
 		const entry = state.imported[g.id];
 		return !!entry && shortcutExists(entry.appid);
@@ -147,10 +147,22 @@ export function planSync(games: Game[], launchers: LauncherStatus[], state: UgiS
 			used.add(manual.appid);
 		}
 	}
+	// The other shortcuts added in Steam by hand: offered as games added by hand ("manual:<appid>"),
+	// taken over as they are. Shortcuts of UGI's launch helper without an entry are left alone.
+	const known = new Set([...Object.values(state.imported).map((e) => e.appid), ...used]);
+	const byHand: Game[] = shortcuts
+		.filter((s) => !known.has(s.appid) && !s.launch_options.includes('ugi_launch.ps1'))
+		.map((s) => {
+			const id = `manual:${s.appid}`;
+			adopt[id] = s;
+			// Its launch options are kept as the game's arguments (a game added by hand gets them from there)
+			return { id, launcher: 'manual', name: s.name, exe: s.exe, start_dir: s.start_dir, launch_options: s.launch_options, ...(s.launch_options ? { launch: { args: s.launch_options } } : {}) };
+		});
+	const offered = [...games, ...byHand];
 	return {
 		adopt,
-		newGames: games.filter((g) => !managed(g) && !state.excluded[g.id]),
-		previouslyExcluded: games.filter((g) => !managed(g) && state.excluded[g.id]),
+		newGames: offered.filter((g) => !managed(g) && !state.excluded[g.id]),
+		previouslyExcluded: offered.filter((g) => !managed(g) && state.excluded[g.id]),
 		outdated: games.filter((g) => {
 			const entry = state.imported[g.id];
 			return !!entry && managed(g) && changed(entry, g);
@@ -204,7 +216,7 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 		if (!entry) continue;
 		const kept = { ...game, overlay: entry.overlay, launch: entry.launch };
 		applyShortcutSettings(entry.appid, kept);
-		state.imported[game.id] = entryFor(kept, entry.appid, entry.manual);
+		state.imported[game.id] = { ...entryFor(kept, entry.appid, entry.manual), ...(entry.profile ? { profile: entry.profile } : {}) };
 		updated++;
 	}
 

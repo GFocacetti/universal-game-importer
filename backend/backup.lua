@@ -198,39 +198,78 @@ function ugi_backup_delete(a_zip)
     return not fs.exists(zip)
 end
 
--- Lets the user pick a backup file anywhere (Windows' own dialog, above Steam); "" if cancelled
+-- Windows' dialogs: the backend starts one and returns at once, the frontend then asks
+-- ugi_dialog_result until it was answered (a call waiting for the user would time out after 30 seconds)
+local DIALOG_FILES = { backup = "backup_pick.json", game = "game_pick.json", folder = "folder_pick.txt" }
+
+local function dialog_out(name)
+    return fs.join(paths.data_dir(), DIALOG_FILES[name])
+end
+
+-- The dialog needs a single-threaded apartment; Start-Process: a separate process the backend doesn't wait for
+local function start_dialog(script, out)
+    if fs.exists(out) then fs.remove(out) end
+    common.run_powershell_json("dialog_start", string.format(
+        "Start-Process -FilePath %s -ArgumentList '-STA -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File \"%s\"' -WindowStyle Hidden; ConvertTo-Json @('ok')",
+        ps_quote(common.POWERSHELL), script))
+    return true
+end
+
+-- a_name: backup / game / folder. Returns {"pending":true} while the dialog is open, then
+-- {"value": ...}: the backup file, the game's JSON {"path","name"}, or the folder ("" if cancelled)
+function ugi_dialog_result(a_name)
+    local name = tostring(a_name or "")
+    if not DIALOG_FILES[name] then return cjson.encode({ value = "" }) end
+    local out = dialog_out(name)
+    if not fs.exists(out) then return '{"pending":true}' end
+    local raw = (utils.read_file(out) or ""):gsub("^\239\187\191", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    fs.remove(out)
+    local value = raw
+    if name == "backup" then
+        local ok, list = pcall(cjson.decode, raw)
+        value = ok and type(list) == "table" and tostring(list[1] or "") or ""
+    elseif name == "game" then
+        value = raw:match("^{") and raw or ""
+    end
+    return cjson.encode({ value = value })
+end
+
+-- Lets the user pick a backup file anywhere (Windows' own dialog, above Steam); answer: ugi_dialog_result("backup")
 function ugi_backup_pick()
     local dir = paths.data_dir()
     local script = fs.join(dir, "backup_pick.ps1")
-    local out = fs.join(dir, "backup_pick.json")
+    local out = dialog_out("backup")
     utils.write_file(script, string.format([[
 Add-Type -AssemblyName System.Windows.Forms
-$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }
+# An invisible window always on top, in the middle of the screen: the dialog opens over it, in
+# front of Steam (with an owner never shown, Windows may open it behind)
+$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; FormBorderStyle = 'None'; Opacity = 0; StartPosition = 'CenterScreen'; Width = 1; Height = 1 }
+$owner.Show()
+$owner.Activate()
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Filter = 'UGI backup (*.zip)|*.zip'
 $dialog.InitialDirectory = %s
 $picked = if ($dialog.ShowDialog($owner) -eq 'OK') { $dialog.FileName } else { '' }
 ConvertTo-Json @($picked) | Out-File -FilePath %s -Encoding utf8
 ]], ps_quote(backup_dir()), ps_quote(out)))
-    if fs.exists(out) then fs.remove(out) end
-    -- The dialog needs a single-threaded apartment
-    utils.exec(string.format([[%s -STA -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File "%s"]], common.POWERSHELL, script))
-    local raw = fs.exists(out) and (utils.read_file(out) or "") or ""
-    local ok, list = pcall(cjson.decode, (raw:gsub("^\239\187\191", "")))
-    return ok and type(list) == "table" and tostring(list[1] or "") or ""
+    return start_dialog(script, out)
 end
 
--- Lets the user pick a game's program (Windows' own dialog, above Steam). Returns JSON
--- {"path": "...", "name": "..."} with the name the game probably has, or "" if cancelled.
+-- Lets the user pick a game's program (Windows' own dialog, above Steam). Answer (ugi_dialog_result("game")):
+-- JSON {"path": "...", "name": "..."} with the name the game probably has, or "" if cancelled.
 -- The name: the product name written in the program, unless it is an engine's or a launcher's;
 -- otherwise the game's folder (above "bin", "Binaries\Win64" and the like); otherwise the file name.
 function ugi_pick_game()
     local dir = paths.data_dir()
     local script = fs.join(dir, "game_pick.ps1")
-    local out = fs.join(dir, "game_pick.json")
+    local out = dialog_out("game")
     utils.write_file(script, string.format([[
 Add-Type -AssemblyName System.Windows.Forms
-$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }
+# An invisible window always on top, in the middle of the screen: the dialog opens over it, in
+# front of Steam (with an owner never shown, Windows may open it behind)
+$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; FormBorderStyle = 'None'; Opacity = 0; StartPosition = 'CenterScreen'; Width = 1; Height = 1 }
+$owner.Show()
+$owner.Activate()
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Filter = 'Program (*.exe)|*.exe'
 if (-not $dialog.ShowDialog($owner).Equals([System.Windows.Forms.DialogResult]::OK)) { '' | Out-File -FilePath %s -Encoding utf8; return }
@@ -251,32 +290,28 @@ if (-not $name) {
 if (-not $name) { $name = [System.IO.Path]::GetFileNameWithoutExtension($path) }
 @{ path = $path; name = $name } | ConvertTo-Json -Compress | Out-File -FilePath %s -Encoding utf8
 ]], ps_quote(out), ps_quote(out)))
-    if fs.exists(out) then fs.remove(out) end
-    -- The dialog needs a single-threaded apartment
-    utils.exec(string.format([[%s -STA -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File "%s"]], common.POWERSHELL, script))
-    local raw = fs.exists(out) and (utils.read_file(out) or "") or ""
-    raw = raw:gsub("^\239\187\191", ""):gsub("^%s+", ""):gsub("%s+$", "")
-    return raw:match("^{") and raw or ""
+    return start_dialog(script, out)
 end
 
--- A folder chosen in Windows' folder dialog, or ""
+-- A folder chosen in Windows' dialog; answer: ugi_dialog_result("folder")
 function ugi_pick_folder()
     local dir = paths.data_dir()
     local script = fs.join(dir, "folder_pick.ps1")
-    local out = fs.join(dir, "folder_pick.txt")
+    local out = dialog_out("folder")
     utils.write_file(script, string.format([[
 Add-Type -AssemblyName System.Windows.Forms
-$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }
+# An invisible window always on top, in the middle of the screen: the dialog opens over it, in
+# front of Steam (with an owner never shown, Windows may open it behind)
+$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; FormBorderStyle = 'None'; Opacity = 0; StartPosition = 'CenterScreen'; Width = 1; Height = 1 }
+$owner.Show()
+$owner.Activate()
 # The file dialog (the one "Choose" for a program uses, which comes to the front), set to pick a
 # folder: the folder dialog opens behind Steam and blocks UGI until it is closed
 $dialog = New-Object System.Windows.Forms.OpenFileDialog -Property @{ ValidateNames = $false; CheckFileExists = $false; CheckPathExists = $true; FileName = 'Folder' }
 $picked = if ($dialog.ShowDialog($owner).Equals([System.Windows.Forms.DialogResult]::OK)) { Split-Path -Parent $dialog.FileName } else { '' }
 $picked | Out-File -FilePath %s -Encoding utf8
 ]], ps_quote(out)))
-    if fs.exists(out) then fs.remove(out) end
-    utils.exec(string.format([[%s -STA -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File "%s"]], common.POWERSHELL, script))
-    local raw = fs.exists(out) and (utils.read_file(out) or "") or ""
-    return (raw:gsub("^\239\187\191", ""):gsub("^%s+", ""):gsub("%s+$", ""))
+    return start_dialog(script, out)
 end
 
 -- Starts the "unzip" job for a backup; ugi_backup_state then reads what it holds

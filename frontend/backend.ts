@@ -81,3 +81,19 @@ export async function saveState(state: UgiState): Promise<boolean> {
 		throw err;
 	});
 }
+
+const dialogResult = callable<[{ a_name: string }], string>('ugi_dialog_result');
+
+// Opens one of Windows' dialogs through the backend and waits for the answer, however long the user
+// takes: start opens it, the answer is then asked for twice a second (10 minutes at most)
+export async function windowsDialog(start: () => Promise<unknown>, name: 'backup' | 'game' | 'folder'): Promise<string> {
+	await start();
+	for (let i = 0; i < 1200; i++) {
+		await new Promise((r) => setTimeout(r, 500));
+		try {
+			const answer = JSON.parse(unquote(await dialogResult({ a_name: name })));
+			if (!answer.pending) return String(answer.value ?? '');
+		} catch {}
+	}
+	return '';
+}

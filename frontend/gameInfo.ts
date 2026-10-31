@@ -52,7 +52,11 @@ type Screenshot = { thumb: string; full: string };
 // Bumped when the stored text changes shape: older entries are read again
 const CACHE_VERSION = 15;
 
-type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; info: GameInfo | null };
+// name: the name it was looked up with (a game renamed is looked up again); pick: the source chosen
+// in the game's window (a new choice is looked up again)
+type CacheEntry = { version?: number; fetched: number; locale: string; rawg: boolean; name?: string; pick?: string; info: GameInfo | null };
+const sameLookup = (cached: CacheEntry, name: string, pick: string | undefined) => (cached.name === undefined || cached.name === name) && cached.pick === pick;
+const usable = (cached: CacheEntry | null, locale: string, name: string, pick: string | undefined): cached is CacheEntry => !!cached && cached.locale === locale && sameLookup(cached, name, pick);
 
 const DAY = 24 * 60 * 60 * 1000;
 // Found: shown at once and read again behind it, at most every 10 minutes; not found: tried again
@@ -223,25 +227,36 @@ async function steamReviews(appid: number): Promise<Reviews | undefined> {
 	return up + down ? { percent: Math.round((100 * up) / (up + down)), total: up + down } : undefined;
 }
 
-async function fromSteam(name: string, locale: string): Promise<GameInfo | null> {
-	const lang = locale === 'it' ? 'italian' : 'english';
+const steamLang = (locale: string) => (locale === 'it' ? 'italian' : 'english');
+
+function steamSearch(name: string, locale: string): Promise<any[]> {
 	const cc = locale === 'it' ? 'IT' : 'US';
-	const search = await getJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(name)}&l=${lang}&cc=${cc}`);
-	const match = (search?.items ?? []).find((item: any) => simplifyName(String(item.name ?? '')) === simplifyName(name));
-	if (!match) return null;
-	const reviews = steamReviews(match.id).catch(() => undefined);
-	// The details are the one Steam request the client may make itself: alongside the backend's
-	const detailsUrl = `https://store.steampowered.com/api/appdetails?appids=${match.id}&l=${lang}`;
+	return getJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(name)}&l=${steamLang(locale)}&cc=${cc}`).then((search) => search?.items ?? []);
+}
+
+// The details are the one Steam request the client may make itself: alongside the backend's
+async function steamDetails(appid: number, locale: string, filters?: string): Promise<any | null> {
+	const detailsUrl = `https://store.steampowered.com/api/appdetails?appids=${appid}&l=${steamLang(locale)}${filters ? `&filters=${filters}` : ''}`;
 	const direct = await fetch(detailsUrl)
 		.then((res) => (res.ok ? res.json() : null))
 		.catch(() => null);
-	const details = (direct ?? (await getJson(detailsUrl)))?.[match.id];
-	const d = details?.success ? details.data : null;
+	const details = (direct ?? (await getJson(detailsUrl)))?.[appid];
+	return details?.success ? details.data : null;
+}
+
+async function fromSteam(name: string, locale: string): Promise<GameInfo | null> {
+	const match = (await steamSearch(name, locale)).find((item: any) => simplifyName(String(item.name ?? '')) === simplifyName(name));
+	return match ? fromSteamApp(match.id, locale) : null;
+}
+
+async function fromSteamApp(appid: number, locale: string): Promise<GameInfo | null> {
+	const reviews = steamReviews(appid).catch(() => undefined);
+	const d = await steamDetails(appid, locale);
 	if (!d || d.type !== 'game') return null;
 	const description = htmlToText(d.about_the_game || d.detailed_description || '');
 	const pegi = d.ratings?.pegi;
 	const age = Number(d.required_age) || 0;
-	const url = `https://store.steampowered.com/app/${match.id}/`;
+	const url = `https://store.steampowered.com/app/${appid}/`;
 	return {
 		source: 'steam',
 		url,
@@ -428,14 +443,21 @@ async function fromRawg(name: string, key: string, locale: string): Promise<Game
 	const match = (search?.results ?? [])
 		.filter((r: any) => simplifyName(String(r.name ?? '')) === simplifyName(name))
 		.sort((a: any, b: any) => (b.added ?? 0) - (a.added ?? 0))[0];
-	if (!match) return null;
-	const d = await getJson(`https://api.rawg.io/api/games/${match.id}?key=${encodeURIComponent(key)}`);
+	return match ? fromRawgGame(match.id, key, locale, match.short_screenshots) : null;
+}
+
+// shots: the pictures the search already gave, else asked for
+async function fromRawgGame(id: number, key: string, locale: string, shots?: any[]): Promise<GameInfo | null> {
+	const d = await getJson(`https://api.rawg.io/api/games/${id}?key=${encodeURIComponent(key)}`);
 	const description = tidy(d?.description_raw || '');
 	if (!d || !description) return null;
+	const pictures: string[] = shots
+		? shots.map((s: any) => s.image).filter(Boolean).slice(1)
+		: ((await getJson(`https://api.rawg.io/api/games/${id}/screenshots?key=${encodeURIComponent(key)}`))?.results ?? []).map((s: any) => s.image).filter(Boolean);
 	const pc = (d.platforms ?? []).find((p: any) => p?.platform?.slug === 'pc')?.requirements;
 	return {
 		source: 'rawg',
-		url: `https://rawg.io/games/${d.slug ?? match.slug}`,
+		url: `https://rawg.io/games/${d.slug ?? id}`,
 		summary: brief(description),
 		description,
 		developers: names(d.developers),
@@ -443,7 +465,7 @@ async function fromRawg(name: string, key: string, locale: string): Promise<Game
 		genres: names(d.genres),
 		links: steamTagLinks(names(d.genres)),
 		released: storeDate(d.released, locale),
-		screenshots: (match.short_screenshots ?? []).map((s: any) => s.image).filter(Boolean).slice(1).map((src: string) => ({ thumb: src, full: src })),
+		screenshots: pictures.map((src) => ({ thumb: src, full: src })),
 		header: d.background_image || undefined,
 		metacritic: d.metacritic ? { score: d.metacritic, url: d.metacritic_url || undefined } : undefined,
 		age: d.esrb_rating?.name ? { label: `ESRB ${d.esrb_rating.name}` } : undefined,
@@ -489,8 +511,15 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 	const [launcher, ...rest] = key.split(':');
 	const id = rest.join(':');
 	const store = launcherStore(state, launcher ?? '', id).catch(() => null);
-	const info =
-		(await fromSteam(name, locale)) ??
+	const chosen = state.imported[key]?.profile?.info;
+	const rawgKey = state.settings.rawg_key;
+	const info = chosen
+		? chosen.source === 'steam'
+			? await fromSteamApp(chosen.id, locale)
+			: rawgKey
+				? await fromRawgGame(chosen.id, rawgKey, locale)
+				: null
+		: (await fromSteam(name, locale)) ??
 		(launcher === 'gog' ? await fromGog(id, locale) : null) ??
 		(launcher === 'epic' ? await fromEpic(id, state.settings.launchers?.epic?.path ?? '', locale) : null) ??
 		(launcher === 'xbox' ? await fromMicrosoft(id, locale) : null) ??
@@ -500,6 +529,44 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 	info.stores = [...(own ? [own] : []), ...(info.source === 'steam' ? [{ name: 'Steam', url: info.url }] : [])];
 	return info;
 }
+
+// ---------- Choosing the game by hand ----------
+
+export type InfoCandidate = { source: 'steam' | 'rawg'; id: number; name: string; year?: string; image?: string; platforms?: string };
+
+// Steam store pages and RAWG games (with the user's key) with a name like this one, to choose
+// from in the game's window. Steam's search has no dates: each page's year is asked for.
+export async function infoCandidates(state: UgiState, name: string): Promise<InfoCandidate[]> {
+	const locale = uiLocale();
+	const key = state.settings.rawg_key;
+	const [steam, rawg] = await Promise.all([
+		steamSearch(name, locale).catch(() => []),
+		key ? getJson(`https://api.rawg.io/api/games?key=${encodeURIComponent(key)}&search=${encodeURIComponent(name)}&page_size=15`).then((r) => r?.results ?? []) : Promise.resolve([]),
+	]);
+	const steamList = await Promise.all(
+		steam.slice(0, 10).map(async (item: any): Promise<InfoCandidate> => {
+			const date = (await steamDetails(item.id, locale, 'release_date').catch(() => null))?.release_date?.date;
+			return { source: 'steam', id: item.id, name: String(item.name ?? ''), year: String(date ?? '').match(/\d{4}/)?.[0], image: item.tiny_image || undefined, platforms: 'Steam' };
+		}),
+	);
+	const rawgList = rawg.map(
+		(r: any): InfoCandidate => ({
+			source: 'rawg',
+			id: r.id,
+			name: String(r.name ?? ''),
+			year: String(r.released ?? '').slice(0, 4) || undefined,
+			image: r.background_image || undefined,
+			platforms: names((r.platforms ?? []).map((p: any) => p?.platform)).join(', ') || undefined,
+		}),
+	);
+	return [...steamList, ...rawgList];
+}
+
+// The chosen source, as the cache remembers it ("steam:12345"): undefined when automatic
+const pickOf = (state: UgiState, key: string) => {
+	const chosen = state.imported[key]?.profile?.info;
+	return chosen ? `${chosen.source}:${chosen.id}` : undefined;
+};
 
 // ---------- Cache ----------
 
@@ -522,14 +589,15 @@ function refresh(state: UgiState, key: string, name: string, locale: string, cac
 	const id = `${key}|${locale}`;
 	if (!running.has(id)) {
 		const rawg = !!state.settings.rawg_key;
+		const pick = pickOf(state, key);
 		running.set(
 			id,
 			lookup(state, key, name, locale)
 				.catch(() => null)
 				.then(async (info) => {
 					// Nothing found this time but something before: keep the old one
-					const kept = info ?? cached?.info ?? null;
-					const entry: CacheEntry = { version: CACHE_VERSION, fetched: Date.now(), locale, rawg, info: kept };
+					const kept = info ?? (cached && sameLookup(cached, name, pick) ? cached.info : null) ?? null;
+					const entry: CacheEntry = { version: CACHE_VERSION, fetched: Date.now(), locale, rawg, name, pick, info: kept };
 					memory.set(key, entry);
 					await cacheSave({ a_key: key, b_json: JSON.stringify(entry) }).catch(() => false);
 					return kept;
@@ -545,7 +613,7 @@ function refresh(state: UgiState, key: string, name: string, locale: string, cac
 export async function gameInfo(state: UgiState, key: string, name: string, changed?: (info: GameInfo | null) => void): Promise<GameInfo | null> {
 	const locale = uiLocale();
 	const cached = await readCache(key);
-	if (cached && cached.locale === locale) {
+	if (usable(cached, locale, name, pickOf(state, key))) {
 		const age = Date.now() - cached.fetched;
 		if (!cached.info) {
 			if (age < KEEP_MISSING && cached.rawg === !!state.settings.rawg_key) return null;
@@ -589,7 +657,7 @@ export function prefetchInfo(state: UgiState, keys: string[]): Promise<void> {
 			const name = state.imported[key]?.name;
 			if (!name) continue;
 			const cached = await readCache(key);
-			const info = cached && cached.locale === locale ? cached.info : await refresh(state, key, name, locale, cached).catch(() => null);
+			const info = usable(cached, locale, name, pickOf(state, key)) ? cached.info : await refresh(state, key, name, locale, cached).catch(() => null);
 			if (info) await preloadPictures(info);
 		}
 	}));

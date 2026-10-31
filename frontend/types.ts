@@ -36,6 +36,8 @@ export type LauncherStatus = {
 	enabled: boolean;
 	count: number;
 	error?: string;
+	// Some of the launcher's files couldn't be read (its games are then not removed)
+	unreadable?: number;
 	// The launcher accepts a custom folder, and whether it was found on this PC
 	supports_path?: boolean;
 	installed?: boolean;
@@ -61,6 +63,15 @@ export type ImportedEntry = {
 	// Games added in UGI's page: when (milliseconds)
 	added?: number;
 	launch?: LaunchSettings;
+	profile?: GameProfile;
+};
+
+// Chosen in the game's window when the name alone finds the wrong game: where its information
+// comes from (a Steam store page or a RAWG game) and which SteamGridDB game its images come from
+export type ProfileChoice = { id: number; name: string; year?: string };
+export type GameProfile = {
+	info?: ProfileChoice & { source: 'steam' | 'rawg' };
+	sgdb?: ProfileChoice;
 };
 
 export type ShortcutFields = { name: string; exe: string; start_dir: string; launch_options: string };

@@ -3,20 +3,21 @@ import { SteamImage } from 'SteamImage';
 import { GalleryActions, GalleryOptions, GalleryPicker, IMAGE_TYPES, useGallery } from 'Gallery';
 import { loadState, saveState } from 'backend';
 import { t } from 'i18n';
-import { missingFor } from 'sgdb';
+import { missingFor, replaceGame, searchGames } from 'sgdb';
+import { infoCandidates, InfoCandidate, prefetchInfo } from 'gameInfo';
 import { ImageKind, launcherName, launchShortcut } from 'steamApps';
 import { syncCollections } from 'collections';
 import { callable } from '@steambrew/client';
 import { applyEntry, launchFields, usesLaunchHelper } from 'importer';
-import { unquote } from 'backend';
-import { ImportedEntry, LaunchSettings, UgiState } from 'types';
+import { windowsDialog } from 'backend';
+import { GameProfile, ImportedEntry, LaunchSettings, ProfileChoice, UgiState } from 'types';
 import { ImagesProgress, watchImages } from 'imagesProgress';
 import { backdrop } from 'backdrop';
 
 type Row = ImportedEntry & { id: string };
 
 // A game's window: its pictures, how it starts, what Steam does with it
-const TABS = ['images', 'launch', 'steam'] as const;
+const TABS = ['images', 'profile', 'launch', 'steam'] as const;
 
 // The mosaic's order (the cover spans two rows)
 const MOSAIC: ImageKind[] = ['grid', 'wide', 'logo', 'hero', 'icon'];
@@ -52,12 +53,12 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 	};
 	const pickExe = async () => {
 		try {
-			const picked = JSON.parse(unquote(await pickProgram()) || 'null');
+			const picked = JSON.parse((await windowsDialog(pickProgram, 'game')) || 'null');
 			if (picked?.path) set({ exe: picked.path });
 		} catch {}
 	};
 	const pickDir = async () => {
-		const picked = unquote(await pickFolder());
+		const picked = await windowsDialog(pickFolder, 'folder');
 		if (picked) set({ start_dir: picked });
 	};
 	const save = async (next: LaunchSettings) => {
@@ -174,6 +175,129 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 	);
 }
 
+// The right game when the name alone finds another one with the same name: one list for where the
+// information comes from (Steam store pages, RAWG games), one for SteamGridDB's game (the images).
+// A choice is saved at once; a new SteamGridDB game also picks the game's images again.
+function ProfileTab({ row, onImages }: { row: Row; onImages: () => void }) {
+	const [query, setQuery] = useState(row.name);
+	const [profile, setProfile] = useState<GameProfile>(row.profile ?? {});
+	const [info, setInfo] = useState<InfoCandidate[] | null>(null);
+	const [games, setGames] = useState<ProfileChoice[] | null>(null);
+	const [keys, setKeys] = useState({ rawg: false, sgdb: false });
+	const [status, setStatus] = useState('');
+	const [busy, setBusy] = useState(false);
+	const search = async (name: string) => {
+		const state = await loadState();
+		setKeys({ rawg: !!state.settings.rawg_key, sgdb: !!state.settings.sgdb_key });
+		setInfo(null);
+		setGames(null);
+		infoCandidates(state, name).then(setInfo, () => setInfo([]));
+		if (state.settings.sgdb_key) searchGames(state, name).then(setGames, () => setGames([]));
+		else setGames([]);
+	};
+	useEffect(() => {
+		search(row.name);
+	}, []);
+	const save = async (change: (p: GameProfile) => void) => {
+		const state = await loadState();
+		const entry = state.imported[row.id];
+		if (!entry) return null;
+		const next: GameProfile = { ...(entry.profile ?? {}) };
+		change(next);
+		if (next.info || next.sgdb) entry.profile = next;
+		else delete entry.profile;
+		row.profile = entry.profile;
+		setProfile(next);
+		return state;
+	};
+	const chooseInfo = async (choice: InfoCandidate | null) => {
+		const state = await save((p) => {
+			if (choice) p.info = { source: choice.source, id: choice.id, name: choice.name, ...(choice.year ? { year: choice.year } : {}) };
+			else delete p.info;
+		});
+		if (!state) return;
+		await saveState(state);
+		setStatus(t('profile.infoDone'));
+		prefetchInfo(state, [row.id]);
+	};
+	const chooseGame = async (choice: ProfileChoice | null) => {
+		setBusy(true);
+		setStatus(t('profile.imagesBusy'));
+		try {
+			const state = await save((p) => {
+				if (choice) p.sgdb = { id: choice.id, name: choice.name, ...(choice.year ? { year: choice.year } : {}) };
+				else delete p.sgdb;
+			});
+			if (!state) return;
+			await saveState(state);
+			const n = await replaceGame(state, row.appid);
+			await saveState(state);
+			setStatus(t('profile.imagesDone', { n }));
+			onImages();
+		} catch (err) {
+			console.error('[UGI] profile images', err);
+			setStatus(t('gallery.error'));
+		} finally {
+			setBusy(false);
+		}
+	};
+	const year = (c: { year?: string }) => (c.year ? ` (${c.year})` : '');
+	const list = <T extends ProfileChoice>(items: T[] | null, chosen: ProfileChoice | undefined, same: (c: T) => boolean, choose: (c: T | null) => void, image?: (c: T) => React.ReactNode, note?: (c: T) => string) => (
+		<div className="ugi-choice-list">
+			<div className={`ugi-choice${chosen ? '' : ' on'}`} onClick={() => !busy && chosen && choose(null)}>
+				<i />
+				<span>{t('profile.auto')}</span>
+			</div>
+			{chosen && !items?.some(same) && (
+				<div className="ugi-choice on">
+					<i />
+					<span>{chosen.name}{year(chosen)}</span>
+				</div>
+			)}
+			{items === null && <p className="ugi-muted">{t('profile.loading')}</p>}
+			{items?.length === 0 && <p className="ugi-muted">{t('profile.none')}</p>}
+			{items?.map((c) => (
+				<div key={`${(c as any).source ?? 'sgdb'}:${c.id}`} className={`ugi-choice${same(c) ? ' on' : ''}`} onClick={() => !busy && !same(c) && choose(c)}>
+					<i />
+					{image?.(c)}
+					<span>
+						{c.name}{year(c)}
+						{note && <small>{note(c)}</small>}
+					</span>
+				</div>
+			))}
+		</div>
+	);
+	return (
+		<div className="ugi-win-pane">
+			<p className="ugi-muted">{t('profile.text')}</p>
+			<div className="ugi-field">
+				<input type="text" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && query.trim() && search(query.trim())} />
+				<button className="ugi-btn secondary" disabled={!query.trim()} onClick={() => search(query.trim())}>{t('profile.search')}</button>
+			</div>
+			<div className="ugi-profile">
+				<div>
+					<strong>{t('profile.info')}</strong>
+					{list(
+						info,
+						profile.info,
+						(c) => profile.info?.source === c.source && profile.info.id === c.id,
+						chooseInfo,
+						(c) => (c.image ? <img src={c.image} /> : <b />),
+						(c) => (c.source === 'steam' ? 'Steam' : `RAWG${c.platforms ? ` · ${c.platforms}` : ''}`),
+					)}
+					{!keys.rawg && <p className="ugi-muted">{t('profile.noRawg')}</p>}
+				</div>
+				<div>
+					<strong>{t('profile.images')}</strong>
+					{keys.sgdb ? list(games, profile.sgdb, (c) => profile.sgdb?.id === c.id, chooseGame) : <p className="ugi-muted">{t('profile.noSgdb')}</p>}
+				</div>
+			</div>
+			{status && <p className="ugi-muted">{status}</p>}
+		</div>
+	);
+}
+
 function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; missing: number[]; onClose: () => void; onRemoved: () => void; onImages: () => void }) {
 	const [missingNow, setMissingNow] = useState(missing);
 	const [tab, setTab] = useState<(typeof TABS)[number]>('images');
@@ -248,6 +372,7 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 						</footer>
 					</>
 				)}
+				{tab === 'profile' && <ProfileTab row={row} onImages={() => { g.reload(); refresh(); }} />}
 				{tab === 'launch' && <LaunchTab row={row} overlay={overlay} />}
 				{tab === 'steam' && (
 					<div className="ugi-win-pane">

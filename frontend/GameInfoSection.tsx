@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { AchievementsBlock } from 'Achievements';
-import { importedKeyFor, loadState } from 'backend';
+import { importedKeyFor, loadState, saveState } from 'backend';
 import { GameInfo, gameInfo, Requirement, Reviews, Video } from 'gameInfo';
 import { t } from 'i18n';
 import { gamepadDocument, gamepadWindow, mainWindowPath } from 'location';
@@ -361,7 +361,14 @@ function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHo
 		(async () => {
 			const state = await loadState();
 			const key = importedKeyFor(state, appid) ?? `manual:${appid}`;
-			const name = state.imported[key]?.name ?? appStore.GetAppOverviewByAppID(appid)?.display_name ?? '';
+			// A game added by hand goes by its name in Steam (renamed there, it is looked up again)
+			const entry = state.imported[key];
+			const inSteam = appStore.GetAppOverviewByAppID(appid)?.display_name;
+			if (entry && entry.launcher === 'manual' && inSteam && inSteam !== entry.name) {
+				entry.name = inSteam;
+				await saveState(state);
+			}
+			const name = entry?.name ?? inSteam ?? '';
 			const found = name ? await gameInfo(state, key, name, (fresh) => alive && setInfo(fresh)) : null;
 			if (alive) setInfo(found);
 		})()

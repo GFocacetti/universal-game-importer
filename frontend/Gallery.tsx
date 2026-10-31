@@ -116,7 +116,13 @@ export function useGallery(appid: number, onChanged?: () => void) {
 		if (gameId) openUrl(`https://www.steamgriddb.com/game/${gameId}`);
 	};
 
-	return { appid, state, type, setType, animated, setAnimated, images, gameId, status, busy, version, filter, setFilter, apply, reset, autoPick, clearCache, openWebsite };
+	// After the game's SteamGridDB game was chosen elsewhere: its lists and pictures again
+	const reload = () => {
+		setVersion((v) => v + 1);
+		loadState().then(setState);
+	};
+
+	return { appid, state, type, setType, animated, setAnimated, images, gameId, status, busy, version, filter, setFilter, apply, reset, autoPick, clearCache, openWebsite, reload };
 }
 
 export type GalleryModel = ReturnType<typeof useGallery>;

@@ -1,5 +1,5 @@
 import { callable } from '@steambrew/client';
-import { loadState, saveState, unquote } from 'backend';
+import { loadState, saveState, unquote, windowsDialog } from 'backend';
 import { removeCollections, syncCollections } from 'collections';
 import { setLanguage } from 'i18n';
 import { recreateShortcut, shortcutExists, SteamShortcut, steamShortcuts, unquotePath, withOverlay } from 'importer';
@@ -64,7 +64,7 @@ export const openBackupFolder = (path: string) => openFolder({ a_path: path });
 
 // Windows' file dialog: the path of the chosen backup, or "" if cancelled
 export async function pickBackup(): Promise<Backup | null> {
-	const path = unquote(await backupPick()).replace(/\\\\/g, '\\');
+	const path = (await windowsDialog(backupPick, 'backup')).replace(/\\\\/g, '\\');
 	return path ? { name: path.split('\\').pop() ?? path, path } : null;
 }
 

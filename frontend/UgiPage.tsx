@@ -10,7 +10,7 @@ import ReviewDialog from 'ReviewDialog';
 import { runScan } from 'scanner';
 import { addManualGame, SyncPlan } from 'importer';
 import { callable } from '@steambrew/client';
-import { unquote } from 'backend';
+import { windowsDialog } from 'backend';
 import Onboarding from 'Onboarding';
 import { takePendingReview } from 'pending';
 import UninstallSection from 'UninstallSection';
@@ -113,7 +113,7 @@ export default function UgiPage() {
 
 	const addGame = async () => {
 		try {
-			const raw = unquote(await pickGame());
+			const raw = await windowsDialog(pickGame, 'game');
 			const game = raw ? JSON.parse(raw) : null;
 			if (game?.path) setPicked({ path: String(game.path), name: String(game.name ?? '') });
 		} catch (err) {

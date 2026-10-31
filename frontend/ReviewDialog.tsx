@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { applySync, SyncPlan } from 'importer';
+import { loadState } from 'backend';
 import { t } from 'i18n';
 import { launcherName } from 'steamApps';
-import { Game } from 'types';
+import { Game, ImportedEntry } from 'types';
 import { backdrop } from 'backdrop';
 
 // List of found games to confirm before importing (first install, "Scan now", new-games notice)
@@ -11,6 +12,12 @@ export default function ReviewDialog({ plan, onClose, onDone }: { plan: SyncPlan
 	const apps = plan.newGames.filter((g) => g.kind === 'app');
 	const [chosen, setChosen] = useState<Set<string>>(new Set(games.filter((g) => g.kind === 'game').map((g) => g.id)));
 	const [busy, setBusy] = useState(false);
+	// The games to be removed, by name (the plan only has their ids)
+	const [gone, setGone] = useState<Record<string, ImportedEntry>>({});
+	useEffect(() => {
+		loadState().then((s) => setGone(s.imported));
+	}, []);
+	const named = (g: { name: string; launcher: string } | undefined, id: string) => (g ? `${g.name} (${launcherName(g.launcher)})` : id);
 
 	const toggle = (id: string) => {
 		const next = new Set(chosen);
@@ -46,6 +53,8 @@ export default function ReviewDialog({ plan, onClose, onDone }: { plan: SyncPlan
 				{(plan.gone.length > 0 || plan.outdated.length > 0) && (
 					<p className="ugi-muted">{t('review.changes', { gone: plan.gone.length, updated: plan.outdated.length })}</p>
 				)}
+				{plan.gone.length > 0 && <p className="ugi-muted">{t('review.goneList')}: {plan.gone.map((id) => named(gone[id], id)).join(', ')}</p>}
+				{plan.outdated.length > 0 && <p className="ugi-muted">{t('review.updatedList')}: {plan.outdated.map((g) => named(g, g.id)).join(', ')}</p>}
 				<div className="ugi-review-list">
 					{byLauncher(games).map(([launcher, list]) => (
 						<div key={launcher}>

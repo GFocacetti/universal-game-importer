@@ -193,6 +193,15 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-modes span { display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--ugi-text); }
 .ugi-modes i { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid var(--ugi-muted); box-sizing: border-box; }
 .ugi-modes span.on i { border: 4px solid var(--ugi-accent); }
+.ugi-profile { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px; }
+.ugi-choice-list { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; max-height: 340px; overflow: auto; }
+.ugi-choice { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--ugi-radius); cursor: pointer; color: var(--ugi-text); }
+.ugi-choice:hover { background: var(--ugi-bg2); }
+.ugi-choice i { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid var(--ugi-muted); box-sizing: border-box; }
+.ugi-choice.on i { border: 4px solid var(--ugi-accent); }
+.ugi-choice img, .ugi-choice b { width: 64px; height: 30px; flex: none; object-fit: cover; border-radius: 3px; background: var(--ugi-bg2); }
+.ugi-choice span { display: flex; flex-direction: column; min-width: 0; }
+.ugi-choice small { color: var(--ugi-muted); font-size: 12px; }
 .ugi-set.column > :last-child { justify-self: stretch; }
 .ugi-set .ugi-field.narrow { width: 90px; }
 .ugi-tabs { display: flex; gap: 4px; margin: 14px 0 16px; border-bottom: 1px solid var(--ugi-panel-border); }

@@ -94,6 +94,7 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 									⚠ {imported === 1 ? t('launchers.offWarningOne') : t('launchers.offWarning', { n: imported })}
 								</div>
 							)}
+							{cfg.enabled !== false && !!l.unreadable && <div className="ugi-launcher-warn">⚠ {t('launchers.unreadable', { n: l.unreadable })}</div>}
 						</div>
 						<Toggle on={cfg.enabled !== false} onChange={(v) => setEnabled(l.id, v)} />
 						<div className="ugi-opts">

@@ -22,6 +22,9 @@ M.CONHOST = [[C:\Windows\System32\conhost.exe]]
 -- instead, outside what Steam follows.
 local LAUNCH_SCRIPT = [==[
 param([string]$Start, [string]$Arguments = '', [string]$WaitDir = '', [int]$StartTimeout = 180, [int]$Closed = 60, [switch]$Detached)
+# The launchers' programs, and those already open before this start (left alone at the end)
+$launchers = 'GalaxyClient', 'EpicGamesLauncher', 'EADesktop', 'Battle.net', 'upc', 'UbisoftConnect', 'Amazon Games', 'Amazon Games UI', 'RiotClientServices', 'Riot Client', 'itch'
+$openBefore = @(Get-Process -Name $launchers -ErrorAction SilentlyContinue | ForEach-Object { $_.ProcessName } | Sort-Object -Unique)
 $created = $null
 if ($Detached) {
   if ($Start -match '^[a-z][a-z0-9+.-]*://') { $line = 'explorer.exe "' + $Start + '"'; $from = $env:SystemRoot }
@@ -35,7 +38,7 @@ if (-not $WaitDir) { exit 0 }
 $dir = $WaitDir.TrimEnd('\') + '\'
 # A process's program path, also for games running as administrator (Get-Process can't read those):
 # Windows hands it over with the "limited information" right. Compiled once beside this script.
-$ugiProcDll = Join-Path $PSScriptRoot 'UgiProc-1.dll'
+$ugiProcDll = Join-Path $PSScriptRoot 'UgiProc-2.dll'
 $ugiProcCode = @"
 using System;
 using System.Runtime.InteropServices;
@@ -44,6 +47,11 @@ public static class UgiProc {
   [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
   [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder name, ref int size);
   [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window, int command);
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr window);
+  public static void Minimize(IntPtr window) { if (!IsIconic(window)) ShowWindow(window, 6); }
+  public static void Front(IntPtr window) { SetForegroundWindow(window); }
   public static string PathOf(int pid) {
     IntPtr process = OpenProcess(0x1000, false, pid);
     if (process == IntPtr.Zero) return null;
@@ -74,18 +82,46 @@ $waited = 0
 while (-not (Get-GameProcesses) -and $waited -lt $StartTimeout) { Start-Sleep -Seconds 2; $waited += 2 }
 # Then it runs while one of its programs has a window (minimized and full screen included). Closed
 # once none has had one for Closed seconds; before the first window (loading), StartTimeout at most.
+# The launcher's window goes down (it often comes to the front as the game starts, and would stay over
+# Big Picture after the game): a few times in the game's first seconds, and once it closes.
+function Hide-Launchers {
+  if (-not $canQuery) { return }
+  Get-Process -Name $launchers -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Object { [UgiProc]::Minimize($_.MainWindowHandle) }
+}
 $seenWindow = $false
+$hidden = 0
 $without = 0
 while ($true) {
   $running = @(Get-GameProcesses)
   if (-not $running) { break }
-  if ($running | Where-Object { $_.MainWindowHandle -ne 0 }) { $seenWindow = $true; $without = 0 }
+  $window = $running | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+  if ($window) {
+    $seenWindow = $true; $without = 0
+    if ($hidden -lt 4) {
+      Hide-Launchers
+      if ($canQuery) { [UgiProc]::Front($window.MainWindowHandle) }
+      $hidden++
+    }
+  }
   else {
     $without += 3
     if ($seenWindow -and $without -ge $Closed) { break }
     if (-not $seenWindow -and $without -ge $StartTimeout) { break }
   }
   Start-Sleep -Seconds 3
+}
+Hide-Launchers
+# A launcher this start opened is closed again, gently and after a while (it may still be syncing
+# saves or achievements): as long as it runs, Steam counts it as part of the game. GOG Galaxy has its
+# own command to quit; the others are asked to close their window, like their X button.
+$openedNow = @(Get-Process -Name $launchers -ErrorAction SilentlyContinue | Where-Object { $openBefore -notcontains $_.ProcessName })
+if ($openedNow) {
+  Start-Sleep -Seconds 20
+  foreach ($launcher in $openedNow) {
+    if ($launcher.HasExited) { continue }
+    if ($launcher.ProcessName -eq 'GalaxyClient' -and $launcher.Path) { Start-Process -FilePath $launcher.Path -ArgumentList '/command=shutdown' }
+    else { [void]$launcher.CloseMainWindow() }
+  }
 }
 ]==]
 
