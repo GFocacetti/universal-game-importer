@@ -26,16 +26,30 @@ const pickFolder = callable<[], string>('ugi_pick_folder');
 
 const DEFAULT_CLOSED = 60;
 
-// How the game starts. Launcher games: through their launcher, or their own program directly; games
-// added by hand: their program, folder and arguments. Saved and applied to the shortcut at once.
+// How the game starts, in one of these ways: through its launcher (for games added by hand: their
+// program), its own program directly, or a command written by hand. Saved and applied to the shortcut.
+type Mode = 'launcher' | 'direct' | 'custom';
+const modeOf = (launch: LaunchSettings): Mode => (launch.command ? 'custom' : launch.direct ? 'direct' : 'launcher');
+
 function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 	const manual = row.launcher === 'manual';
 	const helper = usesLaunchHelper(row.launch_options);
+	const modes: Mode[] = helper && !manual ? ['launcher', 'direct', 'custom'] : ['launcher', 'custom'];
 	const [draft, setDraft] = useState<LaunchSettings>(row.launch ?? {});
 	const [saved, setSaved] = useState<LaunchSettings>(row.launch ?? {});
 	const [busy, setBusy] = useState(false);
-	// Changing a setting makes the command again from the settings
-	const set = (part: Partial<LaunchSettings>) => setDraft((d) => ({ ...d, command: undefined, ...part }));
+	const mode = modeOf(draft);
+	const set = (part: Partial<LaunchSettings>) => setDraft((d) => ({ ...d, ...part }));
+	const commandOf = (launch: LaunchSettings) => {
+		const fields = launchFields({ ...row, exe: row.exe ?? '', start_dir: row.start_dir ?? '', launch_options: row.launch_options ?? '', overlay: overlay ? undefined : false, launch: { ...launch, command: undefined } });
+		return { exe: fields.exe, launch_options: fields.launch_options };
+	};
+	// The custom command starts from the one the current way makes
+	const setMode = (next: Mode) => {
+		if (next === mode) return;
+		if (next === 'custom') set({ command: commandOf(draft) });
+		else set({ command: undefined, direct: next === 'direct' || undefined });
+	};
 	const pickExe = async () => {
 		try {
 			const picked = JSON.parse(unquote(await pickProgram()) || 'null');
@@ -46,26 +60,20 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 		const picked = unquote(await pickFolder());
 		if (picked) set({ start_dir: picked });
 	};
-	const commandOf = (launch: LaunchSettings) => {
-		const fields = launchFields({ ...row, exe: row.exe ?? '', start_dir: row.start_dir ?? '', launch_options: row.launch_options ?? '', overlay: overlay ? undefined : false, launch: { ...launch, command: undefined } });
-		return { exe: fields.exe, launch_options: fields.launch_options };
-	};
 	const save = async (next: LaunchSettings) => {
 		setBusy(true);
 		try {
 			const clean: LaunchSettings = {};
-			if (next.exe?.trim()) clean.exe = next.exe.trim();
-			if (next.start_dir?.trim()) clean.start_dir = next.start_dir.trim();
-			if (next.args?.trim()) clean.args = next.args.trim();
-			if (next.closed && next.closed !== DEFAULT_CLOSED) clean.closed = Math.max(5, Math.round(next.closed));
-			if (!manual && next.direct && clean.exe) clean.direct = true;
-			// A command written by hand is kept only when it differs from the one the settings make
-			if (next.command) {
-				const made = commandOf(clean);
-				if (next.command.exe.trim() !== made.exe || next.command.launch_options.trim() !== made.launch_options) {
-					clean.command = { exe: next.command.exe.trim(), launch_options: next.command.launch_options.trim() };
-				}
+			const nextMode = modeOf(next);
+			if (nextMode === 'custom' && next.command) {
+				clean.command = { exe: next.command.exe.trim(), launch_options: next.command.launch_options.trim() };
+			} else if (manual || nextMode === 'direct') {
+				if (next.exe?.trim()) clean.exe = next.exe.trim();
+				if (next.start_dir?.trim()) clean.start_dir = next.start_dir.trim();
+				if (next.args?.trim()) clean.args = next.args.trim();
+				if (nextMode === 'direct' && clean.exe) clean.direct = true;
 			}
+			if (helper && nextMode !== 'custom' && next.closed && next.closed !== DEFAULT_CLOSED) clean.closed = Math.max(5, Math.round(next.closed));
 			const state = await loadState();
 			const entry = state.imported[row.id];
 			if (!entry) return;
@@ -83,81 +91,83 @@ function LaunchTab({ row, overlay }: { row: Row; overlay: boolean }) {
 		}
 	};
 	const changed = JSON.stringify(draft) !== JSON.stringify(saved);
-	// The command shown: the one written by hand, or the one the saved settings make
-	const shown = draft.command ?? commandOf(saved);
-	const editCommand = (part: Partial<{ exe: string; launch_options: string }>) => set({ command: { ...shown, ...part } });
-	const program = (
-		<>
-			<div className="ugi-set compact column">
-				<strong>{t('launch.program')}</strong>
-				<div className="ugi-field">
-					<input type="text" value={draft.exe ?? ''} placeholder={manual ? row.exe : t('launch.programHint')} onChange={(e) => set({ exe: e.target.value })} />
-					<button className="ugi-btn secondary" onClick={pickExe}>{t('launch.choose')}</button>
-				</div>
-			</div>
-			<div className="ugi-set compact column">
-				<strong>{t('launch.folder')}</strong>
-				<div className="ugi-field">
-					<input type="text" value={draft.start_dir ?? ''} placeholder={t('launch.folderHint')} onChange={(e) => set({ start_dir: e.target.value })} />
-					<button className="ugi-btn secondary" onClick={pickDir}>{t('launch.choose')}</button>
-				</div>
-			</div>
-			<div className="ugi-set compact column">
-				<strong>{t('launch.args')}</strong>
-				<div className="ugi-field">
-					<input type="text" value={draft.args ?? ''} placeholder="-windowed" onChange={(e) => set({ args: e.target.value })} />
-				</div>
-			</div>
-		</>
-	);
+	const invalid = (mode === 'direct' && !draft.exe?.trim()) || (mode === 'custom' && !draft.command?.exe.trim());
+	const label = (m: Mode) => (m === 'launcher' ? (manual ? t('launch.mode.program') : t('launch.mode.launcher', { launcher: launcherName(row.launcher) })) : t(`launch.mode.${m}`));
+	const command = commandOf(draft);
 	return (
 		<div className="ugi-win-pane">
-			<div className="ugi-kv">
-				{t('detail.launcher')}: <code>{launcherName(row.launcher)}</code>
-			</div>
-			{manual ? (
-				program
-			) : helper ? (
-				<>
-					<div className="ugi-set compact">
-						<div>
-							<strong>{t('launch.direct')}</strong>
-							<small>{t('launch.directText', { launcher: launcherName(row.launcher) })}</small>
-						</div>
-						<span className={`ugi-switch${draft.direct ? ' on' : ''}`} onClick={() => set({ direct: !draft.direct })}>
-							<span className="ugi-tog" />
+			<div className="ugi-set compact column">
+				<strong>{t('launch.how')}</strong>
+				<div className="ugi-modes">
+					{modes.map((m) => (
+						<span key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>
+							<i />
+							{label(m)}
 						</span>
-					</div>
-					{draft.direct && program}
-					<div className="ugi-set compact">
-						<div>
-							<strong>{t('launch.closed')}</strong>
-							<small>{t('launch.closedText')}</small>
+					))}
+				</div>
+			</div>
+			{mode === 'launcher' && !manual && !helper && <p className="ugi-muted">{t('launch.none')}</p>}
+			{(mode === 'direct' || (mode === 'launcher' && manual)) && (
+				<>
+					<div className="ugi-set compact column">
+						<strong>{t('launch.program')}</strong>
+						<div className="ugi-field">
+							<input type="text" value={draft.exe ?? ''} placeholder={manual ? row.exe : t('launch.programHint')} onChange={(e) => set({ exe: e.target.value })} />
+							<button className="ugi-btn secondary" onClick={pickExe}>{t('launch.choose')}</button>
 						</div>
-						<div className="ugi-field narrow">
-							<input type="number" min={5} value={draft.closed ?? DEFAULT_CLOSED} onChange={(e) => set({ closed: Number(e.target.value) || DEFAULT_CLOSED })} />
+					</div>
+					<div className="ugi-set compact column">
+						<strong>{t('launch.folder')}</strong>
+						<div className="ugi-field">
+							<input type="text" value={draft.start_dir ?? ''} placeholder={t('launch.folderHint')} onChange={(e) => set({ start_dir: e.target.value })} />
+							<button className="ugi-btn secondary" onClick={pickDir}>{t('launch.choose')}</button>
+						</div>
+					</div>
+					<div className="ugi-set compact column">
+						<strong>{t('launch.args')}</strong>
+						<div className="ugi-field">
+							<input type="text" value={draft.args ?? ''} placeholder="-windowed" onChange={(e) => set({ args: e.target.value })} />
+						</div>
+					</div>
+					{mode === 'direct' && <p className="ugi-muted">⚠ {t('launch.directText', { launcher: launcherName(row.launcher) })}</p>}
+				</>
+			)}
+			{mode === 'custom' && draft.command && (
+				<>
+					<div className="ugi-set compact column">
+						<strong>{t('launch.target')}</strong>
+						<div className="ugi-field">
+							<input type="text" value={draft.command.exe} onChange={(e) => set({ command: { ...draft.command!, exe: e.target.value } })} />
+						</div>
+					</div>
+					<div className="ugi-set compact column">
+						<strong>{t('launch.options')}</strong>
+						<small>{t('launch.customText')}</small>
+						<div className="ugi-field">
+							<textarea rows={3} value={draft.command.launch_options} onChange={(e) => set({ command: { ...draft.command!, launch_options: e.target.value } })} />
 						</div>
 					</div>
 				</>
-			) : (
-				<p className="ugi-muted">{t('launch.none')}</p>
 			)}
-			<div className="ugi-set compact column">
-				<strong>{t('launch.target')}</strong>
-				<div className="ugi-field">
-					<input type="text" value={shown.exe} onChange={(e) => editCommand({ exe: e.target.value })} />
+			{helper && mode !== 'custom' && (
+				<div className="ugi-set compact">
+					<div>
+						<strong>{t('launch.closed')}</strong>
+						<small>{t('launch.closedText')}</small>
+					</div>
+					<div className="ugi-field narrow">
+						<input type="number" min={5} value={draft.closed ?? DEFAULT_CLOSED} onChange={(e) => set({ closed: Number(e.target.value) || DEFAULT_CLOSED })} />
+					</div>
 				</div>
-			</div>
-			<div className="ugi-set compact column">
-				<strong>{t('launch.options')}</strong>
-				<small>{t('launch.optionsText')}</small>
-				<div className="ugi-field">
-					<textarea rows={3} value={shown.launch_options} onChange={(e) => editCommand({ launch_options: e.target.value })} />
+			)}
+			{mode !== 'custom' && (
+				<div className="ugi-kv">
+					{t('detail.command')}: <code>{`"${command.exe}" ${command.launch_options}`.trim()}</code>
 				</div>
-			</div>
-			{saved.command && <p className="ugi-muted">{t('launch.byHand')}</p>}
+			)}
 			<div className="ugi-foot left">
-				<button className="ugi-btn primary" disabled={busy || !changed || (!!draft.direct && !draft.exe?.trim() && !draft.command) || (!!draft.command && !draft.command.exe.trim())} onClick={() => save(draft)}>{t('launch.save')}</button>
+				<button className="ugi-btn primary" disabled={busy || !changed || invalid} onClick={() => save(draft)}>{t('launch.save')}</button>
 				<button className="ugi-btn secondary" disabled={busy || !Object.keys(saved).length} onClick={() => save({})}>{t('launch.reset')}</button>
 			</div>
 		</div>

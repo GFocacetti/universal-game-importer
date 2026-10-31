@@ -189,6 +189,10 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-set .ugi-field { width: 100%; margin: 0; }
 .ugi-set.compact { grid-template-columns: 1fr auto; }
 .ugi-set.column { grid-template-columns: 1fr; gap: 6px; }
+.ugi-modes { display: flex; flex-direction: column; gap: 8px; }
+.ugi-modes span { display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--ugi-text); }
+.ugi-modes i { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid var(--ugi-muted); box-sizing: border-box; }
+.ugi-modes span.on i { border: 4px solid var(--ugi-accent); }
 .ugi-set.column > :last-child { justify-self: stretch; }
 .ugi-set .ugi-field.narrow { width: 90px; }
 .ugi-tabs { display: flex; gap: 4px; margin: 14px 0 16px; border-bottom: 1px solid var(--ugi-panel-border); }

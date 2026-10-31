@@ -33,8 +33,41 @@ if (-not $created -or $created.ReturnValue -ne 0) {
 }
 if (-not $WaitDir) { exit 0 }
 $dir = $WaitDir.TrimEnd('\') + '\'
+# A process's program path, also for games running as administrator (Get-Process can't read those):
+# Windows hands it over with the "limited information" right. Compiled once beside this script.
+$ugiProcDll = Join-Path $PSScriptRoot 'UgiProc-1.dll'
+$ugiProcCode = @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class UgiProc {
+  [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder name, ref int size);
+  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+  public static string PathOf(int pid) {
+    IntPtr process = OpenProcess(0x1000, false, pid);
+    if (process == IntPtr.Zero) return null;
+    try {
+      var name = new StringBuilder(1024);
+      int size = name.Capacity;
+      return QueryFullProcessImageName(process, 0, name, ref size) ? name.ToString() : null;
+    } finally { CloseHandle(process); }
+  }
+}
+"@
+try {
+  if (-not (Test-Path $ugiProcDll)) { Add-Type -TypeDefinition $ugiProcCode -OutputAssembly $ugiProcDll }
+  Add-Type -Path $ugiProcDll
+} catch {
+  try { Add-Type -TypeDefinition $ugiProcCode } catch {}
+}
+$canQuery = [bool]('UgiProc' -as [type])
 function Get-GameProcesses {
-  Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($dir, [System.StringComparison]::OrdinalIgnoreCase) }
+  Get-Process | Where-Object {
+    $path = if ($canQuery) { [UgiProc]::PathOf($_.Id) } else { $null }
+    if (-not $path) { $path = $_.Path }
+    $path -and $path.StartsWith($dir, [System.StringComparison]::OrdinalIgnoreCase)
+  }
 }
 # The game starts: up to StartTimeout seconds for its first program
 $waited = 0
