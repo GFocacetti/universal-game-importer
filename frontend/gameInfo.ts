@@ -50,7 +50,7 @@ export type Requirement = { label: string; value: string };
 type Screenshot = { thumb: string; full: string };
 
 // Bumped when the stored text changes shape: older entries are read again
-const CACHE_VERSION = 15;
+const CACHE_VERSION = 16;
 
 // name: the name it was looked up with (a game renamed is looked up again); pick: the source chosen
 // in the game's window (a new choice is looked up again)
