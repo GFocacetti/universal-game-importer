@@ -2,7 +2,7 @@ import { callable } from '@steambrew/client';
 import { loadState, saveState, unquote } from 'backend';
 import { removeCollections, syncCollections } from 'collections';
 import { setLanguage } from 'i18n';
-import { recreateShortcut, restoreManual, shortcutExists, SteamShortcut, steamShortcuts, unquotePath, withOverlay } from 'importer';
+import { recreateShortcut, shortcutExists, SteamShortcut, steamShortcuts, unquotePath, withOverlay } from 'importer';
 import { resetImages } from 'sgdb';
 import { isSteamApp } from 'steamApps';
 import { UgiState } from 'types';
@@ -191,11 +191,6 @@ export async function removeEverything(step: Step): Promise<{ games: number; app
 	let games = 0;
 	for (const entry of Object.values(state.imported)) {
 		if (!shortcutExists(entry.appid)) continue;
-		// A shortcut the user had made stays, as it was
-		if (entry.manual) {
-			restoreManual(entry.appid, entry.manual);
-			continue;
-		}
 		// The custom artwork files would stay behind in Steam's grid folder
 		for (const type of [0, 1, 2, 3]) SteamClient.Apps.ClearCustomArtworkForApp(entry.appid, type);
 		SteamClient.Apps.RemoveShortcut(entry.appid);

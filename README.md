@@ -17,7 +17,7 @@ Games start through their own launcher, exactly as they would from there, while 
 
 ### A library that looks after itself
 
-Install a new game and UGI tells you with a notification, ready to add it in one click. Uninstall one and it disappears from Steam; move or update one and its shortcut follows. Already added some games to Steam by hand? UGI takes them over, playtime included, and puts them back exactly as they were if it ever removes them. Every launcher can get its own collection and its own shelf on the Home page.
+Install a new game and UGI tells you with a notification, ready to add it in one click. Uninstall one and it disappears from Steam; move or update one and its shortcut follows. Already added some games to Steam by hand? UGI takes them over, playtime included, so each game shows up only once, in its launcher's collection. Every launcher can get its own collection and its own shelf on the Home page.
 
 ### Beautiful, not just present
 

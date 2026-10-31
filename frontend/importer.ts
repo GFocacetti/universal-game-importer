@@ -67,14 +67,6 @@ export function applyEntry(id: string, entry: ImportedEntry) {
 	applyShortcutSettings(entry.appid, { id, launcher: entry.launcher, name: entry.name, exe: entry.exe ?? '', start_dir: entry.start_dir ?? '', launch_options: entry.launch_options ?? '', overlay: entry.overlay, launch: entry.launch });
 }
 
-// Puts back a shortcut the user had made, as it was before UGI took it over
-export function restoreManual(appid: number, manual: ShortcutFields) {
-	SteamClient.Apps.SetShortcutName(appid, manual.name);
-	SteamClient.Apps.SetShortcutExe(appid, manual.exe);
-	SteamClient.Apps.SetShortcutStartDir(appid, manual.start_dir);
-	SteamClient.Apps.SetShortcutLaunchOptions(appid, manual.launch_options);
-}
-
 // Adds the game to Steam live, without restarting; returns the new appid
 async function addShortcut(game: Game): Promise<number> {
 	const appid = await SteamClient.Apps.AddShortcut(game.name, game.exe, game.start_dir, game.launch_options);
@@ -203,9 +195,8 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 
 	for (const id of plan.gone) {
 		const entry = state.imported[id];
-		// A shortcut the user had made stays, as it was
-		if (entry?.manual && shortcutExists(entry.appid)) restoreManual(entry.appid, entry.manual);
-		else if (entry && shortcutExists(entry.appid)) SteamClient.Apps.RemoveShortcut(entry.appid);
+		// Uninstalled (or its launcher turned off): gone from Steam, even a shortcut the user had made
+		if (entry && shortcutExists(entry.appid)) SteamClient.Apps.RemoveShortcut(entry.appid);
 		delete state.imported[id];
 		removed++;
 	}
