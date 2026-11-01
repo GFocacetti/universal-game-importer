@@ -23,6 +23,7 @@ const SOURCE_NAMES: Record<GameInfo['source'], string> = { steam: 'Steam', gog: 
 const CSS = `
 .ugi-info { container-type: inline-size; overflow-wrap: anywhere; margin: 0 0 16px; padding: 16px 20px; background: rgba(0,0,0,.2); border-radius: 3px; color: #dcdedf; font-family: "Motiva Sans", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
 .ugi-info h2.first { margin-top: 0; }
+.ugi-info .ugi-top + h2.first { margin-top: 28px; }
 .ugi-info h2 { margin: 18px 0 10px; padding-bottom: 4px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #ffffff; border-bottom: 1px solid rgba(255,255,255,.08); }
 .ugi-info-text p { margin: 0 0 10px; white-space: pre-line; text-align: justify; }
 .ugi-info-text h3 { margin: 16px 0 6px; font-size: 14px; font-weight: 700; color: #ffffff; }
@@ -812,7 +813,11 @@ function listenToStick() {
 		if (Math.abs(stickSpeed) > 0.15) delta = -stickSpeed * Math.abs(stickSpeed) * elapsed * 2.2;
 		delta += stickMoved;
 		stickMoved = 0;
-		if (big && Math.abs(delta) >= 0.5) {
+		// A UGI window open over the page (the achievements list) scrolls instead of the page
+		const pane = big?.host.ownerDocument.querySelector<HTMLElement>('.ugi-overlay .ugi-win-pane');
+		if (pane) {
+			if (Math.abs(delta) >= 0.5) pane.scrollTop += delta;
+		} else if (big && Math.abs(delta) >= 0.5) {
 			scrollPage(big.host, delta);
 			scrolled = true;
 		} else if (big && scrolled && now - lastMessage > 120) {

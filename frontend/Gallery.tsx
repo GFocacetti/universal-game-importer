@@ -1,3 +1,4 @@
+import { toaster } from '@steambrew/client';
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadState, saveState } from 'backend';
@@ -18,6 +19,14 @@ export const IMAGE_TYPES: { type: ImageType; kind: ImageKind; label: () => strin
 	{ type: 2, kind: 'logo', label: () => t('image.logo') },
 	{ type: 4, kind: 'icon', label: () => t('image.icon') },
 ];
+
+declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
+
+// A gallery closed while an image is still downloading: Steam's notifications say it is on its way
+// and when it is in place (the gallery's own status line is gone)
+let galleries = 0;
+let arriving = 0;
+const notify = (appid: number, body: string) => toaster.toast({ title: appStore.GetAppOverviewByAppID(appid)?.display_name ?? 'UGI', body, duration: 4000 });
 
 // Everything the gallery shows and does for one game: used by the gallery window (from Steam's menu)
 // and by the Images tab of a game's window in UGI's page. onChanged: after an image was applied.
@@ -40,6 +49,11 @@ export function useGallery(appid: number, onChanged?: () => void) {
 			setState(s);
 			setAnimated(!!s.settings.animated);
 		});
+		galleries++;
+		return () => {
+			galleries--;
+			if (!galleries && arriving) notify(appid, t('gallery.arriving'));
+		};
 	}, []);
 
 	// Loads the lists for all five types (their counts are shown)
@@ -77,7 +91,9 @@ export function useGallery(appid: number, onChanged?: () => void) {
 	const apply = async (image: SgdbImage) => {
 		setBusy(true);
 		setStatus(t('gallery.applying'));
-		const ok = await applyImage(appid, type, image.url);
+		arriving++;
+		const ok = await applyImage(appid, type, image.url).finally(() => arriving--);
+		if (!galleries) notify(appid, ok ? t('gallery.arrived') : t('gallery.applyFailed'));
 		setStatus(ok ? '' : t('gallery.applyFailed'));
 		changed();
 		setBusy(false);

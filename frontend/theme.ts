@@ -1,7 +1,21 @@
 // Theme tokens: every UGI screen uses these variables, so both themes stay in sync.
 // Two themes: "Steam" (default, like Steam's own screens) and "Modern".
+import { bigPicture } from 'location';
 
 type ThemeName = 'steam' | 'modern';
+
+// "Steam" in Big Picture: its greys instead of the desktop's blues (Steam's gamepad palette)
+const BIG_PICTURE: Record<string, string> = {
+	'--ugi-bg': '#23262e',
+	'--ugi-bg2': '#0e141b',
+	'--ugi-panel': 'rgba(0,0,0,.2)',
+	'--ugi-panel-border': '#3d4450',
+	'--ugi-side': '#1a1d23',
+	'--ugi-side-on': '#3d4450',
+	'--ugi-text': '#dcdedf',
+	'--ugi-muted': '#8b929a',
+	'--ugi-chip': '#3d4450',
+};
 
 const TOKENS: Record<ThemeName, Record<string, string>> = {
 	steam: {
@@ -50,7 +64,8 @@ const TOKENS: Record<ThemeName, Record<string, string>> = {
 };
 
 export function themeStyle(theme: ThemeName): Record<string, string> {
-	return TOKENS[theme] ?? TOKENS.steam;
+	const tokens = TOKENS[theme] ?? TOKENS.steam;
+	return tokens === TOKENS.steam && bigPicture() ? { ...tokens, ...BIG_PICTURE } : tokens;
 }
 
 // Shared component styles, all built on the tokens above
@@ -82,6 +97,10 @@ export const UGI_CSS = `
 .ugi-apibar b { color: var(--ugi-warn); }
 .ugi-apibar .go { margin-left: auto; color: var(--ugi-warn); font-weight: 600; white-space: nowrap; }
 .ugi-content { flex: 1; overflow: auto; padding: 16px 22px 22px; }
+/* When the controller brings an element into view, a gap like the grid's stays at the edge */
+.ugi-content, .ugi-win-pane, .ugi-drawer, .ugi-review-list, .ugi-choice-list, .ugi-mosaic { scroll-padding: 14px 0; }
+.ugi-thumbs { scroll-padding: 12px 0; }
+.ugi-picker-list { scroll-padding: 4px 0; }
 .ugi-credit { flex: none; padding: 10px 22px; text-align: center; font-size: 13px; color: var(--ugi-muted); border-top: 1px solid var(--ugi-panel-border); }
 .ugi-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 10; }
 .ugi-dialog { width: 620px; max-width: calc(100% - 32px); background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius-lg); padding: 24px 28px; }
