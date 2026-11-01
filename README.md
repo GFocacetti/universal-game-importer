@@ -21,7 +21,7 @@ Install a new game and UGI tells you with a notification, ready to add it in one
 
 ### Beautiful, not just present
 
-No more grey boxes: UGI picks a cover, a wide cover, a background, a logo and an icon from SteamGridDB for every new game. Prefer another one? "Customize (UGI)…" in the game's menu opens a gallery, animated pictures included. And it works for your whole library too, Steam games as well: fill only what's missing, replace everything, or go back to the originals, with a progress bar and a Stop button.
+No more grey boxes: UGI picks a cover, a wide cover, a background, a logo and an icon from SteamGridDB for every new game. Prefer another one? "Custom images (UGI)" in the game's menu opens a gallery, animated pictures included. And it works for your whole library too, Steam games as well: fill only what's missing, replace everything, or go back to the originals, with a progress bar and a Stop button.
 
 ### A real store page for every game
 

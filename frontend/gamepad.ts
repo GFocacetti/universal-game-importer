@@ -46,8 +46,9 @@ function activeLayer(doc: Document): HTMLElement | null {
 	return [...doc.querySelectorAll<HTMLElement>('.ugi-root')].find(visible) ?? null;
 }
 
+// data-ugi-pad: a stop for the D-pad without an action (rows of a list, so it scrolls)
 const clickable = (el: Element, win: Window): boolean =>
-	(el.matches(NATIVE) && !(el as HTMLButtonElement).disabled) || win.getComputedStyle(el).cursor === 'pointer';
+	(el.matches(NATIVE) && !(el as HTMLButtonElement).disabled) || el.hasAttribute('data-ugi-pad') || win.getComputedStyle(el).cursor === 'pointer';
 
 // The clickable elements of a layer; an element inside another clickable one (a checkbox in its label) is left out
 function targets(layer: HTMLElement): HTMLElement[] {
@@ -186,8 +187,12 @@ function onButton(doc: Document, evt: Event) {
 		case CANCEL: {
 			const active = doc.activeElement as HTMLElement | null;
 			if (active?.matches('input, textarea')) active.blur();
-			// The dialog's backdrop closes it, like a click outside; on the page itself B goes back as usual
-			else if (layer.classList.contains('ugi-overlay')) layer.click();
+			// The dialog's backdrop closes it, like a click outside (it needs the press too, as from a
+			// mouse); on the page itself B goes back as usual
+			else if (layer.classList.contains('ugi-overlay')) {
+				layer.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+				layer.click();
+			}
 			else handled = false;
 			break;
 		}

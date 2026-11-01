@@ -1,4 +1,4 @@
-// "Customize (UGI)…" entry in the library's right-click menu, opening the gallery.
+// "Custom images (UGI)" entry in the library's right-click menu, opening the gallery.
 // In Big Picture, which has no LIBRARY menu, a "UGI" entry opening the UGI page comes after it.
 // Hooking technique from steam-easygrid by luthor112 (MIT), see THIRD_PARTY_NOTICES.md
 import { afterPatch, fakeRenderComponent, findInReactTree, findInTree, findModuleByExport, MenuItem, Navigation } from '@steambrew/client';

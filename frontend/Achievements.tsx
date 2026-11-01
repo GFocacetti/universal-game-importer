@@ -1,11 +1,17 @@
-// "Achievements" section on the library page of imported games, below the game information:
-// progress, the latest unlocked, and the full list on request
+// Achievements on the library page of imported games, in the column beside the player, as Steam
+// shows them: count and bar, its rosette for a perfect game, the latest unlocked; the full
+// list opens in a window
 import { callable, toaster } from '@steambrew/client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { importedKeyFor, loadState, unquote } from 'backend';
+import { backdrop } from 'backdrop';
+import { watchGamepad } from 'gamepad';
 import { epicSandbox, xboxTitleId } from 'gameInfo';
+import { bigPicture } from 'location';
 import { Pressable } from 'Pressable';
 import { t, uiLocale } from 'i18n';
+import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
 
 const readAchievements = callable<[{ a_id: string; b_lang: string; c_extra: string }], string>('ugi_achievements');
@@ -40,14 +46,34 @@ async function extra(state: UgiState, id: string): Promise<Record<string, string
 }
 
 export const ACHIEVEMENTS_CSS = `
-.ugi-ach-bar { height: 6px; margin: 4px 0 12px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
-.ugi-ach-bar i { display: block; height: 100%; background: linear-gradient(90deg, #47bfff, #1a44c2); }
-.ugi-ach-count { color: #c6d4df; font-size: 13px; }
-.ugi-ach-recent { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-.ugi-ach-recent img { width: 48px; height: 48px; border-radius: 3px; display: block; }
-.ugi-ach-toggle { color: #66c0f4; font-size: 13px; cursor: pointer; }
-.ugi-ach-toggle:hover { color: #ffffff; }
-.ugi-ach-list { margin-top: 10px; }
+.ugi-ach { margin-top: 14px; }
+.ugi-ach-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: #ffffff; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.ugi-ach-progress { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ugi-ach-rosette { flex: none; width: 28px; height: 28px; color: #1a9fff; }
+.ugi-ach-meter { flex: 1; min-width: 0; }
+.ugi-ach-count { color: #ffffff; font-size: 13px; }
+.ugi-ach-count span { color: #8f98a0; }
+.ugi-ach-bar { height: 8px; margin-top: 5px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; }
+.ugi-ach-bar i { display: block; height: 100%; background: #1a9fff; border-radius: 4px; }
+.ugi-ach-note { color: #8f98a0; font-size: 12px; margin-bottom: 8px; }
+.ugi-ach-recent { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 8px; }
+.ugi-ach-recent > * { aspect-ratio: 1; border-radius: 2px; overflow: hidden; }
+.ugi-ach-recent img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.ugi-ach-recent img.locked { filter: grayscale(1); opacity: .5; }
+.ugi-ach-recent img.secret { filter: grayscale(1) blur(4px); opacity: .5; }
+.ugi-ach-recent > .ugi-ach-all-cell { grid-column: 6; }
+.ugi-ach-all-cell > * { width: 100%; height: 100%; }
+.ugi-ach-all { box-sizing: border-box; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 2px; background: rgba(255,255,255,.08); color: #66c0f4; font-size: 11px; line-height: 1.2; text-align: center; cursor: pointer; }
+.ugi-ach-all b { font-size: 22px; font-weight: 300; line-height: 1; }
+.ugi-ach-all:hover { background: rgba(102,192,244,.25); color: #ffffff; }
+.ugi-ach-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.ugi-ach-actions > :last-child { flex: none; }
+.ugi-ach-button { font: inherit; font-size: 12px; padding: 4px 10px; border: 0; border-radius: 2px; background: rgba(103,112,123,.25); color: #b8bcbf; cursor: pointer; }
+.ugi-ach-button:hover { background: rgba(103,112,123,.45); color: #ffffff; }
+.ugi-ach .ugi-info-source { flex: 1; min-width: 0; margin: 0; font-size: 10px; line-height: 1.3; }
+.ugi-ach-win { width: 760px; color: #dcdedf; font-family: "Motiva Sans", Arial, sans-serif; font-size: 14px; }
+.ugi-ach-win header .ugi-ach-progress, .ugi-ach-win header .ugi-ach-note { flex: 1; margin: 0; }
+.ugi-ach-win .ugi-win-pane { padding: 0 10px; }
 .ugi-ach-item { display: flex; gap: 12px; align-items: center; padding: 8px; border-top: 1px solid rgba(255,255,255,.05); }
 .ugi-ach-item img, .ugi-ach-item .ugi-ach-blank { width: 56px; height: 56px; flex: none; border-radius: 3px; background: rgba(255,255,255,.06); }
 .ugi-ach-item.locked img { filter: grayscale(1); opacity: .5; }
@@ -231,7 +257,7 @@ function Item({ item }: { item: Achievement }) {
 	const image = item.unlocked ? item.image : item.image_locked ?? item.image;
 	return (
 		<Pressable block ring onPress={hidden ? () => setRevealed(true) : undefined}>
-		<div className={`ugi-ach-item${item.unlocked ? '' : ' locked'}${hidden ? ' hidden' : ''}`} onClick={hidden ? () => setRevealed(true) : undefined}>
+		<div data-ugi-pad className={`ugi-ach-item${item.unlocked ? '' : ' locked'}${hidden ? ' hidden' : ''}`} onClick={hidden ? () => setRevealed(true) : undefined}>
 			{image && !hidden ? <img src={image} /> : <div className="ugi-ach-blank" />}
 			<div className="ugi-ach-text">
 				<b>{hidden ? t('ach.secret') : item.name}</b>
@@ -249,10 +275,96 @@ function Item({ item }: { item: Achievement }) {
 	);
 }
 
+// The list in a window over Steam, in the window of the page (Big Picture's or the desktop's);
+// in Big Picture the D-pad scrolls it and B closes it
+function openList(doc: Document, result: Result, items: Achievement[]) {
+	const host = doc.createElement('div');
+	Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '9999' });
+	doc.body.appendChild(host);
+	const root = createRoot(host);
+	const close = () => {
+		root.unmount();
+		host.remove();
+	};
+	loadState()
+		.then((state) => Object.entries(themeStyle(state.settings.theme ?? 'steam')).forEach(([k, v]) => host.style.setProperty(k, v)))
+		.catch(() => {});
+	if (bigPicture()) watchGamepad(doc);
+	root.render(
+		<div style={{ position: 'absolute', inset: 0 }}>
+			<style>{UGI_CSS + ACHIEVEMENTS_CSS}</style>
+			<div className="ugi-overlay" {...backdrop(close)}>
+				<div className="ugi-win ugi-ach-win" onClick={(e) => e.stopPropagation()}>
+					<header>
+						<h2>{t('ach.title')}</h2>
+						<Progress result={result} items={items} />
+						<button className="ugi-btn secondary" onClick={close}>✕</button>
+					</header>
+					<div className="ugi-win-pane">
+						{items.map((a) => (
+							<Item key={a.id} item={a} />
+						))}
+					</div>
+				</div>
+			</div>
+		</div>,
+	);
+}
+
+// Count and bar as in Steam's achievements panel; its rosette only with every achievement unlocked
+function Progress({ result, items }: { result: Result; items: Achievement[] }) {
+	const got = items.filter((a) => a.unlocked).length;
+	const percent = Math.floor((got / items.length) * 100);
+	if (result.signed_out) return <div className="ugi-ach-note">{t('ach.signedOut', { n: items.length })}</div>;
+	return (
+		<div className="ugi-ach-progress">
+			{got === items.length && <Rosette />}
+			<div className="ugi-ach-meter">
+				<div className="ugi-ach-count">
+					{t('ach.count', { got, n: items.length })} <span>({percent}%)</span>
+				</div>
+				<div className="ugi-ach-bar">
+					<i style={{ width: `${percent}%` }} />
+				</div>
+			</div>
+		</div>
+	);
+}
+
+const Rosette = () => (
+	<svg className="ugi-ach-rosette" viewBox="0 0 24 24" fill="currentColor">
+		<path d="M12 1l1.9 1.6 2.4-.5.9 2.3 2.3.9-.5 2.4L20.6 9.6l-1.6 1.9.5 2.4-2.3.9-.9 2.3-2.4-.5L12 18.2l-1.9-1.6-2.4.5-.9-2.3-2.3-.9.5-2.4L3.4 9.6 5 7.7l-.5-2.4 2.3-.9.9-2.3 2.4.5zm0 4.6a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
+		<path d="M8 17.6l-1.5 5.4 2.6-1.3 1.5 2.1 1.1-4.3zM16 17.6l1.5 5.4-2.6-1.3-1.5 2.1-1.1-4.3z" />
+	</svg>
+);
+
+// The ones shown beside the player, the sixth place being "All": the latest unlocked when the
+// launcher gives the time, else the rarest, else any; with fewer than five unlocked, the locked ones
+// most players have follow
+const PREVIEW = 5;
+function preview(items: Achievement[]): Achievement[] {
+	const unlocked = items
+		.filter((a) => a.unlocked && a.image)
+		.sort((a, b) => {
+			if (!!a.time !== !!b.time) return a.time ? -1 : 1;
+			if (a.time && b.time) return b.time.localeCompare(a.time);
+			return (a.rarity ?? 101) - (b.rarity ?? 101);
+		});
+	const locked = items.filter((a) => !a.unlocked && (a.image_locked ?? a.image)).sort((a, b) => (b.rarity ?? -1) - (a.rarity ?? -1));
+	return [...unlocked, ...locked].slice(0, PREVIEW);
+}
+
+function Thumb({ item }: { item: Achievement }) {
+	const secret = item.secret && !item.unlocked;
+	const title = secret ? t('ach.secret') : `${item.name}${item.description ? `\n${item.description}` : ''}`;
+	const className = item.unlocked ? '' : secret ? 'locked secret' : 'locked';
+	return <img className={className} src={item.unlocked ? item.image : item.image_locked ?? item.image} title={title} />;
+}
+
 // ready: the launcher is read only once the page's information is there; until then, the saved ones
 export function AchievementsBlock({ appid, ready }: { appid: number; ready: boolean }) {
 	const [result, setResult] = useState<Result | undefined>(undefined);
-	const [all, setAll] = useState(false);
+	const box = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		let alive = true;
@@ -281,37 +393,37 @@ export function AchievementsBlock({ appid, ready }: { appid: number; ready: bool
 
 	if (!result?.items.length) return null;
 	const items = sorted(result.items);
-	const got = items.filter((a) => a.unlocked).length;
-	const percent = Math.round((got / items.length) * 100);
-	const recent = items.filter((a) => a.unlocked && a.image).slice(0, 10);
+	const shown = preview(items);
+	const open = () => box.current && openList(box.current.ownerDocument, result, items);
 	return (
-		<div className="ugi-info">
+		<div className="ugi-ach" ref={box}>
 			<style>{ACHIEVEMENTS_CSS}</style>
-			<h2 className="first">{t('ach.title')}</h2>
-			<div className="ugi-ach-count">{result.signed_out ? t('ach.signedOut', { n: items.length }) : t('ach.progress', { got, n: items.length, p: percent })}</div>
-			<div className="ugi-ach-bar">
-				<i style={{ width: `${percent}%` }} />
+			<div className="ugi-ach-head">{t('ach.title')}</div>
+			<Progress result={result} items={items} />
+			<div className="ugi-ach-recent">
+				{shown.map((a) => (
+					<div key={a.id}>
+						<Thumb item={a} />
+					</div>
+				))}
+				{/* Always the sixth place */}
+				<div className="ugi-ach-all-cell">
+					<Pressable block onPress={open}>
+						<div className="ugi-ach-all" onClick={open}>
+							<b>+</b>
+							{t('ach.all')}
+						</div>
+					</Pressable>
+				</div>
 			</div>
-			{recent.length > 0 && (
-				<div className="ugi-ach-recent">
-					{recent.map((a) => (
-						<img key={a.id} src={a.image} title={`${a.name}${a.description ? `\n${a.description}` : ''}`} />
-					))}
-				</div>
-			)}
-			<Pressable onPress={() => setAll(!all)}>
-				<span className="ugi-ach-toggle" onClick={() => setAll(!all)}>
-					{all ? t('ach.showLess') : t('ach.showAll', { n: items.length })}
-				</span>
-			</Pressable>
-			{all && (
-				<div className="ugi-ach-list">
-					{items.map((a) => (
-						<Item key={a.id} item={a} />
-					))}
-				</div>
-			)}
-			{result.source && <div className="ugi-info-source">{t(SOURCE_TEXT[result.source])}</div>}
+			<div className="ugi-ach-actions">
+				{result.source && <div className="ugi-info-source">{t(SOURCE_TEXT[result.source])}</div>}
+				<Pressable onPress={open}>
+					<button className="ugi-ach-button" onClick={open}>
+						{t('ach.showAll')}
+					</button>
+				</Pressable>
+			</div>
 		</div>
 	);
 }

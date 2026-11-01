@@ -339,19 +339,22 @@ function SidePanels({ info }: { info: GameInfo }) {
 }
 
 // The plugin's backend does one thing at a time: the achievements (slower to read) wait until the
-// information is there, so they don't hold it up
+// information is there, so they don't hold it up. They go below the genres; without information,
+// on their own.
 function Blocks({ appid, side, top }: { appid: number; side: HTMLElement | null; top: HTMLElement | null }) {
 	const [ready, setReady] = useState(false);
+	const [noInfo, setNoInfo] = useState(false);
+	const achievements = <AchievementsBlock appid={appid} ready={ready} />;
 	return (
 		<>
 			<style>{CSS}</style>
-			<InfoBlock appid={appid} sideHost={side} topHost={top} onDone={() => setReady(true)} />
-			<AchievementsBlock appid={appid} ready={ready} />
+			<InfoBlock appid={appid} sideHost={side} topHost={top} achievements={achievements} onDone={(shown) => (setNoInfo(!shown), setReady(true))} />
+			{noInfo && <div className="ugi-info">{achievements}</div>}
 		</>
 	);
 }
 
-function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHost: HTMLElement | null; topHost: HTMLElement | null; onDone: () => void }) {
+function InfoBlock({ appid, sideHost, topHost, achievements, onDone }: { appid: number; sideHost: HTMLElement | null; topHost: HTMLElement | null; achievements: React.ReactNode; onDone: (shown: boolean) => void }) {
 	const pad = useGamepad();
 	const [info, setInfo] = useState<GameInfo | null | undefined>(undefined);
 
@@ -371,9 +374,13 @@ function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHo
 			const name = entry?.name ?? inSteam ?? '';
 			const found = name ? await gameInfo(state, key, name, (fresh) => alive && setInfo(fresh)) : null;
 			if (alive) setInfo(found);
+			return !!found;
 		})()
-			.catch(() => alive && setInfo(null))
-			.finally(onDone);
+			.catch(() => {
+				if (alive) setInfo(null);
+				return false;
+			})
+			.then(onDone);
 		return () => {
 			alive = false;
 		};
@@ -479,6 +486,7 @@ function InfoBlock({ appid, sideHost, topHost, onDone }: { appid: number; sideHo
 					</div>
 					</Group>
 				)}
+				{achievements}
 			</div>
 		</div>
 	);
