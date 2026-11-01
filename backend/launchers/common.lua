@@ -38,7 +38,7 @@ if (-not $WaitDir) { exit 0 }
 $dir = $WaitDir.TrimEnd('\') + '\'
 # A process's program path, also for games running as administrator (Get-Process can't read those):
 # Windows hands it over with the "limited information" right. Compiled once beside this script.
-$ugiProcDll = Join-Path $PSScriptRoot 'UgiProc-2.dll'
+$ugiProcDll = Join-Path $PSScriptRoot 'UgiProc-3.dll'
 $ugiProcCode = @"
 using System;
 using System.Runtime.InteropServices;
@@ -50,8 +50,25 @@ public static class UgiProc {
   [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window, int command);
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
   [DllImport("user32.dll")] static extern bool IsIconic(IntPtr window);
-  public static void Minimize(IntPtr window) { if (!IsIconic(window)) ShowWindow(window, 6); }
-  public static void Front(IntPtr window) { SetForegroundWindow(window); }
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, IntPtr pid);
+  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint from, uint to, bool attach);
+  [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr window);
+  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+  // Minimized without activating the next window (that would be Big Picture)
+  public static void Minimize(IntPtr window) { if (!IsIconic(window)) ShowWindow(window, 7); }
+  // Windows lets a background program bring a window forward only while it shares the input of the
+  // window in front
+  public static void Front(IntPtr window) {
+    IntPtr front = GetForegroundWindow();
+    if (front == window) return;
+    uint frontThread = GetWindowThreadProcessId(front, IntPtr.Zero);
+    uint me = GetCurrentThreadId();
+    bool attached = frontThread != 0 && frontThread != me && AttachThreadInput(me, frontThread, true);
+    BringWindowToTop(window);
+    SetForegroundWindow(window);
+    if (attached) AttachThreadInput(me, frontThread, false);
+  }
   public static string PathOf(int pid) {
     IntPtr process = OpenProcess(0x1000, false, pid);
     if (process == IntPtr.Zero) return null;
@@ -83,7 +100,8 @@ while (-not (Get-GameProcesses) -and $waited -lt $StartTimeout) { Start-Sleep -S
 # Then it runs while one of its programs has a window (minimized and full screen included). Closed
 # once none has had one for Closed seconds; before the first window (loading), StartTimeout at most.
 # The launcher's window goes down (it often comes to the front as the game starts, and would stay over
-# Big Picture after the game): a few times in the game's first seconds, and once it closes.
+# Big Picture after the game) and the game comes forward: a few times in the game's first 20 seconds,
+# and the launcher once more when the game closes.
 function Hide-Launchers {
   if (-not $canQuery) { return }
   Get-Process -Name $launchers -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Object { [UgiProc]::Minimize($_.MainWindowHandle) }
@@ -97,7 +115,7 @@ while ($true) {
   $window = $running | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
   if ($window) {
     $seenWindow = $true; $without = 0
-    if ($hidden -lt 4) {
+    if ($hidden -lt 7) {
       Hide-Launchers
       if ($canQuery) { [UgiProc]::Front($window.MainWindowHandle) }
       $hidden++
@@ -111,12 +129,13 @@ while ($true) {
   Start-Sleep -Seconds 3
 }
 Hide-Launchers
-# A launcher this start opened is closed again, gently and after a while (it may still be syncing
-# saves or achievements): as long as it runs, Steam counts it as part of the game. GOG Galaxy has its
-# own command to quit; the others are asked to close their window, like their X button.
+# A launcher this start opened is closed again, gently and after a few seconds (it may still be syncing
+# saves or achievements): as long as it runs, Steam counts it as part of the game, and Big Picture waits
+# on a black screen. GOG Galaxy has its own command to quit; the others are asked to close their
+# window, like their X button.
 $openedNow = @(Get-Process -Name $launchers -ErrorAction SilentlyContinue | Where-Object { $openBefore -notcontains $_.ProcessName })
 if ($openedNow) {
-  Start-Sleep -Seconds 20
+  Start-Sleep -Seconds 5
   foreach ($launcher in $openedNow) {
     if ($launcher.HasExited) { continue }
     if ($launcher.ProcessName -eq 'GalaxyClient' -and $launcher.Path) { Start-Process -FilePath $launcher.Path -ArgumentList '/command=shutdown' }
