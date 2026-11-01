@@ -366,6 +366,9 @@ export function AchievementsBlock({ appid, ready }: { appid: number; ready: bool
 	const [result, setResult] = useState<Result | undefined>(undefined);
 	const box = useRef<HTMLDivElement>(null);
 
+	// Another game's page: nothing from the previous one
+	useEffect(() => setResult(undefined), [appid]);
+
 	useEffect(() => {
 		let alive = true;
 		(async () => {
@@ -377,11 +380,11 @@ export function AchievementsBlock({ appid, ready }: { appid: number; ready: bool
 				if (alive && found) setResult((now) => now ?? found);
 				return;
 			}
+			// The saved ones at once (the information usually comes first and cuts the read above
+			// short), replaced once the launcher answers
 			const last = await saved(key);
-			if (last?.source === 'xbox' && last.fetched && Date.now() - last.fetched < XBOX_RECHECK) {
-				if (alive) setResult((now) => now ?? last);
-				return;
-			}
+			if (alive && last) setResult((now) => now ?? last);
+			if (last?.source === 'xbox' && last.fetched && Date.now() - last.fetched < XBOX_RECHECK) return;
 			const found = await load(state, key);
 			// Nothing read (offline, launcher closed): the saved ones stay
 			if (alive) setResult((now) => (found.items.length || !now ? found : now));
