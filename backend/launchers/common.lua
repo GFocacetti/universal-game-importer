@@ -25,15 +25,19 @@ param([string]$Start, [string]$Arguments = '', [string]$WaitDir = '', [int]$Star
 # The launchers' programs, and those already open before this start (left alone at the end)
 $launchers = 'GalaxyClient', 'EpicGamesLauncher', 'EADesktop', 'Battle.net', 'upc', 'UbisoftConnect', 'Amazon Games', 'Amazon Games UI', 'RiotClientServices', 'Riot Client', 'itch'
 $openBefore = @(Get-Process -Name $launchers -ErrorAction SilentlyContinue | ForEach-Object { $_.ProcessName } | Sort-Object -Unique)
-$created = $null
-if ($Detached) {
-  if ($Start -match '^[a-z][a-z0-9+.-]*://') { $line = 'explorer.exe "' + $Start + '"'; $from = $env:SystemRoot }
-  else { $line = '"' + $Start + '"' + $(if ($Arguments) { ' ' + $Arguments } else { '' }); $from = Split-Path -Parent $Start }
-  $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $line; CurrentDirectory = $from }
+$agentBefore = @(Get-Process -Name 'Agent' -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
+function Start-Game {
+  $created = $null
+  if ($Detached) {
+    if ($Start -match '^[a-z][a-z0-9+.-]*://') { $line = 'explorer.exe "' + $Start + '"'; $from = $env:SystemRoot }
+    else { $line = '"' + $Start + '"' + $(if ($Arguments) { ' ' + $Arguments } else { '' }); $from = Split-Path -Parent $Start }
+    $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $line; CurrentDirectory = $from }
+  }
+  if (-not $created -or $created.ReturnValue -ne 0) {
+    if ($Arguments) { Start-Process -FilePath $Start -ArgumentList $Arguments } else { Start-Process -FilePath $Start }
+  }
 }
-if (-not $created -or $created.ReturnValue -ne 0) {
-  if ($Arguments) { Start-Process -FilePath $Start -ArgumentList $Arguments } else { Start-Process -FilePath $Start }
-}
+Start-Game
 if (-not $WaitDir) { exit 0 }
 $dir = $WaitDir.TrimEnd('\') + '\'
 # A process's program path, also for games running as administrator (Get-Process can't read those):
@@ -94,9 +98,26 @@ function Get-GameProcesses {
     $path -and $path.StartsWith($dir, [System.StringComparison]::OrdinalIgnoreCase)
   }
 }
-# The game starts: up to StartTimeout seconds for its first program
+# The game starts: up to StartTimeout seconds for its first program, up to 20 minutes while a launcher
+# this start opened shows its window (an update or a sign-in first: the game started from there
+# afterwards is still followed). Such a launcher may only open on the first request and need it again
+# once it is ready: Battle.net as soon as its window shows; any launcher after about 20 and 45 seconds
+# without a program of the game.
 $waited = 0
-while (-not (Get-GameProcesses) -and $waited -lt $StartTimeout) { Start-Sleep -Seconds 2; $waited += 2 }
+$askedAgain = $false
+$opened = @()
+while (-not (Get-GameProcesses) -and ($waited -lt $StartTimeout -or ($waited -lt 1200 -and ($opened | Where-Object { $_.MainWindowHandle -ne 0 })))) {
+  Start-Sleep -Seconds 1; $waited += 1
+  $opened = @(Get-Process -Name $launchers -ErrorAction SilentlyContinue | Where-Object { $openBefore -notcontains $_.ProcessName })
+  if (-not $opened) { continue }
+  $ready = -not $askedAgain -and ($opened | Where-Object { $_.ProcessName -eq 'Battle.net' -and $_.MainWindowHandle -ne 0 })
+  if ($ready -or $waited -eq 20 -or $waited -eq 45) {
+    if ($ready) { Start-Sleep -Seconds 1 }
+    $askedAgain = $true
+    Start-Game
+  }
+}
+$gameStarted = [bool](Get-GameProcesses)
 # Then it runs while one of its programs has a window (minimized and full screen included). Closed
 # once none has had one for Closed seconds; before the first window (loading), StartTimeout at most.
 # The launcher's window goes down (it often comes to the front as the game starts, and would stay over
@@ -129,18 +150,30 @@ while ($true) {
   Start-Sleep -Seconds 3
 }
 Hide-Launchers
-# A launcher this start opened is closed again, gently and after a few seconds (it may still be syncing
+# A launcher this start opened is closed again, gently and after a moment (it may still be syncing
 # saves or achievements): as long as it runs, Steam counts it as part of the game, and Big Picture waits
 # on a black screen. GOG Galaxy has its own command to quit; the others are asked to close their
-# window, like their X button.
+# window, like their X button. Launchers that only sit in the system tray (Epic) ignore both, even
+# Windows' shutdown message: whatever still runs 10 seconds after the game is ended, with its helpers.
+# Battle.net's updater (Agent) outlives it and would keep the game running in Steam too.
 $openedNow = @(Get-Process -Name $launchers -ErrorAction SilentlyContinue | Where-Object { $openBefore -notcontains $_.ProcessName })
-if ($openedNow) {
-  Start-Sleep -Seconds 5
+# A game that never started (an update or a sign-in left halfway, an error) leaves the launcher as it is
+if ($openedNow -and $gameStarted) {
+  Start-Sleep -Seconds 2
   foreach ($launcher in $openedNow) {
     if ($launcher.HasExited) { continue }
     if ($launcher.ProcessName -eq 'GalaxyClient' -and $launcher.Path) { Start-Process -FilePath $launcher.Path -ArgumentList '/command=shutdown' }
     else { [void]$launcher.CloseMainWindow() }
   }
+  for ($i = 0; $i -lt 8; $i++) {
+    if (-not ($openedNow | Where-Object { $_.Refresh(); -not $_.HasExited })) { break }
+    Start-Sleep -Seconds 1
+  }
+  foreach ($launcher in $openedNow) {
+    $launcher.Refresh()
+    if (-not $launcher.HasExited) { & "$env:SystemRoot\System32\taskkill.exe" /PID $launcher.Id /T /F | Out-Null }
+  }
+  Get-Process -Name 'Agent' -ErrorAction SilentlyContinue | Where-Object { $agentBefore -notcontains $_.Id -and $_.Path -like '*Battle.net*' } | Stop-Process -Force -ErrorAction SilentlyContinue
 }
 ]==]
 
