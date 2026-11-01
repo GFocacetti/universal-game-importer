@@ -121,6 +121,14 @@ UGI is free and always will be. If it made your library a little nicer, you can 
 
 A ⭐ on GitHub helps too: it makes UGI easier for others to find.
 
+## Special thanks
+
+UGI wouldn't be what it is without:
+
+- **Yuki "manu suka" Quello vero**, for the embarrassing amount of bugs they helped track down and for all the ideas they suggested.
+- **ManuKM**, for the ideas and testing behind the Linux and Steam Deck version (still a work in progress!).
+- **The GWIBBA community**, for all the love and support for the project.
+
 ## License
 
 GNU General Public License v3.0 — see [LICENSE](LICENSE).
