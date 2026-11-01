@@ -68,7 +68,8 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 				<div><b>{t('launchers.shelf')}</b> {t('launchers.helpShelf')}</div>
 				<div><b>{t('launchers.path')}</b> {t('launchers.helpPath')}</div>
 			</div>
-			{launchers.map((l) => {
+			<div className="ugi-lgrid">
+			{[...launchers].sort((a, b) => (LAUNCHER_NAMES[a.id] ?? a.name).localeCompare(LAUNCHER_NAMES[b.id] ?? b.name)).map((l) => {
 				const cfg = state.settings.launchers?.[l.id] ?? {};
 				const info = state.collections[l.id] ?? {};
 				const hasCollection = state.settings.collections && !info.off_collection;
@@ -116,6 +117,7 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 					</div>
 				);
 			})}
+			</div>
 			<p className="ugi-muted">{t('launchers.hint')}</p>
 		</>
 	);

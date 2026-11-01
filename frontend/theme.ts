@@ -196,6 +196,9 @@ export const UGI_CSS = `
 .ugi-card { background: var(--ugi-panel); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius-lg); padding: 14px 16px; margin-bottom: 10px; }
 .ugi-card h3 { margin: 0 0 4px; font-size: 15px; color: var(--ugi-head); font-weight: 600; }
 .ugi-card p { margin: 0 0 10px; color: var(--ugi-muted); font-size: 13px; line-height: 1.45; }
+/* As many columns as fit, from one on narrow windows to four on wide ones */
+.ugi-lgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 10px; margin-bottom: 10px; }
+.ugi-lgrid > .ugi-card { margin-bottom: 0; }
 .ugi-lrow { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; }
 .ugi-launcher-help { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ugi-muted); line-height: 1.45; }
 .ugi-launcher-help b { color: var(--ugi-text); font-weight: 600; }
@@ -203,7 +206,8 @@ export const UGI_CSS = `
 div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-opts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--ugi-muted); margin-top: 6px; align-items: center; }
 .ugi-opts label { display: flex; gap: 6px; align-items: center; }
-.ugi-opts input[type=text] { background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 4px 8px; font: inherit; width: 280px; }
+.ugi-opts input[type=text] { background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 4px 8px; font: inherit; flex: 1; min-width: 0; width: auto; }
+.ugi-opts label:has(input[type=text]) { flex: 1 1 220px; }
 .ugi-select { background: var(--ugi-bg2); border: 1px solid var(--ugi-panel-border); color: var(--ugi-text); border-radius: var(--ugi-radius); padding: 7px 8px; font: inherit; }
 .ugi-tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .ugi-row-between { display: flex; justify-content: space-between; align-items: center; }

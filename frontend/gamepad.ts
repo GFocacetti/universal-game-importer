@@ -94,6 +94,21 @@ function nearest(from: HTMLElement, list: HTMLElement[], dir: number): HTMLEleme
 	return wrapped(from, list, dir === RIGHT) ?? best;
 }
 
+// The first element of the first row of the section shown beside the side menu (UGI's page; the
+// gallery's image types), whichever section of the menu the highlight is on; the only one of that
+// row may sit far right (a switch)
+function sectionTop(layer: HTMLElement, list: HTMLElement[], from: HTMLElement): HTMLElement | undefined {
+	const area = layer.querySelector('.ugi-content') ?? from.closest('.ugi-win-body');
+	const edge = from.getBoundingClientRect().right - 4;
+	const found = list
+		.filter((el) => !el.classList.contains('ugi-nav') && (!area || area.contains(el)) && el.getBoundingClientRect().left >= edge)
+		.map((el) => ({ el, r: el.getBoundingClientRect() }));
+	if (!found.length) return undefined;
+	const top = found.reduce((a, b) => (b.r.top < a.r.top ? b : a));
+	// The first row: what overlaps the topmost element vertically
+	return found.filter(({ r }) => r.top < top.r.bottom && r.bottom > top.r.top).sort((x, y) => x.r.left - y.r.left)[0]?.el;
+}
+
 // Nothing more on the row: right goes on to the first element of the next row down, left back to the
 // last of the row above, as when reading (within the same group: covers of the grid, chips of the toolbar)
 function wrapped(from: HTMLElement, list: HTMLElement[], forward: boolean): HTMLElement | undefined {
@@ -120,6 +135,9 @@ function setFocus(doc: Document, el: HTMLElement) {
 	doc.querySelectorAll(`.${FOCUS}`).forEach((old) => old.classList.remove(FOCUS));
 	el.classList.add(FOCUS);
 	focused = el;
+	// The whole card it belongs to comes into view when it fits (the switch of a launcher's card at
+	// the bottom), then the element itself in any case
+	el.closest('.ugi-card')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 	el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 	const active = doc.activeElement as HTMLElement | null;
 	if (active && active !== el && active.matches('input, textarea')) active.blur();
@@ -190,8 +208,14 @@ function onButton(doc: Document, evt: Event) {
 		case DOWN:
 		case LEFT:
 		case RIGHT: {
-			// First press: start from the selected section, else the first element
-			const next = current ? nearest(current, list, button) : (list.find((el) => el.classList.contains('on')) ?? list[0]);
+			// First press: start from the selected section, else the first element. From a section in the
+			// side menu, right goes to the top of that section; back in the side menu from the section,
+			// the highlight lands on the section shown.
+			const activeNav = list.find((el) => el.classList.contains('ugi-nav') && el.classList.contains('on'));
+			let next = !current
+				? (activeNav ?? list[0])
+				: (button === RIGHT && current.classList.contains('ugi-nav') && sectionTop(layer, list, current)) || nearest(current, list, button);
+			if (button === LEFT && current && !current.classList.contains('ugi-nav') && next?.classList.contains('ugi-nav') && activeNav) next = activeNav;
 			if (next) setFocus(doc, next);
 			break;
 		}
