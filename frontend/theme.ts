@@ -71,7 +71,7 @@ export function themeStyle(theme: ThemeName): Record<string, string> {
 // Shared component styles, all built on the tokens above
 export const UGI_CSS = `
 .ugi-pad { outline: 2px solid var(--ugi-primary) !important; outline-offset: 2px; }
-.ugi-overlay.ugi-picker { position: fixed; display: block; background: transparent; z-index: 10000; }
+.ugi-overlay.ugi-picker { position: fixed; inset: 0; display: block; background: transparent; z-index: 10000; }
 .ugi-picker-list { position: fixed; overflow-y: auto; padding: 4px; background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
 .ugi-picker-item { padding: 8px 12px; border-radius: var(--ugi-radius); cursor: pointer; white-space: nowrap; font-size: 14px; }
 .ugi-picker-item.on { color: var(--ugi-primary); }
@@ -102,8 +102,8 @@ export const UGI_CSS = `
 .ugi-thumbs { scroll-padding: 12px 0; }
 .ugi-picker-list { scroll-padding: 4px 0; }
 .ugi-credit { flex: none; padding: 10px 22px; text-align: center; font-size: 13px; color: var(--ugi-muted); border-top: 1px solid var(--ugi-panel-border); }
-.ugi-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 10; }
-.ugi-dialog { width: 620px; max-width: calc(100% - 32px); background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius-lg); padding: 24px 28px; }
+.ugi-overlay { position: absolute; inset: var(--ugi-bars, 0px) 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.ugi-dialog { width: 620px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; background: var(--ugi-bg); border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius-lg); padding: 24px 28px; }
 .ugi-dialog h2 { margin: 0 0 10px; color: var(--ugi-head); font-weight: 500; }
 .ugi-dialog p, .ugi-dialog ol { color: var(--ugi-muted); line-height: 1.6; }
 .ugi-field { display: flex; gap: 8px; margin-top: 8px; }
@@ -116,6 +116,13 @@ export const UGI_CSS = `
 .ugi-chip { padding: 6px 12px; border-radius: 999px; background: var(--ugi-chip); font-size: 13px; cursor: pointer; }
 .ugi-chip.on { background: var(--ugi-accent); color: #fff; }
 .ugi-search { flex: 1; min-width: 160px; max-width: 260px; margin-left: auto; padding: 7px 10px; border-radius: var(--ugi-radius); border: 1px solid var(--ugi-panel-border); background: var(--ugi-bg2); color: var(--ugi-text); font: inherit; }
+.ugi-zoom { display: flex; align-items: center; gap: 10px; color: var(--ugi-muted); }
+.ugi-zoom-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; cursor: pointer; border-radius: var(--ugi-radius); }
+.ugi-zoom-icon:hover { color: var(--ugi-head); }
+.ugi-zoom-track { position: relative; width: 140px; height: 4px; padding: 8px 0; background-clip: content-box; border-radius: 2px; background-color: var(--ugi-panel-border); cursor: default; touch-action: none; }
+.ugi-zoom-track i { position: absolute; left: 0; top: 8px; height: 4px; border-radius: 2px; background: var(--ugi-accent); }
+.ugi-zoom-track b { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,.5); cursor: grab; }
+.ugi-zoom-track:active b { cursor: grabbing; }
 .ugi-seg { display: flex; border: 1px solid var(--ugi-panel-border); border-radius: var(--ugi-radius); overflow: hidden; }
 .ugi-seg span { padding: 6px 10px; font-size: 13px; cursor: pointer; }
 .ugi-seg span.on { background: var(--ugi-side-on); color: var(--ugi-head); }
@@ -126,7 +133,8 @@ export const UGI_CSS = `
 .ugi-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-radius: var(--ugi-radius); background: rgba(0,0,0,.6); color: #fff; font-size: 12px; text-align: center; padding: 8px; }
 .ugi-loading .ugi-spinner { width: 28px; height: 28px; margin: 0; }
 .ugi-loading.waiting .ugi-spinner { animation-play-state: paused; opacity: .4; }
-.ugi-badge { position: absolute; top: 6px; left: 6px; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,.65); color: #fff; }
+/* Same gap from the top and both sides: never wider than the cover, a name on two lines centred */
+.ugi-badge { position: absolute; top: 6px; left: 6px; box-sizing: border-box; max-width: calc(100% - 12px); font-size: 10px; font-weight: 600; line-height: 1.3; text-align: center; overflow-wrap: anywhere; padding: 2px 6px; border-radius: 8px; background: rgba(0,0,0,.65); color: #fff; }
 .ugi-row { display: grid; grid-template-columns: 40px 1fr 140px 150px; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--ugi-radius); background: var(--ugi-panel); margin-bottom: 6px; font-size: 14px; cursor: pointer; }
 .ugi-mini { width: 40px; height: 56px; object-fit: cover; border-radius: 2px; }
 .ugi-overlay.right { justify-content: flex-end; align-items: stretch; }

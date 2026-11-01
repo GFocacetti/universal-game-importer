@@ -13,6 +13,7 @@ import { windowsDialog } from 'backend';
 import { GameProfile, ImportedEntry, LaunchSettings, ProfileChoice, UgiState } from 'types';
 import { ImagesProgress, watchImages } from 'imagesProgress';
 import { backdrop } from 'backdrop';
+import { bigPicture } from 'location';
 
 type Row = ImportedEntry & { id: string };
 
@@ -396,10 +397,67 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 	);
 }
 
+// Cover sizes of the Games grid (smallest column width). Big Picture keeps five; the desktop has one
+// more small and one more large step. The middle one is the standard in both.
+const ZOOM_PC = [80, 92, 104, 130, 165, 210, 260];
+const ZOOM_BP = [80, 104, 130, 165, 210];
+const zoomSteps = () => (bigPicture() ? ZOOM_BP : ZOOM_PC);
+const zoomDefault = () => Math.floor(zoomSteps().length / 2);
+
+const PictureIcon = ({ size }: { size: number }) => (
+	<svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor">
+		<path d="M2 2h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm0 1.5V11l3.5-3.5 2.5 2.5 2-2 3.5 3.5V3.5zM11 5a1.3 1.3 0 1 0 0 2.6A1.3 1.3 0 0 0 11 5z" />
+	</svg>
+);
+
+// Smaller covers on the left, larger on the right: a slider with one handle that snaps to the sizes
+// (dragged, or a click on the bar), and the icons step once (the way in Big Picture)
+function ZoomBar({ step, onChange }: { step: number; onChange: (step: number) => void }) {
+	const last = zoomSteps().length - 1;
+	const set = (to: number) => {
+		const next = Math.max(0, Math.min(last, to));
+		if (next !== step) onChange(next);
+	};
+	const fromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+		const r = e.currentTarget.getBoundingClientRect();
+		set(Math.round(((e.clientX - r.left) / r.width) * last));
+	};
+	const at = `${(step / last) * 100}%`;
+	return (
+		<div className="ugi-zoom">
+			<span className="ugi-zoom-icon" onClick={() => set(step - 1)}>
+				<PictureIcon size={12} />
+			</span>
+			<div
+				className="ugi-zoom-track"
+				onPointerDown={(e) => {
+					e.currentTarget.setPointerCapture(e.pointerId);
+					fromPointer(e);
+				}}
+				onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && fromPointer(e)}
+			>
+				<i style={{ width: at }} />
+				<b style={{ left: at }} />
+			</div>
+			<span className="ugi-zoom-icon" onClick={() => set(step + 1)}>
+				<PictureIcon size={18} />
+			</span>
+		</div>
+	);
+}
+
 export default function GamesSection({ state, onChanged }: { state: UgiState; onChanged: () => void }) {
 	const [filter, setFilter] = useState<string>('all');
 	const [search, setSearch] = useState('');
 	const [view, setView] = useState<'grid' | 'list'>('grid');
+	const zoomKey = bigPicture() ? 'grid_zoom_bp' : 'grid_zoom_pc';
+	const [zoom, setZoom] = useState(() => Math.min(state.settings[zoomKey] ?? zoomDefault(), zoomSteps().length - 1));
+	const changeZoom = async (step: number) => {
+		setZoom(step);
+		const s = await loadState();
+		s.settings[zoomKey] = step;
+		await saveState(s);
+	};
 	const [missing, setMissing] = useState<Record<string, number[]>>({});
 	const [open, setOpen] = useState<Row | null>(null);
 	// Bumped when images change, so the covers load again
@@ -441,6 +499,9 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 						{launcherName(l)} {rows.filter((r) => r.launcher === l).length}
 					</span>
 				))}
+			</div>
+			<div className="ugi-toolbar">
+				{view === 'grid' && <ZoomBar step={zoom} onChange={changeZoom} />}
 				<input className="ugi-search" placeholder={t('games.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
 				<div className="ugi-seg">
 					<span className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')}>{t('games.grid')}</span>
@@ -448,7 +509,7 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 				</div>
 			</div>
 			{view === 'grid' ? (
-				<div className="ugi-grid">
+				<div className="ugi-grid" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${zoomSteps()[zoom] ?? zoomSteps()[zoomDefault()]}px, 1fr))` }}>
 					{visible.map((r) => (
 						<div key={`${r.id}-${version}-${images.round}`} className="ugi-game" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-cover" label={r.name} />

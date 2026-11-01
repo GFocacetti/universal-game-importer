@@ -64,7 +64,9 @@ function targets(layer: HTMLElement): HTMLElement[] {
 	return found;
 }
 
-// The nearest target in the given direction, favouring the ones in line with the current one
+// The nearest target in the given direction. The ones in line with the current one come first (they
+// overlap it across the move: a small icon under a wide button, the far end of the same row); the
+// others only when there is none, the gap beside them counting. Centres only settle ties.
 function nearest(from: HTMLElement, list: HTMLElement[], dir: number): HTMLElement | undefined {
 	const a = from.getBoundingClientRect();
 	const ax = a.left + a.width / 2;
@@ -77,16 +79,37 @@ function nearest(from: HTMLElement, list: HTMLElement[], dir: number): HTMLEleme
 		const bx = b.left + b.width / 2;
 		const by = b.top + b.height / 2;
 		const along = dir === UP ? a.top - b.bottom : dir === DOWN ? b.top - a.bottom : dir === LEFT ? a.left - b.right : b.left - a.right;
-		const across = dir === UP || dir === DOWN ? Math.abs(bx - ax) : Math.abs(by - ay);
+		const vertical = dir === UP || dir === DOWN;
+		const gap = vertical ? Math.max(0, b.left - a.right, a.left - b.right) : Math.max(0, b.top - a.bottom, a.top - b.bottom);
+		const centres = vertical ? Math.abs(bx - ax) : Math.abs(by - ay);
 		// Only elements beyond the current one's edge (a little overlap is allowed)
 		if (along < -4) continue;
-		const score = Math.max(along, 0) + across * 3;
+		const score = (gap > 0 ? 100000 : 0) + Math.max(along, 0) + gap * 3 + centres * 0.1;
 		if (score < bestScore) {
 			bestScore = score;
 			best = el;
 		}
 	}
-	return best;
+	if (bestScore < 100000 || (dir !== LEFT && dir !== RIGHT)) return best;
+	return wrapped(from, list, dir === RIGHT) ?? best;
+}
+
+// Nothing more on the row: right goes on to the first element of the next row down, left back to the
+// last of the row above, as when reading (within the same group: covers of the grid, chips of the toolbar)
+function wrapped(from: HTMLElement, list: HTMLElement[], forward: boolean): HTMLElement | undefined {
+	const a = from.getBoundingClientRect();
+	const group = from.parentElement;
+	const ay = a.top + a.height / 2;
+	const rows = list
+		.filter((el) => el !== from && group?.contains(el))
+		.map((el) => ({ el, r: el.getBoundingClientRect() }))
+		.filter(({ r }) => (forward ? r.top >= ay : r.bottom <= ay));
+	if (!rows.length) return undefined;
+	// The closest row: the elements overlapping the nearest one vertically
+	const edge = forward ? Math.min(...rows.map(({ r }) => r.top)) : Math.max(...rows.map(({ r }) => r.bottom));
+	const row = rows.filter(({ r }) => (forward ? r.top <= edge + r.height / 2 : r.bottom >= edge - r.height / 2));
+	row.sort((x, y) => (forward ? x.r.left - y.r.left : y.r.right - x.r.right));
+	return row[0]?.el;
 }
 
 // The highlighted element, also kept here: React rewrites the class of an element whose look

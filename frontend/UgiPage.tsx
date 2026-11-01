@@ -19,8 +19,9 @@ import { bigPicture, gamepadDocument } from 'location';
 import { watchGamepad } from 'gamepad';
 import { backdrop } from 'backdrop';
 
-// Big Picture draws its top bar (search, clock) and its button hints over the page: keep the page between them
-const BIG_PICTURE_BARS: React.CSSProperties = { paddingTop: 40, paddingBottom: 40, boxSizing: 'border-box' };
+// Big Picture draws its top bar (search, clock) and its button hints over the page: keep the page, and the
+// windows opened over it (--ugi-bars), between them
+const BIG_PICTURE_BARS = { paddingTop: 40, paddingBottom: 40, boxSizing: 'border-box', '--ugi-bars': '40px' } as React.CSSProperties;
 
 type Section = 'games' | 'launchers' | 'images' | 'settings' | 'uninstall';
 

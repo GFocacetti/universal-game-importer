@@ -113,6 +113,10 @@ export type UgiSettings = {
 	language?: 'auto' | 'en' | 'it';
 	// How often to look for new games
 	check_interval?: 'off' | 'daily' | 'weekly' | 'monthly';
+	// Cover size in the Games grid, separate on the desktop and in Big Picture: a step of its sizes
+	// (the middle one unless changed)
+	grid_zoom_pc?: number;
+	grid_zoom_bp?: number;
 	// Per launcher: turned off, or a custom folder
 	launchers?: Record<string, { enabled?: boolean; path?: string }>;
 	// Gallery filters per image type ("0".. "4")
