@@ -14,6 +14,7 @@ import { GameProfile, ImportedEntry, LaunchSettings, ProfileChoice, UgiState } f
 import { ImagesProgress, watchImages } from 'imagesProgress';
 import { backdrop } from 'backdrop';
 import { bigPicture } from 'location';
+import { steamCopy } from 'steamCopies';
 
 type Row = ImportedEntry & { id: string };
 
@@ -404,6 +405,16 @@ const ZOOM_BP = [80, 104, 130, 165, 210];
 const zoomSteps = () => (bigPicture() ? ZOOM_BP : ZOOM_PC);
 const zoomDefault = () => Math.floor(zoomSteps().length / 2);
 
+// Steam's mark (wheel and piston), on games also in Steam's library
+const SteamLogo = () => (
+	<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor">
+		<circle cx="11" cy="5" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+		<circle cx="11" cy="5" r="1.4" />
+		<circle cx="5" cy="11.2" r="2.4" />
+		<path d="M8.6 7 6.2 9.6l1.1 1 2.6-2.4z" />
+	</svg>
+);
+
 const PictureIcon = ({ size }: { size: number }) => (
 	<svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor">
 		<path d="M2 2h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm0 1.5V11l3.5-3.5 2.5 2.5 2-2 3.5 3.5V3.5zM11 5a1.3 1.3 0 1 0 0 2.6A1.3 1.3 0 0 0 11 5z" />
@@ -514,7 +525,14 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 						<div key={`${r.id}-${version}-${images.round}`} className="ugi-game" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-cover" label={r.name} />
 							{loading(r)}
-							<span className="ugi-badge">{launcherName(r.launcher)}</span>
+							<div className="ugi-badges">
+								<span className="ugi-badge">{launcherName(r.launcher)}</span>
+								{!!steamCopy(r) && (
+									<span className="ugi-badge steam" title={t('games.alsoOnSteam')}>
+										<SteamLogo />
+									</span>
+								)}
+							</div>
 						</div>
 					))}
 				</div>
@@ -524,7 +542,7 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 						<div key={`${r.id}-${version}-${images.round}`} className="ugi-row" onClick={() => setOpen(r)}>
 							<SteamImage appid={r.appid} kind="grid" className="ugi-mini" />
 							<span>{r.name}</span>
-							<span className="ugi-muted">{launcherName(r.launcher)}</span>
+							<span className="ugi-muted">{launcherName(r.launcher)}{steamCopy(r) ? ` · ${t('games.alsoOnSteam')}` : ''}</span>
 							<span className="ugi-muted">{images.pending.includes(r.appid) ? t('cover.downloading') : missingOf(r).length ? t('games.imagesMissing') : t('games.imagesComplete')}</span>
 						</div>
 					))}
@@ -534,7 +552,11 @@ export default function GamesSection({ state, onChanged }: { state: UgiState; on
 				<Detail
 					row={open}
 					missing={missingOf(open)}
-					onClose={() => setOpen(null)}
+					// The page reads the settings again: a choice made in the window (its Game profile) shows on the cover
+					onClose={() => {
+						setOpen(null);
+						onChanged();
+					}}
 					onImages={() => {
 						// Steam writes the new images in the background: load the covers again once they are there
 						for (const ms of [0, 2000, 5000]) setTimeout(() => setVersion((v) => v + 1), ms);

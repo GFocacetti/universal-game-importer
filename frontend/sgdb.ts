@@ -97,7 +97,8 @@ export async function gameIdFor(state: UgiState, appid: number): Promise<number 
 			id = res?.success ? res.data?.id ?? null : null;
 		}
 	}
-	const name = appStore.GetAppOverviewByAppID(appid)?.display_name;
+	// An imported game by its own name (in Steam it may carry its launcher, when Steam has it too)
+	const name = state.imported[importedKeyFor(state, appid) ?? '']?.name ?? appStore.GetAppOverviewByAppID(appid)?.display_name;
 	if (!id && name) {
 		// Prefer a result with the same name, else SteamGridDB's best match
 		const res = await api(state, `search/autocomplete/${encodeURIComponent(name)}`);

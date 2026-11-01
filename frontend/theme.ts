@@ -133,8 +133,11 @@ export const UGI_CSS = `
 .ugi-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-radius: var(--ugi-radius); background: rgba(0,0,0,.6); color: #fff; font-size: 12px; text-align: center; padding: 8px; }
 .ugi-loading .ugi-spinner { width: 28px; height: 28px; margin: 0; }
 .ugi-loading.waiting .ugi-spinner { animation-play-state: paused; opacity: .4; }
-/* Same gap from the top and both sides: never wider than the cover, a name on two lines centred */
-.ugi-badge { position: absolute; top: 6px; left: 6px; box-sizing: border-box; max-width: calc(100% - 12px); font-size: 10px; font-weight: 600; line-height: 1.3; text-align: center; overflow-wrap: anywhere; padding: 2px 6px; border-radius: 8px; background: rgba(0,0,0,.65); color: #fff; }
+/* Same gap from the top and both sides: never wider than the cover, a name on two lines centred;
+   the Steam mark beside it on games also in Steam's library */
+.ugi-badges { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; align-items: flex-start; gap: 4px; pointer-events: none; }
+.ugi-badge { box-sizing: border-box; min-width: 0; font-size: 10px; font-weight: 600; line-height: 1.3; text-align: center; overflow-wrap: anywhere; padding: 2px 6px; border-radius: 8px; background: rgba(0,0,0,.65); color: #fff; }
+.ugi-badge.steam { flex: none; display: flex; align-items: center; padding: 3px 5px; pointer-events: auto; }
 .ugi-row { display: grid; grid-template-columns: 40px 1fr 140px 150px; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--ugi-radius); background: var(--ugi-panel); margin-bottom: 6px; font-size: 14px; cursor: pointer; }
 .ugi-mini { width: 40px; height: 56px; object-fit: cover; border-radius: 2px; }
 .ugi-overlay.right { justify-content: flex-end; align-items: stretch; }

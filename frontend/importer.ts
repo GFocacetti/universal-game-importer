@@ -5,6 +5,7 @@ import { syncCollections } from 'collections';
 import { fillMissing } from 'sgdb';
 import { prefetchInfo } from 'gameInfo';
 import { finishImages, startImages } from 'imagesProgress';
+import { nameSteamCopies, shortcutName } from 'steamCopies';
 
 // Steam client store of all library apps (global in Steam's UI context)
 declare const appStore: { GetAppOverviewByAppID(appid: number): unknown };
@@ -70,7 +71,7 @@ export function launchFields(game: Pick<Game, 'launcher' | 'exe' | 'start_dir' |
 
 function applyShortcutSettings(appid: number, game: Game) {
 	const fields = launchFields(game);
-	SteamClient.Apps.SetShortcutName(appid, game.name);
+	SteamClient.Apps.SetShortcutName(appid, shortcutName(game));
 	SteamClient.Apps.SetShortcutExe(appid, quote(fields.exe));
 	SteamClient.Apps.SetShortcutStartDir(appid, quote(fields.start_dir));
 	SteamClient.Apps.SetShortcutLaunchOptions(appid, fields.launch_options);
@@ -229,6 +230,8 @@ export async function applySync(plan: SyncPlan, chosen: Set<string>): Promise<{ 
 	}
 
 	await syncCollections(state);
+	// Games also in Steam's library show their launcher in their name (or lose it)
+	nameSteamCopies(state);
 	await saveState(state);
 
 	// New games get their images when a SteamGridDB key is set, in the background:

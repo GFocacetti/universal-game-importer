@@ -1,5 +1,6 @@
 // "About this game" section in the library page of imported games. Steam shows a dashed box there
 // ("some detailed information is not available for non-Steam shortcuts"): UGI's block takes its place.
+import { Navigation } from '@steambrew/client';
 import Hls from 'hls.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -12,6 +13,7 @@ import { gamepadDocument, gamepadWindow, mainWindowPath } from 'location';
 import { mainDocument } from 'overlay';
 import { GamepadMode, Group, Pressable, Row, useGamepad } from 'Pressable';
 import { imageUrls, isShortcut, openUrl } from 'steamApps';
+import { steamCopy } from 'steamCopies';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 
@@ -49,6 +51,7 @@ const CSS = `
 .ugi-chip:hover { background: #67c1f5; color: #ffffff; }
 .ugi-chip.plain { cursor: default; }
 .ugi-chip.plain:hover { background: rgba(103,193,245,.2); color: #67c1f5; }
+.ugi-copy { margin-top: 10px; color: #8f98a0; font-size: 12px; }
 .ugi-req { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 13px; }
 .ugi-req h4 { margin: 0 0 6px; color: #ffffff; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
 .ugi-req div { margin-bottom: 4px; color: #acb2b8; }
@@ -358,15 +361,19 @@ function Blocks({ appid, side, top }: { appid: number; side: HTMLElement | null;
 function InfoBlock({ appid, sideHost, topHost, achievements, onDone }: { appid: number; sideHost: HTMLElement | null; topHost: HTMLElement | null; achievements: React.ReactNode; onDone: (shown: boolean) => void }) {
 	const pad = useGamepad();
 	const [info, setInfo] = useState<GameInfo | null | undefined>(undefined);
+	// The same game in Steam's library, linked below the genres
+	const [copy, setCopy] = useState<number | undefined>(undefined);
 
 	useEffect(() => {
 		let alive = true;
 		setInfo(undefined);
+		setCopy(undefined);
 		(async () => {
 			const state = await loadState();
 			const key = importedKeyFor(state, appid) ?? `manual:${appid}`;
 			// A game added by hand goes by its name in Steam (renamed there, it is looked up again)
 			const entry = state.imported[key];
+			if (entry && alive) setCopy(steamCopy(entry));
 			const inSteam = appStore.GetAppOverviewByAppID(appid)?.display_name;
 			if (entry && entry.launcher === 'manual' && inSteam && inSteam !== entry.name) {
 				entry.name = inSteam;
@@ -486,6 +493,14 @@ function InfoBlock({ appid, sideHost, topHost, achievements, onDone }: { appid: 
 						)}
 					</div>
 					</Group>
+				)}
+				{copy && (
+					<div className="ugi-copy">
+						{t('info.alsoOnSteam')}{' '}
+						<Pressable onPress={() => Navigation.Navigate(`/library/app/${copy}`)}>
+							<a onClick={() => Navigation.Navigate(`/library/app/${copy}`)}>{t('info.openSteamCopy')}</a>
+						</Pressable>
+					</div>
 				)}
 				{achievements}
 			</div>
