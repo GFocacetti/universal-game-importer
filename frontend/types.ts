@@ -109,8 +109,8 @@ export type UgiSettings = {
 	// Include WebP images (on by default, can be turned off)
 	webp?: boolean;
 	theme?: 'steam' | 'modern';
-	// 'auto' follows Steam's language
-	language?: 'auto' | 'en' | 'it';
+	// 'auto' follows Steam's language; else the code of a language in i18n's LANGUAGES
+	language?: string;
 	// How often to look for new games
 	check_interval?: 'off' | 'daily' | 'weekly' | 'monthly';
 	// Cover size in the Games grid, separate on the desktop and in Big Picture: a step of its sizes

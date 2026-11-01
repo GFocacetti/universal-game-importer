@@ -1,7 +1,7 @@
 import { callable } from '@steambrew/client';
 import { unquote } from 'backend';
 import { simplifyName } from 'steamApps';
-import { uiLocale } from 'i18n';
+import { LANGUAGES, uiLocale } from 'i18n';
 import { UgiState } from 'types';
 
 // Description, developer, genres... of an imported game, for its library page.
@@ -227,10 +227,13 @@ async function steamReviews(appid: number): Promise<Reviews | undefined> {
 	return up + down ? { percent: Math.round((100 * up) / (up + down)), total: up + down } : undefined;
 }
 
-const steamLang = (locale: string) => (locale === 'it' ? 'italian' : 'english');
+// locale: the UI language's tag ('it-IT'). Steam's store wants its own language names; the store region
+// stays the US (Italy for Italian): only the texts follow the language.
+const steamLang = (locale: string) => LANGUAGES.find((l) => l.tag === locale)?.steam ?? 'english';
+const region = (locale: string) => (locale === 'it-IT' ? 'IT' : 'US');
 
 function steamSearch(name: string, locale: string): Promise<any[]> {
-	const cc = locale === 'it' ? 'IT' : 'US';
+	const cc = region(locale);
 	return getJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(name)}&l=${steamLang(locale)}&cc=${cc}`).then((search) => search?.items ?? []);
 }
 
@@ -284,7 +287,10 @@ async function fromSteamApp(appid: number, locale: string): Promise<GameInfo | n
 }
 
 async function fromGog(id: string, locale: string): Promise<GameInfo | null> {
-	const d = await getJson(`https://api.gog.com/v2/games/${encodeURIComponent(id)}?locale=${locale === 'it' ? 'it-IT' : 'en-US'}`);
+	// GOG has only some languages: English for the others
+	const gog = (tag: string) => getJson(`https://api.gog.com/v2/games/${encodeURIComponent(id)}?locale=${tag}`);
+	const first = await gog(locale);
+	const d = first?._embedded || locale === 'en-US' ? first : await gog('en-US');
 	if (!d?._embedded) return null;
 	const e = d._embedded;
 	const description = htmlToText(d.description || '');
@@ -340,7 +346,7 @@ const microsoftProducts = new Map<string, Promise<any | null>>();
 
 function microsoftProduct(id: string, locale: string): Promise<any | null> {
 	const family = id.split('!')[0] ?? '';
-	const market = locale === 'it' ? 'market=IT&languages=it-IT,en-US' : 'market=US&languages=en-US';
+	const market = `market=${region(locale)}&languages=${locale === 'en-US' ? 'en-US' : `${locale},en-US`}`;
 	const key = `${family}|${market}`;
 	if (!microsoftProducts.has(key)) {
 		microsoftProducts.set(
@@ -399,10 +405,16 @@ async function epicSlug(appName: string, dir: string): Promise<string | null> {
 	return epicSlugs?.[namespace] ?? null;
 }
 
+const EPIC_LOCALES: Record<string, string> = { 'en-US': 'en-US', 'es-ES': 'es-ES', 'es-419': 'es-MX', 'pt-BR': 'pt-BR', 'pt-PT': 'pt-BR', 'zh-CN': 'zh-CN', 'zh-TW': 'zh-Hant' };
+
 async function fromEpic(appName: string, dir: string, locale: string): Promise<GameInfo | null> {
 	const slug = await epicSlug(appName, dir);
 	if (!slug) return null;
-	const page = await getJson(`https://store-content-ipv4.ak.epicgames.com/api/${locale === 'it' ? 'it' : 'en-US'}/content/products/${encodeURIComponent(slug)}`);
+	// Epic's store names its languages its own way; English when it has no page in the language
+	const epicLocale = EPIC_LOCALES[locale] ?? locale.slice(0, 2);
+	const epicPage = (code: string) => getJson(`https://store-content-ipv4.ak.epicgames.com/api/${code}/content/products/${encodeURIComponent(slug)}`);
+	const first = await epicPage(epicLocale);
+	const page = first?.pages?.length || epicLocale === 'en-US' ? first : await epicPage('en-US');
 	// The product's home page (some products list other pages first)
 	const pages: any[] = page?.pages ?? [];
 	const d = (pages.find((p) => p?.type === 'productHome') ?? pages[0])?.data;

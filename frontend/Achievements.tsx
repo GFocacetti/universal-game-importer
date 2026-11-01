@@ -89,7 +89,7 @@ export const ACHIEVEMENTS_CSS = `
 // Kept for the session: the launchers' files change only while playing
 const cache = new Map<string, Promise<Result>>();
 
-const language = () => (uiLocale() === 'it' ? 'it-IT' : 'en-US');
+const language = () => uiLocale();
 // Saved beside the game information, shown while the launcher is read again
 const savedKey = (id: string) => `achievements_${id}_${language()}`;
 

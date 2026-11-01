@@ -353,12 +353,12 @@ end
 
 -- ---------- The frontend call ----------
 
--- a_id: the imported game's id ("gog:1207658754", "xbox:<family>!<app>", "epic:<app name>"); b_lang: "it-IT"
+-- a_id: the imported game's id ("gog:1207658754", "xbox:<family>!<app>", "epic:<app name>"); b_lang: "it-IT", "es-419"
 -- c_extra: JSON { title = Xbox title id, key = OpenXBL key, sandbox = Epic namespace }
 -- Returns {"source":"gog","items":[...]} (plus "signed_out" for Epic), or {"items":[]} when there is nothing
 function ugi_achievements(a_id, b_lang, c_extra)
     local id = tostring(a_id or "")
-    local lang = tostring(b_lang or ""):match("^%a%a%-%a%a$") or "en-US"
+    local lang = tostring(b_lang or ""):match("^%a%a%-%w+$") or "en-US"
     local ok, extra = pcall(cjson.decode, c_extra or "{}")
     if not ok or type(extra) ~= "table" then extra = {} end
 

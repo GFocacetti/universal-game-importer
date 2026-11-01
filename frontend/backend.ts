@@ -1,5 +1,6 @@
 import { callable } from '@steambrew/client';
 import { ScanResult, UgiSettings, UgiState } from 'types';
+import { LANGUAGES } from 'i18n';
 
 const ugiScan = callable<[{ a_options: string }], string>('ugi_scan');
 const ugiGetState = callable<[], string>('ugi_get_state');
@@ -54,7 +55,7 @@ export async function loadState(): Promise<UgiState> {
 			// WebP included unless the user turned it off
 			webp: settings.webp !== false,
 			theme: settings.theme === 'modern' ? 'modern' : 'steam',
-			language: settings.language === 'en' || settings.language === 'it' ? settings.language : 'auto',
+			language: LANGUAGES.some((l) => l.code === settings.language) ? settings.language : 'auto',
 			filters: asRecord(settings.filters),
 			check_interval: (['off', 'daily', 'weekly', 'monthly'] as const).includes(settings.check_interval as any) ? settings.check_interval : 'weekly',
 			launchers: asRecord(settings.launchers),

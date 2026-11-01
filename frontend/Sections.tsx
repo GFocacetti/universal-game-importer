@@ -2,7 +2,7 @@ import { callable } from '@steambrew/client';
 import React, { useEffect, useState } from 'react';
 import { loadState, saveState, unquote } from 'backend';
 import { removeCollections, removeLauncherCollection, syncCollections } from 'collections';
-import { LanguageChoice, setLanguage, t } from 'i18n';
+import { LANGUAGES, LanguageChoice, setLanguage, t } from 'i18n';
 import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag } from 'sgdb';
 import { isGameOrShortcut, LAUNCHER_NAMES, openUrl } from 'steamApps';
 import { CancelFlag, exportBackup } from 'maintenance';
@@ -423,8 +423,11 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 					}}
 				>
 					<option value="auto">{t('settings.languageAuto')}</option>
-					<option value="en">English</option>
-					<option value="it">Italiano</option>
+					{[...LANGUAGES].sort((a, b) => a.name.localeCompare(b.name)).map((l) => (
+						<option key={l.code} value={l.code}>
+							{l.name}
+						</option>
+					))}
 				</select>
 			</div>
 			<div className="ugi-set">
