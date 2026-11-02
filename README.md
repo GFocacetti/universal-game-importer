@@ -3,6 +3,8 @@
 A Millennium plugin that brings any game into your Steam library and gets its pictures, store information and achievements where available.
 It works with every game from the supported launchers (imported automatically) and with every other non-Steam game, even the ones you add by hand.
 
+![UGI page with games from every launcher](docs/screenshots/games.png)
+
 ## Features
 
 ### Every game, in one library
@@ -10,6 +12,8 @@ It works with every game from the supported launchers (imported automatically) a
 Steam is where your friends, your controller settings and your Big Picture couch setup already live, so why should a game be left out just because you bought it somewhere else? UGI looks through Xbox / Microsoft Store, Epic Games, GOG Galaxy, EA app, Battle.net, Amazon Games, Ubisoft Connect, itch.io and Riot Games, and brings every installed game into Steam for you.
 
 Got something that doesn't come from any launcher, like an old CD game, an indie download or a mod? Click **Add a game**, pick its program, check the name UGI suggests, and it joins the others in an "Imported games" collection, with the same pictures and game page.
+
+![New games found by a scan](docs/screenshots/new-games.png)
 
 ### Press Play and forget about it
 
@@ -19,13 +23,19 @@ Games start through their own launcher, exactly as they would from there, while 
 
 Install a new game and UGI tells you with a notification, ready to add it in one click. Uninstall one and it disappears from Steam; move or update one and its shortcut follows. Already added some games to Steam by hand? UGI takes them over, playtime included, so each game shows up only once, in its launcher's collection. Every launcher can get its own collection and its own shelf on the Home page.
 
+![A Home shelf for each launcher](docs/screenshots/home-shelves.png)
+
 ### Beautiful, not just present
 
 No more grey boxes: UGI picks a cover, a wide cover, a background, a logo and an icon from SteamGridDB for every new game. Prefer another one? "Custom images (UGI)" in the game's menu opens a gallery, animated pictures included. And it works for your whole library too, Steam games as well: fill only what's missing, replace everything, or go back to the originals, with a progress bar and a Stop button.
 
+![Picture gallery from SteamGridDB](docs/screenshots/gallery.png)
+
 ### A real store page for every game
 
 Open a non-Steam game in your library and you'll find what a store page would show you: trailers and screenshots, summary and description, reviews, release date, developer and publisher, system requirements, languages, age rating and Metacritic score, with links to the game's own store. Everything is fetched when the game is imported and kept ready, so the page opens instantly.
+
+![Game page with information and achievements](docs/screenshots/game-page.png)
 
 ### Your achievements, where you play
 
@@ -37,7 +47,9 @@ In Big Picture mode, game information and achievements sit in the "Game info" ta
 
 ### Everything else
 
-Each game has its own window in UGI's page, with tabs for its pictures, its launch settings and Steam's overlay. There you can start a DRM-free game straight from its own program instead of its launcher (its achievements may then not be recorded), add launch arguments, change its program or start folder, and choose how long after its last window closes Steam counts it as closed. Settings, imported games and pictures can be backed up and restored at any time. UGI speaks English and Italian, and follows Steam's language by default.
+Each game has its own window in UGI's page, with tabs for its pictures, its launch settings and Steam's overlay. There you can start a DRM-free game straight from its own program instead of its launcher (its achievements may then not be recorded), add launch arguments, change its program or start folder, and choose how long after its last window closes Steam counts it as closed. Settings, imported games and pictures can be backed up and restored at any time. UGI is translated into every language Steam offers, and follows Steam's language by default.
+
+![Launch settings of a game](docs/screenshots/launch-settings.png)
 
 ### What works where
 
@@ -86,6 +98,21 @@ Optional keys and accounts, also in UGI's **Settings**:
 * RAWG API key: information for games not found on Steam, GOG or Epic (texts in English). Free key: https://rawg.io/apidocs
 * OpenXBL API key: achievements of every Xbox game; without it, only those of the games you opened in the Xbox app. Free key: https://xbl.io
 * Epic account: to see which Epic achievements you unlocked
+
+<details>
+<summary>More screenshots</summary>
+
+![Launchers](docs/screenshots/launchers.png)
+
+![Images](docs/screenshots/images.png)
+
+![Settings](docs/screenshots/settings.png)
+
+![Backup and uninstall](docs/screenshots/backup.png)
+
+![A launcher collection in the library](docs/screenshots/collection.png)
+
+</details>
 
 ## Prerequisites
 
