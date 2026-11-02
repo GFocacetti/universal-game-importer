@@ -6,6 +6,12 @@ const ugiScan = callable<[{ a_options: string }], string>('ugi_scan');
 const ugiGetState = callable<[], string>('ugi_get_state');
 const ugiSaveState = callable<[{ json: string }], boolean>('ugi_save_state');
 
+// The Epic account for achievements: its name (empty when signed out), signing in with the code
+// Epic's page shows (the account name, empty when it failed) and signing out
+export const epicAccountName = callable<[], string>('ugi_epic_account');
+export const epicSignIn = callable<[{ a_code: string }], string>('ugi_epic_sign_in');
+export const epicSignOut = callable<[], boolean>('ugi_epic_sign_out');
+
 // Millennium may hand string results back still wrapped in JSON quotes ("fn" instead of fn):
 // every string from a backend call goes through this
 export const unquote = (value: unknown) => String(value ?? '').replace(/^"|"$/g, '');

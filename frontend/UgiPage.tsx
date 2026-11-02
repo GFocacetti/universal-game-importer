@@ -18,6 +18,7 @@ import { openUrl } from 'steamApps';
 import { bigPicture, gamepadDocument } from 'location';
 import { watchGamepad } from 'gamepad';
 import { backdrop } from 'backdrop';
+import { GuideSteps } from 'Guide';
 
 // Big Picture draws its top bar (search, clock) and its button hints over the page: keep the page, and the
 // windows opened over it (--ugi-bars), between them
@@ -46,12 +47,7 @@ function ApiKeyDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 			<div className="ugi-dialog" onClick={(e) => e.stopPropagation()}>
 				<h2>{t('apikey.title')}</h2>
 				<p>{t('apikey.intro')}</p>
-				<ol>
-					<li>{t('apikey.step1')}</li>
-					<li>{t('apikey.step2')}</li>
-					<li>{t('apikey.step3')}</li>
-					<li>{t('apikey.step4')}</li>
-				</ol>
+				<GuideSteps id="sgdb" />
 				<div className="ugi-field">
 					<input value={key} placeholder={t('apikey.placeholder')} onChange={(e) => setKey(e.target.value)} />
 				</div>

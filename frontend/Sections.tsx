@@ -1,6 +1,5 @@
-import { callable } from '@steambrew/client';
 import React, { useEffect, useState } from 'react';
-import { loadState, saveState, unquote } from 'backend';
+import { epicAccountName, epicSignIn, epicSignOut, loadState, saveState, unquote } from 'backend';
 import { removeCollections, removeLauncherCollection, syncCollections } from 'collections';
 import { LANGUAGES, LanguageChoice, setLanguage, t } from 'i18n';
 import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag } from 'sgdb';
@@ -8,6 +7,7 @@ import { isGameOrShortcut, LAUNCHER_NAMES, openUrl } from 'steamApps';
 import { CancelFlag, exportBackup } from 'maintenance';
 import { UgiState } from 'types';
 import { backdrop } from 'backdrop';
+import { EPIC_LOGIN } from 'Guide';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
 declare const collectionStore: {
@@ -286,12 +286,6 @@ const SiteLink = ({ url }: { url: string }) => (
 	</>
 );
 
-const epicAccountName = callable<[], string>('ugi_epic_account');
-const epicSignIn = callable<[{ a_code: string }], string>('ugi_epic_sign_in');
-const epicSignOut = callable<[], boolean>('ugi_epic_sign_out');
-// Epic's sign-in page: once signed in, it shows the code to paste in UGI
-const EPIC_LOGIN = 'https://www.epicgames.com/id/login?redirectUrl=' +
-	encodeURIComponent('https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code');
 
 // Epic account for achievements: sign in on Epic's page, then paste the code it shows
 function EpicAccount() {

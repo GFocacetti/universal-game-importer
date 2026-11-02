@@ -256,6 +256,10 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-switch.disabled { opacity: .4; cursor: default; }
 .ugi-onboarding { position: relative; min-height: 440px; display: flex; flex-direction: column; }
 .ugi-ob-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.ugi-guide { padding-left: 22px; }
+.ugi-guide li { margin-bottom: 14px; }
+.ugi-guide img { display: block; max-width: 100%; margin-top: 8px; border-radius: 6px; border: 1px solid var(--ugi-panel-border); }
+.ugi-dialog p.ugi-guide-note { font-size: 13px; }
 .ugi-dots { display: flex; gap: 6px; }
 .ugi-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--ugi-side-on); display: block; }
 .ugi-dots i.on { background: var(--ugi-accent); }

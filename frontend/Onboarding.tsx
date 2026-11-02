@@ -1,17 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { Backup, listBackups, pickBackup, readBackup, restoreBackup } from 'maintenance';
-import { loadState, saveState } from 'backend';
+import { epicAccountName, epicSignIn, loadState, saveState, unquote } from 'backend';
+import { GuideSteps } from 'Guide';
 import { t } from 'i18n';
 import ReviewDialog from 'ReviewDialog';
 import { runScan, ScanOutcome } from 'scanner';
 import { LAUNCHER_NAMES } from 'steamApps';
 
-type Step = 'welcome' | 'key' | 'keyWarning' | 'collections' | 'shelves' | 'scan' | 'review' | 'done' | 'restored';
-const DOTS: Step[] = ['welcome', 'key', 'collections', 'scan', 'done'];
+type Step = 'welcome' | 'key' | 'keyWarning' | 'rawg' | 'xbl' | 'epic' | 'collections' | 'shelves' | 'scan' | 'review' | 'done' | 'restored';
+const DOTS: Step[] = ['welcome', 'key', 'rawg', 'xbl', 'epic', 'collections', 'scan', 'done'];
 
 export default function Onboarding({ onClose }: { onClose: () => void }) {
 	const [step, setStep] = useState<Step>('welcome');
 	const [key, setKey] = useState('');
+	// The optional keys and the Epic account, each on its own page after SteamGridDB's
+	const [rawgKey, setRawgKey] = useState('');
+	const [xblKey, setXblKey] = useState('');
+	const [epicName, setEpicName] = useState('');
+	const [epicCode, setEpicCode] = useState('');
+	const [epicBusy, setEpicBusy] = useState(false);
+	const [epicFailed, setEpicFailed] = useState(false);
 	const [collections, setCollections] = useState(true);
 	const [shelves, setShelves] = useState(true);
 	const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
@@ -23,6 +31,7 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 	const [restored, setRestored] = useState('');
 	useEffect(() => {
 		listBackups().then((list) => setLatest(list.files[0] ?? null)).catch(() => {});
+		epicAccountName().then((n) => setEpicName(unquote(n))).catch(() => {});
 	}, []);
 
 	const restore = async (backup: Backup | null) => {
@@ -56,6 +65,8 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 		setStep('scan');
 		const s = await loadState();
 		if (key.trim()) s.settings.sgdb_key = key.trim();
+		if (rawgKey.trim()) s.settings.rawg_key = rawgKey.trim();
+		if (xblKey.trim()) s.settings.xbl_key = xblKey.trim();
 		s.settings.collections = collections;
 		s.settings.shelves = collections && shelves;
 		await saveState(s);
@@ -65,6 +76,17 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 		} catch (err) {
 			setError(String(err));
 		}
+	};
+
+	const epicSignInNow = async () => {
+		setEpicBusy(true);
+		setEpicFailed(false);
+		const signed = unquote(await epicSignIn({ a_code: epicCode.trim() }).catch(() => ''));
+		setEpicBusy(false);
+		if (signed) {
+			setEpicName(signed);
+			setEpicCode('');
+		} else setEpicFailed(true);
 	};
 
 	const dot = DOTS.indexOf(step === 'keyWarning' ? 'key' : step === 'shelves' ? 'collections' : step === 'review' ? 'scan' : step === 'restored' ? 'done' : step);
@@ -139,18 +161,13 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 					<>
 						<h2>{t('ob.images')}</h2>
 						<p>{t('apikey.intro')}</p>
-						<ol>
-							<li>{t('apikey.step1')}</li>
-							<li>{t('apikey.step2')}</li>
-							<li>{t('apikey.step3')}</li>
-							<li>{t('apikey.step4')}</li>
-						</ol>
+						<GuideSteps id="sgdb" />
 						<div className="ugi-field"><input value={key} placeholder={t('apikey.placeholder')} onChange={(e) => setKey(e.target.value)} /></div>
 						<div className="ugi-foot">
 							<button className="ugi-link" onClick={() => setStep('keyWarning')}>{t('ob.skip')}</button>
 							<span className="ugi-sp" />
 							<button className="ugi-btn secondary" onClick={() => setStep('welcome')}>{t('ob.back')}</button>
-							<button className="ugi-btn primary" disabled={!key.trim()} onClick={() => setStep('collections')}>{t('ob.next')}</button>
+							<button className="ugi-btn primary" disabled={!key.trim()} onClick={() => setStep('rawg')}>{t('ob.next')}</button>
 						</div>
 						{step === 'keyWarning' && (
 							<div className="ugi-warn-layer">
@@ -160,11 +177,68 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 									<p>{t('ob.noKeyLater')}</p>
 									<div className="ugi-foot">
 										<button className="ugi-btn secondary" onClick={() => setStep('key')}>{t('ob.back')}</button>
-										<button className="ugi-btn primary" onClick={() => { setKey(''); setStep('collections'); }}>{t('ob.noKeyContinue')}</button>
+										<button className="ugi-btn primary" onClick={() => { setKey(''); setStep('rawg'); }}>{t('ob.noKeyContinue')}</button>
 									</div>
 								</div>
 							</div>
 						)}
+					</>
+				)}
+
+				{step === 'rawg' && (
+					<>
+						<h2>{t('ob.rawg')}</h2>
+						<p>{t('ob.rawgText')}</p>
+						<p className="ugi-guide-note">{t('guide.optional')}</p>
+						<GuideSteps id="rawg" />
+						<div className="ugi-field"><input value={rawgKey} placeholder={t('apikey.placeholder')} onChange={(e) => setRawgKey(e.target.value)} /></div>
+						<div className="ugi-foot">
+							<button className="ugi-link" onClick={() => setStep('xbl')}>{t('ob.skip')}</button>
+							<span className="ugi-sp" />
+							<button className="ugi-btn secondary" onClick={() => setStep('key')}>{t('ob.back')}</button>
+							<button className="ugi-btn primary" onClick={() => setStep('xbl')}>{t('ob.next')}</button>
+						</div>
+					</>
+				)}
+
+				{step === 'xbl' && (
+					<>
+						<h2>{t('ob.xbl')}</h2>
+						<p>{t('ob.xblText')}</p>
+						<p className="ugi-guide-note">{t('guide.optional')}</p>
+						<GuideSteps id="xbl" />
+						<div className="ugi-field"><input value={xblKey} placeholder={t('apikey.placeholder')} onChange={(e) => setXblKey(e.target.value)} /></div>
+						<div className="ugi-foot">
+							<button className="ugi-link" onClick={() => setStep('epic')}>{t('ob.skip')}</button>
+							<span className="ugi-sp" />
+							<button className="ugi-btn secondary" onClick={() => setStep('rawg')}>{t('ob.back')}</button>
+							<button className="ugi-btn primary" onClick={() => setStep('epic')}>{t('ob.next')}</button>
+						</div>
+					</>
+				)}
+
+				{step === 'epic' && (
+					<>
+						<h2>{t('ob.epic')}</h2>
+						<p>{t('ob.epicText')}</p>
+						<p className="ugi-guide-note">{t('guide.optional')}</p>
+						<GuideSteps id="epic" />
+						<p className="ugi-guide-note">{t('guide.epicSafe')}</p>
+						{epicName ? (
+							<p>{t('settings.epicSignedIn', { name: epicName })}</p>
+						) : (
+							<div className="ugi-field">
+								<input value={epicCode} placeholder={t('settings.epicCode')} onChange={(e) => setEpicCode(e.target.value)} />
+								<button className="ugi-btn secondary" disabled={!epicCode.trim() || epicBusy} onClick={epicSignInNow}>{t('settings.epicConnect')}</button>
+							</div>
+						)}
+						{epicFailed && <p className="ugi-launcher-warn">{t('settings.epicFailed')}</p>}
+						<div className="ugi-foot">
+							<button className="ugi-link" onClick={() => setStep('collections')}>{t('ob.skip')}</button>
+							<span className="ugi-sp" />
+							<button className="ugi-btn secondary" onClick={() => setStep('xbl')}>{t('ob.back')}</button>
+							<button className="ugi-btn primary" onClick={() => setStep('collections')}>{t('ob.next')}</button>
+						</div>
 					</>
 				)}
 
@@ -174,7 +248,7 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
 						<p>{t('ob.collectionsText')}</p>
 						{choice(collections, setCollections, [t('ob.collectionsYes'), t('ob.collectionsYesText')], [t('ob.no'), t('ob.collectionsNoText')])}
 						<div className="ugi-foot">
-							<button className="ugi-btn secondary" onClick={() => setStep('key')}>{t('ob.back')}</button>
+							<button className="ugi-btn secondary" onClick={() => setStep('epic')}>{t('ob.back')}</button>
 							<button className="ugi-btn primary" onClick={() => (collections ? setStep('shelves') : startScan())}>{t('ob.next')}</button>
 						</div>
 					</>
