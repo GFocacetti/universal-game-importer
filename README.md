@@ -153,7 +153,7 @@ A ⭐ on GitHub helps too: it makes UGI easier for others to find.
 UGI wouldn't be what it is without:
 
 - **Yuki "manu suka" Quello vero**, for the embarrassing amount of bugs they helped track down and for all the ideas they suggested.
-- **ManuKM**, for the ideas and testing behind the Linux and Steam Deck version (still a work in progress!).
+- **ManuKM Dehpefforzah**, for the ideas and testing behind the Linux and Steam Deck version (still a work in progress!).
 - **The GWIBBA community**, for all the love and support for the project.
 
 ## License
