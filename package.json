@@ -14,7 +14,7 @@
   },
   "type": "module",
   "name": "universal-game-importer",
-  "version": "0.67.1",
+  "version": "0.67.2",
   "description": "Brings any game into your Steam library: imports games from other launchers or adds them by hand, with pictures, store pages and achievements.",
   "main": "./frontend/index.jsx",
   "author": "Giuseppe Focacetti",
