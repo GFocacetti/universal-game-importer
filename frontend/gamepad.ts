@@ -91,26 +91,32 @@ function nearest(from: HTMLElement, list: HTMLElement[], dir: number): HTMLEleme
 		}
 	}
 	if (bestScore < 100000 || (dir !== LEFT && dir !== RIGHT)) return best;
-	return wrapped(from, list, dir === RIGHT) ?? best;
+	return wrapped(from, list, dir === (rightToLeft(from) ? LEFT : RIGHT)) ?? best;
 }
+
+// Laid out right to left (Arabic): the side menu is on the right, rows read from the right
+const rightToLeft = (el: HTMLElement) => el.ownerDocument.defaultView?.getComputedStyle(el).direction === 'rtl';
 
 // The first element of the first row of the section shown beside the side menu (UGI's page; the
 // gallery's image types), whichever section of the menu the highlight is on; the only one of that
-// row may sit far right (a switch)
+// row may sit at the far end (a switch)
 function sectionTop(layer: HTMLElement, list: HTMLElement[], from: HTMLElement): HTMLElement | undefined {
 	const area = layer.querySelector('.ugi-content') ?? from.closest('.ugi-win-body');
-	const edge = from.getBoundingClientRect().right - 4;
+	const rtl = rightToLeft(from);
+	const menu = from.getBoundingClientRect();
 	const found = list
-		.filter((el) => !el.classList.contains('ugi-nav') && (!area || area.contains(el)) && el.getBoundingClientRect().left >= edge)
+		.filter((el) => !el.classList.contains('ugi-nav') && (!area || area.contains(el)))
+		.filter((el) => (rtl ? el.getBoundingClientRect().right <= menu.left + 4 : el.getBoundingClientRect().left >= menu.right - 4))
 		.map((el) => ({ el, r: el.getBoundingClientRect() }));
 	if (!found.length) return undefined;
 	const top = found.reduce((a, b) => (b.r.top < a.r.top ? b : a));
 	// The first row: what overlaps the topmost element vertically
-	return found.filter(({ r }) => r.top < top.r.bottom && r.bottom > top.r.top).sort((x, y) => x.r.left - y.r.left)[0]?.el;
+	return found.filter(({ r }) => r.top < top.r.bottom && r.bottom > top.r.top).sort((x, y) => (rtl ? y.r.right - x.r.right : x.r.left - y.r.left))[0]?.el;
 }
 
-// Nothing more on the row: right goes on to the first element of the next row down, left back to the
-// last of the row above, as when reading (within the same group: covers of the grid, chips of the toolbar)
+// Nothing more on the row: on to the first element of the next row down, or back to the last of the
+// row above, as when reading (within the same group: covers of the grid, chips of the toolbar); in
+// Arabic rows read from the right
 function wrapped(from: HTMLElement, list: HTMLElement[], forward: boolean): HTMLElement | undefined {
 	const a = from.getBoundingClientRect();
 	const group = from.parentElement;
@@ -123,7 +129,9 @@ function wrapped(from: HTMLElement, list: HTMLElement[], forward: boolean): HTML
 	// The closest row: the elements overlapping the nearest one vertically
 	const edge = forward ? Math.min(...rows.map(({ r }) => r.top)) : Math.max(...rows.map(({ r }) => r.bottom));
 	const row = rows.filter(({ r }) => (forward ? r.top <= edge + r.height / 2 : r.bottom >= edge - r.height / 2));
-	row.sort((x, y) => (forward ? x.r.left - y.r.left : y.r.right - x.r.right));
+	// The start of the row going on, its end going back
+	const fromLeft = forward !== rightToLeft(from);
+	row.sort((x, y) => (fromLeft ? x.r.left - y.r.left : y.r.right - x.r.right));
 	return row[0]?.el;
 }
 
@@ -159,7 +167,9 @@ function openPicker(doc: Document, layer: HTMLElement, select: HTMLSelectElement
 	list.className = 'ugi-picker-list';
 	const r = select.getBoundingClientRect();
 	const below = doc.documentElement.clientHeight - r.bottom;
-	Object.assign(list.style, { left: `${r.left}px`, minWidth: `${r.width}px` });
+	// Under the select, lined up with its start
+	if (rightToLeft(select)) Object.assign(list.style, { right: `${doc.documentElement.clientWidth - r.right}px`, minWidth: `${r.width}px` });
+	else Object.assign(list.style, { left: `${r.left}px`, minWidth: `${r.width}px` });
 	// Below the select, or above it when there is more room there
 	if (below >= r.top) Object.assign(list.style, { top: `${r.bottom + 4}px`, maxHeight: `${below - 16}px` });
 	else Object.assign(list.style, { bottom: `${doc.documentElement.clientHeight - r.top + 4}px`, maxHeight: `${r.top - 16}px` });
@@ -209,13 +219,14 @@ function onButton(doc: Document, evt: Event) {
 		case LEFT:
 		case RIGHT: {
 			// First press: start from the selected section, else the first element. From a section in the
-			// side menu, right goes to the top of that section; back in the side menu from the section,
-			// the highlight lands on the section shown.
+			// side menu, towards the page (right, left in Arabic) goes to the top of that section; back in
+			// the side menu from the section, the highlight lands on the section shown.
+			const inward = rightToLeft(layer) ? LEFT : RIGHT;
 			const activeNav = list.find((el) => el.classList.contains('ugi-nav') && el.classList.contains('on'));
 			let next = !current
 				? (activeNav ?? list[0])
-				: (button === RIGHT && current.classList.contains('ugi-nav') && sectionTop(layer, list, current)) || nearest(current, list, button);
-			if (button === LEFT && current && !current.classList.contains('ugi-nav') && next?.classList.contains('ugi-nav') && activeNav) next = activeNav;
+				: (button === inward && current.classList.contains('ugi-nav') && sectionTop(layer, list, current)) || nearest(current, list, button);
+			if (button !== inward && (button === LEFT || button === RIGHT) && current && !current.classList.contains('ugi-nav') && next?.classList.contains('ugi-nav') && activeNav) next = activeNav;
 			if (next) setFocus(doc, next);
 			break;
 		}

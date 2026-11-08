@@ -289,6 +289,8 @@ const fr: Strings = {
 	'settings.rawgText': "Pour la description des jeux absents de Steam, GOG ou Epic (textes en anglais). Clé gratuite :",
 	'settings.xbl': "Clé API OpenXBL (facultative)",
 	'settings.xblText': "Succès de tous les jeux Xbox ; sans elle, seulement les jeux ouverts dans l'appli Xbox. Clé gratuite (connexion avec votre compte Microsoft) :",
+	'settings.steamPages': "Page du magasin aussi pour les jeux Steam",
+	'settings.steamPagesText': "Les bandes-annonces, la description, la configuration requise et le reste de la page du magasin aussi sur la page de vos jeux Steam.",
 	'settings.achToasts': "Notifications de succès",
 	'settings.achToastsText': "Pendant que vous jouez à un jeu GOG, Epic ou Xbox, une notification Steam affiche chaque succès débloqué : GOG tout de suite, Epic en moins de deux minutes, Xbox en moins de cinq.",
 	'settings.epic': "Compte Epic (facultatif)",

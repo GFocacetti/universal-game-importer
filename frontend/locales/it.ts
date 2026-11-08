@@ -289,6 +289,8 @@ const it: Strings = {
 	'settings.rawgText': "Per la descrizione dei giochi che non si trovano su Steam, GOG o Epic (testi in inglese). Key gratuita:",
 	'settings.xbl': "API key di OpenXBL (facoltativa)",
 	'settings.xblText': "Achievement di tutti i giochi Xbox; senza, solo i giochi che hai aperto nell'app Xbox. Key gratuita (accedi con il tuo account Microsoft):",
+	'settings.steamPages': "Pagina del negozio anche sui giochi Steam",
+	'settings.steamPagesText': "Trailer, descrizione, requisiti e il resto della pagina del negozio anche nella pagina dei giochi che hai su Steam.",
 	'settings.achToasts': "Avvisi degli achievement",
 	'settings.achToastsText': "Mentre giochi a un gioco GOG, Epic o Xbox, una notifica di Steam mostra ogni achievement che sblocchi: GOG subito, Epic entro due minuti, Xbox entro cinque.",
 	'settings.epic': "Account Epic (facoltativo)",

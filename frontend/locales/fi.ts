@@ -289,6 +289,8 @@ const fi: Strings = {
 	'settings.rawgText': "Pelien kuvauksiin, kun peliä ei ole Steamissa, GOGissa eikä Epicissä (englanninkieliset tekstit). Ilmainen avain:",
 	'settings.xbl': "OpenXBL:n API-avain (valinnainen)",
 	'settings.xblText': "Kaikkien Xbox-pelien saavutukset; ilman sitä vain Xbox-sovelluksessa avattujen pelien. Ilmainen avain (kirjaudu Microsoft-tililläsi):",
+	'settings.steamPages': "Kauppasivu myös Steam-peleille",
+	'settings.steamPagesText': "Trailerit, kuvaus, järjestelmävaatimukset ja muu kauppasivu myös Steamissa olevien pelien sivulla.",
 	'settings.achToasts': "Saavutusilmoitukset",
 	'settings.achToastsText': "Kun pelaat GOG-, Epic- tai Xbox-peliä, Steam-ilmoitus näyttää jokaisen avaamasi saavutuksen: GOG heti, Epic kahden minuutin ja Xbox viiden minuutin sisällä.",
 	'settings.epic': "Epic-tili (valinnainen)",

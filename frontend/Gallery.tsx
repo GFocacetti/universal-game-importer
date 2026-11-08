@@ -2,7 +2,7 @@ import { toaster } from '@steambrew/client';
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadState, saveState } from 'backend';
-import { t } from 'i18n';
+import { t, textDir } from 'i18n';
 import { applyImage, FILTER_OPTIONS, gameIdFor, imagesFor, ImageType, replaceGame, resetImage, SgdbImage, sgdbCacheKey, UserFilter } from 'sgdb';
 import { ImageKind, openUrl } from 'steamApps';
 import { SteamImage } from 'SteamImage';
@@ -278,6 +278,7 @@ export async function openGallery(appid: number, name: string, doc: Document, on
 	const theme = (await loadState()).settings.theme ?? 'steam';
 	if (bigPicture()) watchGamepad(doc);
 	const host = doc.createElement('div');
+	host.dir = textDir();
 	Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '9999' });
 	Object.entries(themeStyle(theme)).forEach(([k, v]) => host.style.setProperty(k, v));
 	doc.body.appendChild(host);

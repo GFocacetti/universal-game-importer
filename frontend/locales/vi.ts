@@ -289,6 +289,8 @@ const vi: Strings = {
 	'settings.rawgText': "Dùng cho phần mô tả trò chơi không có trên Steam, GOG hay Epic (nội dung tiếng Anh). Khóa miễn phí:",
 	'settings.xbl': "Khóa API OpenXBL (tùy chọn)",
 	'settings.xblText': "Thành tựu của mọi trò chơi Xbox; không có khóa thì chỉ các trò bạn đã mở trong ứng dụng Xbox. Khóa miễn phí (đăng nhập bằng tài khoản Microsoft):",
+	'settings.steamPages': "Trang cửa hàng cho cả trò chơi Steam",
+	'settings.steamPagesText': "Trailer, mô tả, cấu hình yêu cầu và phần còn lại của trang cửa hàng cũng có trên trang các trò chơi bạn có trên Steam.",
 	'settings.achToasts': "Thông báo thành tựu",
 	'settings.achToastsText': "Khi bạn chơi trò chơi GOG, Epic hoặc Xbox, thông báo Steam sẽ hiện mỗi thành tựu bạn mở khóa: GOG ngay lập tức, Epic trong vòng hai phút, Xbox trong vòng năm phút.",
 	'settings.epic': "Tài khoản Epic (tùy chọn)",

@@ -525,6 +525,8 @@ async function lookup(state: UgiState, key: string, name: string, locale: string
 	const store = launcherStore(state, launcher ?? '', id).catch(() => null);
 	const chosen = state.imported[key]?.profile?.info;
 	const rawgKey = state.settings.rawg_key;
+	// Steam's own games ("steam:<appid>"): their store page, nothing to search for
+	if (launcher === 'steam') return fromSteamApp(Number(id), locale);
 	const info = chosen
 		? chosen.source === 'steam'
 			? await fromSteamApp(chosen.id, locale)

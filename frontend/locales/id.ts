@@ -289,6 +289,8 @@ const id: Strings = {
 	'settings.rawgText': "Untuk deskripsi game yang tidak ada di Steam, GOG, atau Epic (teks berbahasa Inggris). Kunci gratis:",
 	'settings.xbl': "Kunci API OpenXBL (opsional)",
 	'settings.xblText': "Prestasi semua game Xbox; tanpa kunci ini, hanya game yang pernah dibuka di aplikasi Xbox. Kunci gratis (masuk dengan akun Microsoft):",
+	'settings.steamPages': "Halaman toko juga di game Steam",
+	'settings.steamPagesText': "Trailer, deskripsi, persyaratan, dan bagian lain halaman toko juga di halaman game yang Anda miliki di Steam.",
 	'settings.achToasts': "Notifikasi prestasi",
 	'settings.achToastsText': "Saat Anda memainkan game GOG, Epic, atau Xbox, notifikasi Steam menampilkan setiap prestasi yang terbuka: GOG langsung, Epic dalam dua menit, Xbox dalam lima menit.",
 	'settings.epic': "Akun Epic (opsional)",

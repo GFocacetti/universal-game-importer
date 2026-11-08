@@ -435,7 +435,7 @@ function ZoomBar({ step, onChange }: { step: number; onChange: (step: number) =>
 	};
 	const at = `${(step / last) * 100}%`;
 	return (
-		<div className="ugi-zoom">
+		<div className="ugi-zoom" dir="ltr">
 			<span className="ugi-zoom-icon" onClick={() => set(step - 1)}>
 				<PictureIcon size={12} />
 			</span>

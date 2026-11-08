@@ -319,6 +319,8 @@ const en = {
 	'settings.rawgText': "For the description of games not found on Steam, GOG or Epic (texts in English). Free key:",
 	'settings.xbl': "OpenXBL API key (optional)",
 	'settings.xblText': "Achievements of every Xbox game; without it, only the games you opened in the Xbox app. Free key (sign in with your Microsoft account):",
+	'settings.steamPages': "Store page on Steam games too",
+	'settings.steamPagesText': "The trailers, description, requirements and the rest of the store page also on the page of the games you have on Steam.",
 	'settings.achToasts': "Achievement notifications",
 	'settings.achToastsText': "While you play a GOG, Epic or Xbox game, a Steam notification shows each achievement you unlock: GOG at once, Epic within two minutes, Xbox within five.",
 	'settings.epic': "Epic account (optional)",
@@ -496,6 +498,8 @@ export function setLanguage(choice: LanguageChoice | undefined) {
 // The UI language: its tag ('it-IT'), and the language as a whole
 export const uiLocale = () => current.tag;
 export const uiLanguage = () => current;
+// Arabic is written right to left: UGI's pages, windows and texts are laid out that way too
+export const textDir = (): 'rtl' | 'ltr' => (current.code === 'ar' ? 'rtl' : 'ltr');
 
 // "3 days ago", in the UI language
 export function relativeTime(iso: string): string {

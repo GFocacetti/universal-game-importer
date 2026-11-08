@@ -289,6 +289,8 @@ const th: Strings = {
 	'settings.rawgText': "สำหรับคำอธิบายของเกมที่ไม่มีใน Steam, GOG หรือ Epic (ข้อความภาษาอังกฤษ) คีย์ฟรี:",
 	'settings.xbl': "คีย์ API ของ OpenXBL (ไม่บังคับ)",
 	'settings.xblText': "ความสำเร็จของเกม Xbox ทั้งหมด หากไม่มีคีย์ จะมีเฉพาะเกมที่คุณเคยเปิดในแอป Xbox คีย์ฟรี (ลงชื่อเข้าใช้ด้วยบัญชี Microsoft):",
+	'settings.steamPages': "หน้าร้านค้าในเกม Steam ด้วย",
+	'settings.steamPagesText': "ตัวอย่าง คำอธิบาย ความต้องการของระบบ และส่วนอื่นของหน้าร้านค้า บนหน้าของเกมที่คุณมีใน Steam ด้วย",
 	'settings.achToasts': "การแจ้งเตือนความสำเร็จ",
 	'settings.achToastsText': "ขณะเล่นเกม GOG, Epic หรือ Xbox การแจ้งเตือนของ Steam จะแสดงทุกความสำเร็จที่คุณปลดล็อก: GOG ทันที, Epic ภายในสองนาที, Xbox ภายในห้านาที",
 	'settings.epic': "บัญชี Epic (ไม่บังคับ)",

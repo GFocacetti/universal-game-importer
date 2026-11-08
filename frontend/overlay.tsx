@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadState } from 'backend';
+import { textDir } from 'i18n';
 import { themeStyle, UGI_CSS } from 'theme';
 
 // The main Steam window document, once it exists
@@ -27,8 +28,9 @@ export async function waitForMainDocument(timeoutMs = 10 * 60 * 1000): Promise<D
 export async function mountOverlay(doc: Document, render: (close: () => void) => React.ReactNode, onClosed?: () => void, layout: 'full' | 'toast' = 'full') {
 	const theme = (await loadState()).settings.theme ?? 'steam';
 	const host = doc.createElement('div');
+	host.dir = textDir();
 	if (layout === 'full') Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '9999' });
-	else Object.assign(host.style, { position: 'fixed', right: '18px', bottom: '18px', zIndex: '9999' });
+	else Object.assign(host.style, { position: 'fixed', insetInlineEnd: '18px', bottom: '18px', zIndex: '9999' });
 	Object.entries(themeStyle(theme)).forEach(([k, v]) => host.style.setProperty(k, v));
 	doc.body.appendChild(host);
 	const root = createRoot(host);

@@ -289,6 +289,8 @@ const pt: Strings = {
 	'settings.rawgText': "Para a descrição de jogos que não estão na Steam, GOG ou Epic (textos em inglês). Chave gratuita:",
 	'settings.xbl': "Chave de API do OpenXBL (opcional)",
 	'settings.xblText': "Conquistas de todos os jogos do Xbox; sem ela, só dos jogos que você abriu no aplicação Xbox. Chave gratuita (entre com sua conta Microsoft):",
+	'settings.steamPages': "Página da loja também nos jogos Steam",
+	'settings.steamPagesText': "Os trailers, a descrição, os requisitos e o resto da página da loja também na página dos teus jogos no Steam.",
 	'settings.achToasts': "Notificações de conquistas",
 	'settings.achToastsText': "Enquanto você joga um jogo da GOG, Epic ou Xbox, uma notificação da Steam mostra cada conquista desbloqueada: GOG na hora, Epic em até dois minutos, Xbox em até cinco.",
 	'settings.epic': "Conta Epic (opcional)",

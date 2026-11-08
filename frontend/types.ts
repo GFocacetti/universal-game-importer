@@ -106,6 +106,8 @@ export type UgiSettings = {
 	animated?: boolean;
 	// A Steam notification for each achievement unlocked while playing (on unless turned off)
 	achievement_toasts?: boolean;
+	// The store page (player, description, requirements...) on the pages of Steam's own games too (off unless turned on)
+	steam_pages?: boolean;
 	// Include WebP images (on by default, can be turned off)
 	webp?: boolean;
 	theme?: 'steam' | 'modern';

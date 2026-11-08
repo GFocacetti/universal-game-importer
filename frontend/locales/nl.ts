@@ -289,6 +289,8 @@ const nl: Strings = {
 	'settings.rawgText': "Voor de beschrijving van games die niet op Steam, GOG of Epic staan (teksten in het Engels). Gratis sleutel:",
 	'settings.xbl': "OpenXBL-API-sleutel (optioneel)",
 	'settings.xblText': "Prestaties van alle Xbox-games; zonder sleutel alleen van games die je in de Xbox-app hebt geopend. Gratis sleutel (meld je aan met je Microsoft-account):",
+	'settings.steamPages': "Winkelpagina ook bij Steam-games",
+	'settings.steamPagesText': "De trailers, beschrijving, systeemeisen en de rest van de winkelpagina ook op de pagina van je games op Steam.",
 	'settings.achToasts': "Meldingen voor prestaties",
 	'settings.achToastsText': "Terwijl je een GOG-, Epic- of Xbox-game speelt, toont een Steam-melding elke behaalde prestatie: GOG meteen, Epic binnen twee minuten, Xbox binnen vijf.",
 	'settings.epic': "Epic-account (optioneel)",

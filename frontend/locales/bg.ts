@@ -289,6 +289,8 @@ const bg: Strings = {
 	'settings.rawgText': "За описанието на игри, които не са в Steam, GOG или Epic (текстове на английски). Безплатен ключ:",
 	'settings.xbl': "API ключ за OpenXBL (по избор)",
 	'settings.xblText': "Постиженията на всички игри за Xbox; без него — само на игрите, отворени в приложението Xbox. Безплатен ключ (влезте с акаунта си в Microsoft):",
+	'settings.steamPages': "Страница в магазина и за игрите в Steam",
+	'settings.steamPagesText': "Трейлърите, описанието, изискванията и останалата част от страницата в магазина и на страницата на игрите ти в Steam.",
 	'settings.achToasts': "Известия за постижения",
 	'settings.achToastsText': "Докато играете игра от GOG, Epic или Xbox, известие на Steam показва всяко отключено постижение: GOG веднага, Epic до две минути, Xbox до пет.",
 	'settings.epic': "Акаунт в Epic (по избор)",

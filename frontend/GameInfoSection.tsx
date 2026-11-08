@@ -8,7 +8,7 @@ import { createRoot, Root } from 'react-dom/client';
 import { AchievementsBlock } from 'Achievements';
 import { importedKeyFor, loadState, saveState } from 'backend';
 import { GameInfo, gameInfo, Requirement, Reviews, Video } from 'gameInfo';
-import { t } from 'i18n';
+import { t, textDir } from 'i18n';
 import { gamepadDocument, gamepadWindow, mainWindowPath } from 'location';
 import { mainDocument } from 'overlay';
 import { GamepadMode, Group, Pressable, Row, useGamepad } from 'Pressable';
@@ -28,6 +28,9 @@ const CSS = `
 .ugi-info .ugi-top + h2.first { margin-top: 28px; }
 .ugi-info h2 { margin: 18px 0 10px; padding-bottom: 4px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #ffffff; border-bottom: 1px solid rgba(255,255,255,.08); }
 .ugi-info-text p { margin: 0 0 10px; white-space: pre-line; text-align: justify; }
+/* The stores' texts may be in another language than UGI's (English on an Arabic page): each paragraph
+   takes its own writing direction */
+.ugi-info-text p, .ugi-info-text h3, .ugi-req > div > div, .ugi-glance-summary, .ugi-glance-value, .ugi-feature span, .ugi-langs td, .ugi-ach-text b, .ugi-ach-text span { unicode-bidi: plaintext; }
 .ugi-info-text h3 { margin: 16px 0 6px; font-size: 14px; font-weight: 700; color: #ffffff; }
 .ugi-info-source { margin-top: 10px; color: #8f98a0; font-size: 12px; }
 .ugi-info-source a { color: #8f98a0; text-decoration: underline; cursor: pointer; }
@@ -208,7 +211,7 @@ function Player({ media }: { media: Media[] }) {
 
 	const current = media[Math.min(index, media.length - 1)]!;
 	return (
-		<div className="ugi-player" ref={box}>
+		<div className="ugi-player" dir="ltr" ref={box}>
 			<div className={`ugi-player-main${current.video ? '' : ' image'}`}>
 				{/* Big Picture: no full screen view (Steam's navigation can't reach it) */}
 				<MediaView item={current} onZoom={pad ? undefined : () => setFull(true)} />
@@ -348,12 +351,13 @@ function SidePanels({ info }: { info: GameInfo }) {
 function Blocks({ appid, side, top }: { appid: number; side: HTMLElement | null; top: HTMLElement | null }) {
 	const [ready, setReady] = useState(false);
 	const [noInfo, setNoInfo] = useState(false);
-	const achievements = <AchievementsBlock appid={appid} ready={ready} />;
+	// Steam's own games have Steam's achievements panel already
+	const achievements = isShortcut(appid) ? <AchievementsBlock appid={appid} ready={ready} /> : null;
 	return (
 		<>
 			<style>{CSS}</style>
 			<InfoBlock appid={appid} sideHost={side} topHost={top} achievements={achievements} onDone={(shown) => (setNoInfo(!shown), setReady(true))} />
-			{noInfo && <div className="ugi-info">{achievements}</div>}
+			{noInfo && achievements && <div className="ugi-info">{achievements}</div>}
 		</>
 	);
 }
@@ -370,7 +374,8 @@ function InfoBlock({ appid, sideHost, topHost, achievements, onDone }: { appid: 
 		setCopy(undefined);
 		(async () => {
 			const state = await loadState();
-			const key = importedKeyFor(state, appid) ?? `manual:${appid}`;
+			// Steam's own games go by their store page
+			const key = isShortcut(appid) ? (importedKeyFor(state, appid) ?? `manual:${appid}`) : `steam:${appid}`;
 			// A game added by hand goes by its name in Steam (renamed there, it is looked up again)
 			const entry = state.imported[key];
 			if (entry && alive) setCopy(steamCopy(entry));
@@ -559,7 +564,10 @@ type Mounted = {
 	host: HTMLElement;
 	root: Root;
 	appid: number;
-	notice: HTMLElement;
+	// Steam's box for non-Steam shortcuts, hidden while the block is there (none on Steam's own games)
+	notice: HTMLElement | null;
+	// What the block sits right before: that box, or the first part of the left column
+	anchor: HTMLElement;
 	side: HTMLElement | null;
 	column: HTMLElement | null;
 	// Player and summary, across both columns
@@ -581,7 +589,7 @@ function unmount() {
 		mounted.column.style.marginLeft = mounted.column.dataset.ugiMargin;
 		delete mounted.column.dataset.ugiMargin;
 	}
-	showNotice(mounted.notice);
+	if (mounted.notice) showNotice(mounted.notice);
 	mounted = null;
 }
 
@@ -614,6 +622,13 @@ function columns(notice: HTMLElement): { left: HTMLElement; right: HTMLElement }
 		if (found) return { left: el, right: found as HTMLElement };
 	}
 	return null;
+}
+
+// A Steam game's page: its two columns, the left one (activity) and the right one (achievements, notes)
+function gameColumns(doc: Document): { left: HTMLElement; right: HTMLElement } | null {
+	const right = Array.from(doc.querySelectorAll<HTMLElement>('.RightColumn')).find((el) => el.getClientRects().length);
+	const left = right && Array.from(right.parentElement?.children ?? []).find((el) => el.classList.contains('LeftColumn'));
+	return right && left ? { left: left as HTMLElement, right } : null;
 }
 
 // The side box starts level with the "About this game" block, and has the same side edges as the
@@ -690,13 +705,20 @@ function alignSide(m: Mounted) {
 // Steam draws a game's page a moment after opening it: its box is looked for at every check for the
 // first seconds, then once a second (the search goes through the whole page)
 let searching = { appid: 0, since: 0, last: 0 };
+// The setting for Steam's own games, read again every few seconds (changed in UGI's page meanwhile)
+let steamPages = false;
+let steamPagesRead = 0;
 let aligned = 0;
 
 async function tick() {
+	if (Date.now() - steamPagesRead > 3000) {
+		steamPagesRead = Date.now();
+		steamPages = (await loadState()).settings.steam_pages === true;
+	}
 	const path = mainWindowPath();
 	const appid = Number(path.match(/^\/library\/app\/(\d+)/)?.[1] ?? 0);
-	// Every non-Steam game: imported by UGI or added by hand
-	if (!appid || !isShortcut(appid)) {
+	// Every non-Steam game (imported by UGI or added by hand), and Steam's own when the setting is on
+	if (!appid || (!isShortcut(appid) && !steamPages)) {
 		searching.appid = 0;
 		return unmount();
 	}
@@ -708,8 +730,8 @@ async function tick() {
 		mounted &&
 		mounted.appid === appid &&
 		mounted.host.isConnected &&
-		mounted.host.nextElementSibling === mounted.notice &&
-		mounted.notice.dataset.ugiStyle !== undefined &&
+		mounted.host.nextElementSibling === mounted.anchor &&
+		(!mounted.notice || mounted.notice.dataset.ugiStyle !== undefined) &&
 		(!mounted.side || (mounted.side.isConnected && mounted.column?.firstElementChild === mounted.side)) &&
 		(!mounted.top || mounted.top.isConnected)
 	) {
@@ -723,17 +745,23 @@ async function tick() {
 	if (now - searching.since > 3000 && now - searching.last < 1000) return;
 	searching.last = now;
 	const name = appStore.GetAppOverviewByAppID(appid)?.display_name;
-	const notice = doc && name ? shortcutNotice(doc, name) : null;
-	if (!doc || !notice) return unmount();
+	const notice = doc && name && isShortcut(appid) ? shortcutNotice(doc, name) : null;
+	// A Steam game: the block goes at the top of the left column, under the bar of links to its store page
+	const steamColumns = doc && !isShortcut(appid) ? gameColumns(doc) : null;
+	const anchor = notice ?? steamColumns?.left.firstElementChild as HTMLElement | null | undefined;
+	if (!doc || !anchor) return unmount();
 
 	unmount();
 	// Measured while Steam's box is still visible
-	const cols = columns(notice);
+	const cols = notice ? columns(notice) : steamColumns;
 	const column = cols?.right ?? null;
+	// UGI's texts follow its language's direction; the media above the columns stay as Steam lays them out
 	const host = doc.createElement('div');
-	notice.insertAdjacentElement('beforebegin', host);
-	hideNotice(notice);
+	host.dir = textDir();
+	anchor.insertAdjacentElement('beforebegin', host);
+	if (notice) hideNotice(notice);
 	const side = column ? doc.createElement('div') : null;
+	if (side) side.dir = textDir();
 	if (column && side) column.insertAdjacentElement('afterbegin', side);
 	// Above both columns, like the store's media section
 	let top: HTMLElement | null = null;
@@ -746,7 +774,7 @@ async function tick() {
 	host.style.display = 'flow-root';
 	const root = createRoot(host);
 	root.render(<Blocks appid={appid} side={side} top={top} />);
-	mounted = { host, root, appid, notice, side, column, top };
+	mounted = { host, root, appid, notice, anchor, side, column, top };
 	// Steam drawing the page again: looked for quickly once more
 	searching.appid = 0;
 	// Realigned as soon as the block or the right column changes size (pictures loading, window resized)
@@ -897,16 +925,20 @@ function steamContexts(el: HTMLElement): { type: any; value: unknown }[] {
 function tickBigPicture() {
 	const path: string = gamepadWindow()?.m_history?.location?.pathname ?? '';
 	const appid = Number(path.match(/^\/library\/app\/(\d+)\/tab\/GameInfo/)?.[1] ?? 0);
-	if (!appid || !isShortcut(appid)) return unmountBig();
+	if (!appid || (!isShortcut(appid) && !steamPages)) return unmountBig();
 	if (big && big.appid === appid && big.host.isConnected && big.box.isConnected) return;
 	const doc = gamepadDocument();
-	// Steam's notice and the portrait beside it, in one box
-	const box = doc?.querySelector<HTMLElement>('.AppGameInfoContainer .Shortcut')?.parentElement;
+	// Steam's notice and the portrait beside it, in one box; on Steam's own games, its short summary
+	// (details, features, portrait), which UGI's blocks include
+	const box = isShortcut(appid)
+		? doc?.querySelector<HTMLElement>('.AppGameInfoContainer .Shortcut')?.parentElement
+		: doc?.querySelector<HTMLElement>('.AppGameInfoContainer')?.firstElementChild as HTMLElement | null | undefined;
 	unmountBig();
 	if (!doc || !box) return;
 
 	const host = doc.createElement('div');
 	host.className = 'ugi-bpm';
+	host.dir = textDir();
 	box.insertAdjacentElement('beforebegin', host);
 	hideNotice(box);
 	let tree: React.ReactNode = (

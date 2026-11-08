@@ -289,6 +289,8 @@ const zhTW: Strings = {
 	'settings.rawgText': "用於不在 Steam、GOG 或 Epic 上的遊戲簡介（英文）。免費金鑰：",
 	'settings.xbl': "OpenXBL API 金鑰（選用）",
 	'settings.xblText': "所有 Xbox 遊戲的成就；沒有金鑰時，僅限你在 Xbox 應用程式中開啟過的遊戲。免費金鑰（用 Microsoft 帳戶登入）：",
+	'settings.steamPages': "Steam 遊戲也顯示商店頁面",
+	'settings.steamPagesText': "在你的 Steam 遊戲頁面上也顯示預告片、簡介、系統需求等商店頁面內容。",
 	'settings.achToasts': "成就通知",
 	'settings.achToastsText': "玩 GOG、Epic 或 Xbox 遊戲時，Steam 通知會顯示你解鎖的每個成就：GOG 立即顯示，Epic 兩分鐘內，Xbox 五分鐘內。",
 	'settings.epic': "Epic 帳戶（選用）",

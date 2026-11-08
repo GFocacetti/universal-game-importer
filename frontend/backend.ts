@@ -58,6 +58,7 @@ export async function loadState(): Promise<UgiState> {
 			xbl_key: typeof settings.xbl_key === 'string' ? settings.xbl_key : '',
 			animated: settings.animated === true,
 			achievement_toasts: settings.achievement_toasts !== false,
+			steam_pages: settings.steam_pages === true,
 			// WebP included unless the user turned it off
 			webp: settings.webp !== false,
 			theme: settings.theme === 'modern' ? 'modern' : 'steam',

@@ -289,6 +289,8 @@ const da: Strings = {
 	'settings.rawgText': "Til beskrivelsen af spil, der ikke findes på Steam, GOG eller Epic (tekster på engelsk). Gratis nøgle:",
 	'settings.xbl': "OpenXBL-API-nøgle (valgfri)",
 	'settings.xblText': "Præstationer for alle Xbox-spil; uden den kun for spil, du har åbnet i Xbox-appen. Gratis nøgle (log ind med din Microsoft-konto):",
+	'settings.steamPages': "Butiksside også på Steam-spil",
+	'settings.steamPagesText': "Trailere, beskrivelse, systemkrav og resten af butikssiden også på siden for dine spil på Steam.",
 	'settings.achToasts': "Notifikationer om præstationer",
 	'settings.achToastsText': "Mens du spiller et GOG-, Epic- eller Xbox-spil, viser en Steam-notifikation hver præstation, du låser op: GOG med det samme, Epic inden for to minutter, Xbox inden for fem.",
 	'settings.epic': "Epic-konto (valgfri)",

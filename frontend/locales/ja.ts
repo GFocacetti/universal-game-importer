@@ -289,6 +289,8 @@ const ja: Strings = {
 	'settings.rawgText': "Steam、GOG、Epic にないゲームの説明用（英語のテキスト）。無料のキー：",
 	'settings.xbl': "OpenXBL の API キー（任意）",
 	'settings.xblText': "すべての Xbox ゲームの実績。キーがない場合は Xbox アプリで開いたゲームのみ。無料のキー（Microsoft アカウントでサインイン）：",
+	'settings.steamPages': "Steam のゲームにもストアページを",
+	'settings.steamPagesText': "トレーラー、説明、システム要件などのストアページの内容を、Steam で持っているゲームのページにも表示します。",
 	'settings.achToasts': "実績の通知",
 	'settings.achToastsText': "GOG、Epic、Xbox のゲームをプレイ中、解除した実績を Steam の通知で表示します：GOG はすぐに、Epic は 2 分以内、Xbox は 5 分以内。",
 	'settings.epic': "Epic アカウント（任意）",

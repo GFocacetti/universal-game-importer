@@ -377,6 +377,10 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 				<Toggle on={state.settings.achievement_toasts !== false} onChange={(v) => set({ achievement_toasts: v })} />
 			</div>
 			<div className="ugi-set">
+				<div><strong>{t('settings.steamPages')}</strong><small>{t('settings.steamPagesText')}</small></div>
+				<Toggle on={state.settings.steam_pages === true} onChange={(v) => set({ steam_pages: v })} />
+			</div>
+			<div className="ugi-set">
 				<div><strong>{t('settings.animated')}</strong><small>{t('settings.animatedText')}</small></div>
 				<Toggle on={!!state.settings.animated} onChange={(v) => set({ animated: v })} />
 			</div>

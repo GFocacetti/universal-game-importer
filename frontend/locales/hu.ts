@@ -289,6 +289,8 @@ const hu: Strings = {
 	'settings.rawgText': "A Steamen, GOG-on vagy Epicen nem szereplő játékok leírásához (angol nyelvű szövegek). Ingyenes kulcs:",
 	'settings.xbl': "OpenXBL API-kulcs (nem kötelező)",
 	'settings.xblText': "Minden Xbox-játék teljesítményei; nélküle csak az Xbox alkalmazásban megnyitott játékoké. Ingyenes kulcs (jelentkezz be Microsoft-fiókkal):",
+	'settings.steamPages': "Áruházi oldal a Steam-játékoknál is",
+	'settings.steamPagesText': "Az előzetesek, a leírás, a gépigény és az áruházi oldal többi része a Steamen meglévő játékaid oldalán is.",
 	'settings.achToasts': "Teljesítményértesítések",
 	'settings.achToastsText': "Amíg GOG-, Epic- vagy Xbox-játékkal játszol, egy Steam-értesítés minden megszerzett teljesítményt mutat: GOG azonnal, Epic két percen belül, Xbox öt percen belül.",
 	'settings.epic': "Epic-fiók (nem kötelező)",

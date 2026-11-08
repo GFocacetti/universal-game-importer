@@ -1,7 +1,7 @@
 import { Focusable } from '@steambrew/client';
 import React, { useEffect, useState } from 'react';
 import { loadState, saveState } from 'backend';
-import { relativeTime, t } from 'i18n';
+import { relativeTime, t, textDir } from 'i18n';
 import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
 import GamesSection from 'GamesSection';
@@ -151,7 +151,7 @@ export default function UgiPage() {
 		: '';
 
 	const page = (
-		<div className="ugi-root" style={{ ...(themeStyle(theme) as React.CSSProperties), ...(bigPicture() ? BIG_PICTURE_BARS : {}) }}>
+		<div className="ugi-root" dir={textDir()} style={{ ...(themeStyle(theme) as React.CSSProperties), ...(bigPicture() ? BIG_PICTURE_BARS : {}) }}>
 			<style>{UGI_CSS}</style>
 			<nav className="ugi-side">
 				<div className="ugi-brand">

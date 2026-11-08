@@ -289,6 +289,8 @@ const cs: Strings = {
 	'settings.rawgText': "Pro popis her, které nejsou na Steamu, GOG ani Epic (texty v angličtině). Bezplatný klíč:",
 	'settings.xbl': "API klíč OpenXBL (volitelné)",
 	'settings.xblText': "Úspěchy všech her Xbox; bez něj jen her otevřených v aplikaci Xbox. Bezplatný klíč (přihlaste se účtem Microsoft):",
+	'settings.steamPages': "Stránka obchodu i u her ze Steamu",
+	'settings.steamPagesText': "Trailery, popis, požadavky a zbytek stránky obchodu i na stránce her, které máte na Steamu.",
 	'settings.achToasts': "Oznámení o úspěších",
 	'settings.achToastsText': "Když hrajete hru z GOG, Epic nebo Xbox, oznámení Steamu ukáže každý získaný úspěch: GOG hned, Epic do dvou minut, Xbox do pěti.",
 	'settings.epic': "Účet Epic (volitelné)",

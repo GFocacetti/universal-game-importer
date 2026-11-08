@@ -289,6 +289,8 @@ const uk: Strings = {
 	'settings.rawgText': "Для описів ігор, яких немає в Steam, GOG чи Epic (тексти англійською). Безкоштовний ключ:",
 	'settings.xbl': "API-ключ OpenXBL (необов'язково)",
 	'settings.xblText': "Досягнення всіх ігор Xbox; без нього — лише ігор, відкритих у застосунку Xbox. Безкоштовний ключ (вхід через обліковий запис Microsoft):",
+	'settings.steamPages': "Сторінка крамниці й для ігор Steam",
+	'settings.steamPagesText': "Трейлери, опис, системні вимоги та решта сторінки крамниці також на сторінці ваших ігор у Steam.",
 	'settings.achToasts': "Сповіщення про досягнення",
 	'settings.achToastsText': "Поки ви граєте в гру GOG, Epic чи Xbox, сповіщення Steam показує кожне здобуте досягнення: GOG одразу, Epic протягом двох хвилин, Xbox протягом п'яти.",
 	'settings.epic': "Обліковий запис Epic (необов'язково)",

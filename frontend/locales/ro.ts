@@ -289,6 +289,8 @@ const ro: Strings = {
 	'settings.rawgText': "Pentru descrierea jocurilor care nu sunt pe Steam, GOG sau Epic (texte în engleză). Cheie gratuită:",
 	'settings.xbl': "Cheie API OpenXBL (opțional)",
 	'settings.xblText': "Realizările tuturor jocurilor Xbox; fără ea, doar ale jocurilor deschise în aplicația Xbox. Cheie gratuită (autentifică-te cu contul Microsoft):",
+	'settings.steamPages': "Pagina magazinului și la jocurile Steam",
+	'settings.steamPagesText': "Trailerele, descrierea, cerințele și restul paginii magazinului și pe pagina jocurilor tale de pe Steam.",
 	'settings.achToasts': "Notificări pentru realizări",
 	'settings.achToastsText': "Cât joci un joc GOG, Epic sau Xbox, o notificare Steam arată fiecare realizare deblocată: GOG imediat, Epic în cel mult două minute, Xbox în cel mult cinci.",
 	'settings.epic': "Cont Epic (opțional)",

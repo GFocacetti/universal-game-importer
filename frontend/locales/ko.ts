@@ -289,6 +289,8 @@ const ko: Strings = {
 	'settings.rawgText': "Steam, GOG, Epic에 없는 게임의 설명용 (영어 텍스트). 무료 키:",
 	'settings.xbl': "OpenXBL API 키 (선택)",
 	'settings.xblText': "모든 Xbox 게임의 도전 과제. 키가 없으면 Xbox 앱에서 연 게임만. 무료 키 (Microsoft 계정으로 로그인):",
+	'settings.steamPages': "Steam 게임에도 상점 페이지",
+	'settings.steamPagesText': "트레일러, 설명, 시스템 요구 사항 등 상점 페이지 내용을 Steam에 있는 게임의 페이지에도 표시합니다.",
 	'settings.achToasts': "도전 과제 알림",
 	'settings.achToastsText': "GOG, Epic, Xbox 게임을 플레이하는 동안 달성한 도전 과제를 Steam 알림으로 보여줍니다: GOG는 즉시, Epic은 2분 이내, Xbox는 5분 이내.",
 	'settings.epic': "Epic 계정 (선택)",

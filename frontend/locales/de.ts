@@ -289,6 +289,8 @@ const de: Strings = {
 	'settings.rawgText': "Für die Beschreibung von Spielen, die nicht auf Steam, GOG oder Epic sind (Texte auf Englisch). Kostenloser Schlüssel:",
 	'settings.xbl': "OpenXBL-API-Schlüssel (optional)",
 	'settings.xblText': "Errungenschaften aller Xbox-Spiele; ohne ihn nur die Spiele, die du in der Xbox-App geöffnet hast. Kostenloser Schlüssel (mit deinem Microsoft-Konto anmelden):",
+	'settings.steamPages': "Shopseite auch bei Steam-Spielen",
+	'settings.steamPagesText': "Trailer, Beschreibung, Systemanforderungen und der Rest der Shopseite auch auf der Seite deiner Spiele auf Steam.",
 	'settings.achToasts': "Benachrichtigungen für Errungenschaften",
 	'settings.achToastsText': "Während du ein GOG-, Epic- oder Xbox-Spiel spielst, zeigt eine Steam-Benachrichtigung jede freigeschaltete Errungenschaft: GOG sofort, Epic innerhalb von zwei Minuten, Xbox innerhalb von fünf.",
 	'settings.epic': "Epic-Konto (optional)",

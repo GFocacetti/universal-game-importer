@@ -10,7 +10,7 @@ import { watchGamepad } from 'gamepad';
 import { epicSandbox, xboxTitleId } from 'gameInfo';
 import { bigPicture } from 'location';
 import { Pressable } from 'Pressable';
-import { t, uiLocale } from 'i18n';
+import { t, textDir, uiLocale } from 'i18n';
 import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
 
@@ -82,7 +82,7 @@ export const ACHIEVEMENTS_CSS = `
 .ugi-ach-text b { display: block; color: #ffffff; font-weight: 400; }
 .ugi-ach-item.locked .ugi-ach-text b { color: #acb2b8; }
 .ugi-ach-text span { color: #8f98a0; font-size: 13px; }
-.ugi-ach-side { flex: none; text-align: right; color: #8f98a0; font-size: 12px; }
+.ugi-ach-side { flex: none; text-align: end; color: #8f98a0; font-size: 12px; }
 .ugi-ach-side .rare { color: #e4ae39; }
 `;
 
@@ -279,6 +279,7 @@ function Item({ item }: { item: Achievement }) {
 // in Big Picture the D-pad scrolls it and B closes it
 function openList(doc: Document, result: Result, items: Achievement[]) {
 	const host = doc.createElement('div');
+	host.dir = textDir();
 	Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '9999' });
 	doc.body.appendChild(host);
 	const root = createRoot(host);

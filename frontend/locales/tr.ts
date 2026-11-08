@@ -289,6 +289,8 @@ const tr: Strings = {
 	'settings.rawgText': "Steam, GOG veya Epic'te bulunmayan oyunların açıklaması için (İngilizce metinler). Ücretsiz anahtar:",
 	'settings.xbl': "OpenXBL API anahtarı (isteğe bağlı)",
 	'settings.xblText': "Tüm Xbox oyunlarının başarımları; anahtar olmadan yalnızca Xbox uygulamasında açtığın oyunlarınkiler. Ücretsiz anahtar (Microsoft hesabınla giriş yap):",
+	'settings.steamPages': "Steam oyunlarında da mağaza sayfası",
+	'settings.steamPagesText': "Fragmanlar, açıklama, sistem gereksinimleri ve mağaza sayfasının geri kalanı Steam'deki oyunlarının sayfasında da.",
 	'settings.achToasts': "Başarım bildirimleri",
 	'settings.achToastsText': "Bir GOG, Epic veya Xbox oyunu oynarken, bir Steam bildirimi açtığın her başarımı gösterir: GOG hemen, Epic iki dakika içinde, Xbox beş dakika içinde.",
 	'settings.epic': "Epic hesabı (isteğe bağlı)",

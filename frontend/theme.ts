@@ -95,7 +95,7 @@ export const UGI_CSS = `
 .ugi-btn:disabled { opacity: .5; cursor: default; }
 .ugi-apibar { margin: 12px 22px 0; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--ugi-radius); background: var(--ugi-warn-bg); border: 1px solid var(--ugi-warn); cursor: pointer; font-size: 14px; }
 .ugi-apibar b { color: var(--ugi-warn); }
-.ugi-apibar .go { margin-left: auto; color: var(--ugi-warn); font-weight: 600; white-space: nowrap; }
+.ugi-apibar .go { margin-inline-start: auto; color: var(--ugi-warn); font-weight: 600; white-space: nowrap; }
 .ugi-content { flex: 1; overflow: auto; padding: 16px 22px 22px; }
 /* When the controller brings an element into view, a gap like the grid's stays at the edge */
 .ugi-content, .ugi-win-pane, .ugi-drawer, .ugi-review-list, .ugi-choice-list, .ugi-mosaic { scroll-padding: 14px 0; }
@@ -115,7 +115,7 @@ export const UGI_CSS = `
 .ugi-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
 .ugi-chip { padding: 6px 12px; border-radius: 999px; background: var(--ugi-chip); font-size: 13px; cursor: pointer; }
 .ugi-chip.on { background: var(--ugi-accent); color: #fff; }
-.ugi-search { flex: 1; min-width: 160px; max-width: 260px; margin-left: auto; padding: 7px 10px; border-radius: var(--ugi-radius); border: 1px solid var(--ugi-panel-border); background: var(--ugi-bg2); color: var(--ugi-text); font: inherit; }
+.ugi-search { flex: 1; min-width: 160px; max-width: 260px; margin-inline-start: auto; padding: 7px 10px; border-radius: var(--ugi-radius); border: 1px solid var(--ugi-panel-border); background: var(--ugi-bg2); color: var(--ugi-text); font: inherit; }
 .ugi-zoom { display: flex; align-items: center; gap: 10px; color: var(--ugi-muted); }
 .ugi-zoom-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; cursor: pointer; border-radius: var(--ugi-radius); }
 .ugi-zoom-icon:hover { color: var(--ugi-head); }
@@ -141,13 +141,13 @@ export const UGI_CSS = `
 .ugi-row { display: grid; grid-template-columns: 40px 1fr 140px 150px; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--ugi-radius); background: var(--ugi-panel); margin-bottom: 6px; font-size: 14px; cursor: pointer; }
 .ugi-mini { width: 40px; height: 56px; object-fit: cover; border-radius: 2px; }
 .ugi-overlay.right { justify-content: flex-end; align-items: stretch; }
-.ugi-drawer { width: 460px; max-width: 100%; height: 100%; box-sizing: border-box; background: var(--ugi-bg2); border-left: 1px solid var(--ugi-panel-border); padding: 20px 22px; overflow: auto; }
+.ugi-drawer { width: 460px; max-width: 100%; height: 100%; box-sizing: border-box; background: var(--ugi-bg2); border-inline-start: 1px solid var(--ugi-panel-border); padding: 20px 22px; overflow: auto; }
 .ugi-drawer-head { display: flex; justify-content: space-between; align-items: flex-start; }
 .ugi-drawer h2 { margin: 0 0 4px; color: var(--ugi-head); font-weight: 500; }
 .ugi-imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
 .ugi-im { position: relative; border-radius: var(--ugi-radius); overflow: hidden; background: var(--ugi-panel); }
 .ugi-im img, .ugi-im .ugi-noimg { width: 100%; height: 100%; object-fit: cover; display: block; border: 0; }
-.ugi-im span { position: absolute; left: 6px; bottom: 6px; font-size: 11px; background: rgba(0,0,0,.6); padding: 2px 6px; border-radius: 4px; color: #fff; }
+.ugi-im span { position: absolute; inset-inline-start: 6px; bottom: 6px; font-size: 11px; background: rgba(0,0,0,.6); padding: 2px 6px; border-radius: 4px; color: #fff; }
 .ugi-im.grid { aspect-ratio: 2/3; grid-row: span 2; }
 .ugi-im.wide { aspect-ratio: 92/43; }
 .ugi-im.hero { aspect-ratio: 96/31; grid-column: 1 / -1; }
@@ -165,13 +165,13 @@ export const UGI_CSS = `
 .ugi-sp { flex: 1; }
 .ugi-switch { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; user-select: none; }
 .ugi-tog { width: 40px; height: 22px; border-radius: 11px; background: #3a4350; position: relative; flex: none; }
-.ugi-tog::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.ugi-tog::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: inset-inline-start .15s; }
 .ugi-switch.on .ugi-tog { background: var(--ugi-accent); }
-.ugi-switch.on .ugi-tog::after { left: 21px; }
+.ugi-switch.on .ugi-tog::after { inset-inline-start: 21px; }
 .ugi-win.large { width: 90%; height: 90%; max-width: none; max-height: none; }
 .ugi-pick-bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--ugi-panel-border); }
 .ugi-win-body { flex: 1; display: flex; min-height: 0; }
-.ugi-types { width: 200px; flex: none; padding: 12px 8px; border-right: 1px solid var(--ugi-panel-border); display: flex; flex-direction: column; gap: 4px; }
+.ugi-types { width: 200px; flex: none; padding: 12px 8px; border-inline-end: 1px solid var(--ugi-panel-border); display: flex; flex-direction: column; gap: 4px; }
 .ugi-current { margin-top: auto; padding: 10px 12px; font-size: 12px; color: var(--ugi-muted); }
 .ugi-current .ugi-im { margin-top: 6px; width: 100%; }
 .ugi-current .ugi-im.grid { width: 110px; grid-row: auto; }
@@ -190,7 +190,7 @@ export const UGI_CSS = `
 .ugi-check { display: flex; align-items: center; gap: 10px; padding: 7px 10px; margin-bottom: 4px; font-size: 14px; background: var(--ugi-panel); border-radius: var(--ugi-radius); cursor: pointer; }
 .ugi-check.off { opacity: .6; }
 .ugi-check input { accent-color: var(--ugi-accent); }
-.ugi-check small { margin-left: auto; color: var(--ugi-muted); font-size: 12px; }
+.ugi-check small { margin-inline-start: auto; color: var(--ugi-muted); font-size: 12px; }
 .ugi-review { max-height: calc(100% - 48px); display: flex; flex-direction: column; }
 .ugi-review-list { overflow: auto; flex: 1; min-height: 0; }
 .ugi-review-list h3 { font-size: 13px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .5px; color: var(--ugi-muted); }
@@ -244,7 +244,7 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-tabs span.on { color: var(--ugi-head); border-bottom-color: var(--ugi-accent); }
 .ugi-tabs.pad { margin: 0; padding: 0 18px; }
 .ugi-win header h2 + .ugi-muted { font-size: 13px; }
-.ugi-mosaic { width: 340px; flex: none; padding: 14px 16px; border-right: 1px solid var(--ugi-panel-border); overflow: auto; }
+.ugi-mosaic { width: 340px; flex: none; padding: 14px 16px; border-inline-end: 1px solid var(--ugi-panel-border); overflow: auto; }
 .ugi-mosaic .ugi-imgs { margin: 0 0 10px; grid-template-areas: "grid wide" "grid logo" "grid icon" "hero hero"; align-items: start; }
 .ugi-mosaic .ugi-im.grid { grid-area: grid; grid-row: grid; aspect-ratio: auto; align-self: stretch; }
 .ugi-mosaic .ugi-im.wide { grid-area: wide; }
@@ -256,7 +256,7 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-switch.disabled { opacity: .4; cursor: default; }
 .ugi-onboarding { position: relative; min-height: 440px; display: flex; flex-direction: column; }
 .ugi-ob-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.ugi-guide { padding-left: 22px; }
+.ugi-guide { padding-inline-start: 22px; }
 .ugi-guide li { margin-bottom: 14px; }
 .ugi-guide img { display: block; max-width: 100%; margin-top: 8px; border-radius: 6px; border: 1px solid var(--ugi-panel-border); }
 .ugi-dialog p.ugi-guide-note { font-size: 13px; }

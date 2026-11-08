@@ -289,6 +289,8 @@ const sv: Strings = {
 	'settings.rawgText': "För beskrivningen av spel som inte finns på Steam, GOG eller Epic (texter på engelska). Gratis nyckel:",
 	'settings.xbl': "API-nyckel för OpenXBL (valfri)",
 	'settings.xblText': "Prestationer för alla Xbox-spel; utan den bara för spel du har öppnat i Xbox-appen. Gratis nyckel (logga in med ditt Microsoft-konto):",
+	'settings.steamPages': "Butikssida även för Steam-spel",
+	'settings.steamPagesText': "Trailrar, beskrivning, systemkrav och resten av butikssidan även på sidan för dina spel på Steam.",
 	'settings.achToasts': "Aviseringar om prestationer",
 	'settings.achToastsText': "Medan du spelar ett GOG-, Epic- eller Xbox-spel visar en Steam-avisering varje prestation du låser upp: GOG direkt, Epic inom två minuter, Xbox inom fem.",
 	'settings.epic': "Epic-konto (valfritt)",

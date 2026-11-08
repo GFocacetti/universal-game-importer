@@ -289,6 +289,8 @@ const es419: Strings = {
 	'settings.rawgText': "Para la descripción de los juegos que no están en Steam, GOG o Epic (textos en inglés). Clave gratuita:",
 	'settings.xbl': "Clave API de OpenXBL (opcional)",
 	'settings.xblText': "Logros de todos los juegos de Xbox; sin ella, solo de los juegos que has abierto en la aplicación Xbox. Clave gratuita (inicia sesión con tu cuenta de Microsoft):",
+	'settings.steamPages': "Página de la tienda también en los juegos de Steam",
+	'settings.steamPagesText': "Los tráileres, la descripción, los requisitos y el resto de la página de la tienda también en la página de tus juegos de Steam.",
 	'settings.achToasts': "Notificaciones de logros",
 	'settings.achToastsText': "Mientras juegas a un juego de GOG, Epic o Xbox, una notificación de Steam muestra cada logro que desbloqueas: GOG al momento, Epic en menos de dos minutos, Xbox en menos de cinco.",
 	'settings.epic': "Cuenta de Epic (opcional)",

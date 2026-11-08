@@ -289,6 +289,8 @@ const ar: Strings = {
 	'settings.rawgText': "لوصف الألعاب غير الموجودة على Steam أو GOG أو Epic (نصوص بالإنجليزية). مفتاح مجاني:",
 	'settings.xbl': "مفتاح API الخاص بـ OpenXBL (اختياري)",
 	'settings.xblText': "إنجازات كل ألعاب Xbox؛ ومن دونه فقط الألعاب التي فتحتها في تطبيق Xbox. مفتاح مجاني (سجّل الدخول بحساب Microsoft):",
+	'settings.steamPages': "صفحة المتجر في ألعاب Steam أيضًا",
+	'settings.steamPagesText': "المقاطع الدعائية والوصف ومتطلبات التشغيل وبقية صفحة المتجر في صفحة ألعابك على Steam أيضًا.",
 	'settings.achToasts': "إشعارات الإنجازات",
 	'settings.achToastsText': "أثناء لعبك لعبة من GOG أو Epic أو Xbox، يعرض إشعار من Steam كل إنجاز تفتحه: GOG فورًا، وEpic خلال دقيقتين، وXbox خلال خمس.",
 	'settings.epic': "حساب Epic (اختياري)",
