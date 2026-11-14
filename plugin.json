@@ -5,5 +5,5 @@
 	"description": "Brings any game into your Steam library: imports games from other launchers or adds them by hand, with pictures, store pages and achievements.",
 	"backendType": "lua",
 	"useBackend": true,
-	"version": "0.67.2"
+	"version": "0.67.3"
 }
