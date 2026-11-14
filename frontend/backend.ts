@@ -12,6 +12,11 @@ export const epicAccountName = callable<[], string>('ugi_epic_account');
 export const epicSignIn = callable<[{ a_code: string }], string>('ugi_epic_sign_in');
 export const epicSignOut = callable<[], boolean>('ugi_epic_sign_out');
 
+// Updating UGI from GitHub, on request: what's installed and what's out (JSON), and installing
+// the latest release (its version, empty when it failed)
+export const updateCheck = callable<[], string>('ugi_update_check');
+export const updateInstall = callable<[], string>('ugi_update_install');
+
 // Millennium may hand string results back still wrapped in JSON quotes ("fn" instead of fn):
 // every string from a backend call goes through this
 export const unquote = (value: unknown) => String(value ?? '').replace(/^"|"$/g, '');

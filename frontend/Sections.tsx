@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { epicAccountName, epicSignIn, epicSignOut, loadState, saveState, unquote } from 'backend';
+import { epicAccountName, epicSignIn, epicSignOut, loadState, saveState, unquote, updateCheck, updateInstall } from 'backend';
 import { removeCollections, removeLauncherCollection, syncCollections } from 'collections';
 import { LANGUAGES, LanguageChoice, setLanguage, t } from 'i18n';
 import { checkMissing, fillMissing, ImageType, replaceAll, resetImages, StopFlag } from 'sgdb';
@@ -333,6 +333,65 @@ function EpicAccount() {
 	);
 }
 
+// UGI's own update, only when asked: look on GitHub, then install the new release (active after
+// Steam restarts). Meant for manual installs, until Millennium's plugin list carries UGI.
+type UpdateInfo = { current: string; latest?: string; url?: string };
+function UgiUpdate() {
+	const [info, setInfo] = useState<UpdateInfo | null>(null);
+	const [busy, setBusy] = useState(false);
+	const [installed, setInstalled] = useState<string | null>(null);
+	const [failed, setFailed] = useState(false);
+	// GitHub is asked only when the button is pressed
+	const check = async () => {
+		setBusy(true);
+		setFailed(false);
+		try {
+			setInfo(JSON.parse(unquote(await updateCheck())) as UpdateInfo);
+		} catch {
+			setInfo({ current: '' });
+		}
+		setBusy(false);
+	};
+	const install = async () => {
+		setBusy(true);
+		setFailed(false);
+		const version = unquote(await updateInstall().catch(() => ''));
+		setBusy(false);
+		if (version) setInstalled(version);
+		else setFailed(true);
+	};
+	const available = info?.latest && info.latest !== info.current;
+	let status = '';
+	if (installed) status = t('settings.updateDone', { version: installed });
+	else if (failed) status = t('settings.updateInstallFailed', { version: info?.current ?? '' });
+	else if (info && !info.latest) status = t('settings.updateFailed');
+	else if (info && !available) status = t('settings.updateNone', { version: info.current });
+	else if (available) status = t('settings.updateAvailable', { version: info!.latest! });
+	return (
+		<div className="ugi-set">
+			<div>
+				<strong>{t('settings.update')}</strong>
+				<small>
+					{status || t('settings.updateText')}
+					{available && !installed && info?.url && (
+						<>
+							{' '}
+							<button className="ugi-link" onClick={() => openUrl(info.url!)}>{t('settings.updateNotes')}</button>
+						</>
+					)}
+				</small>
+			</div>
+			{installed ? (
+				<button className="ugi-btn secondary" onClick={() => SteamClient.User.StartRestart(false)}>{t('settings.updateRestart')}</button>
+			) : available ? (
+				<button className="ugi-btn secondary" disabled={busy} onClick={install}>{t('settings.updateInstall')}</button>
+			) : (
+				<button className="ugi-btn secondary" disabled={busy} onClick={check}>{t('settings.updateCheck')}</button>
+			)}
+		</div>
+	);
+}
+
 export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiState; onChanged: () => void; onRedoSetup: () => void }) {
 	const [key, setKey] = useState<string | null>(null);
 	const [rawgKey, setRawgKey] = useState<string | null>(null);
@@ -439,6 +498,7 @@ export function SettingsSection({ state, onChanged, onRedoSetup }: { state: UgiS
 				<div><strong>{t('settings.setup')}</strong><small>{t('settings.setupText')}</small></div>
 				<button className="ugi-btn secondary" onClick={onRedoSetup}>{t('settings.setupButton')}</button>
 			</div>
+			<UgiUpdate />
 		</div>
 	);
 }
