@@ -30,7 +30,7 @@ export type Achievement = {
 	time?: string;
 	gamerscore?: number;
 };
-type Result = { source?: 'gog' | 'xbox' | 'epic'; items: Achievement[]; signed_out?: boolean; fetched?: number };
+type Result = { source?: 'gog' | 'xbox' | 'epic'; items: Achievement[]; signed_out?: boolean; fetched?: number; unreachable?: boolean };
 
 // OpenXBL's free key allows 150 requests an hour: an Xbox game is asked again after 10 minutes at most
 const XBOX_RECHECK = 10 * 60 * 1000;
@@ -108,6 +108,9 @@ async function saved(id: string): Promise<Result | null> {
 	return result;
 }
 
+// Set when the last read found OpenXBL unreachable
+let unreachable = false;
+
 // Reads the launcher now (and saves what it got)
 function fetchFresh(state: UgiState, id: string): Promise<Result> {
 	const lang = language();
@@ -115,7 +118,8 @@ function fetchFresh(state: UgiState, id: string): Promise<Result> {
 		.then((more) => readAchievements({ a_id: id, b_lang: lang, c_extra: JSON.stringify(more) }))
 		.then((raw) => {
 			const parsed = JSON.parse(unquote(raw)) as Result;
-			const result = { source: parsed.source, items: Array.isArray(parsed.items) ? parsed.items : [], signed_out: parsed.signed_out === true, fetched: Date.now() };
+			const result: Result = { source: parsed.source, items: Array.isArray(parsed.items) ? parsed.items : [], signed_out: parsed.signed_out === true, fetched: Date.now() };
+			if (parsed.unreachable === true) unreachable = true;
 			// An empty answer doesn't replace a saved list (launcher closed, offline)
 			if (result.items.length || !savedMemory.get(savedKey(id))?.items.length) {
 				savedMemory.set(savedKey(id), result);
@@ -144,11 +148,16 @@ const DAY = 24 * 60 * 60 * 1000;
 // Every imported game's achievements read again once a day, one at a time, behind the library;
 // opening a game's page reads them at once
 export async function prefetchAchievements(state: UgiState) {
+	// OpenXBL gave no answer: the other Xbox games wait for the next round
+	let xblDown = false;
 	for (const id of Object.keys(state.imported)) {
 		if (!WITH_ACHIEVEMENTS.includes(id.slice(0, id.indexOf(':')))) continue;
+		if (xblDown && id.startsWith('xbox:') && state.settings.xbl_key) continue;
 		const last = await saved(id);
 		if (last?.fetched && Date.now() - last.fetched < DAY) continue;
+		unreachable = false;
 		await load(state, id);
+		if (id.startsWith('xbox:') && unreachable) xblDown = true;
 		// OpenXBL's free key allows 150 requests an hour: Xbox games one every 30 seconds at most
 		if (id.startsWith('xbox:') && state.settings.xbl_key) await new Promise((r) => setTimeout(r, 30_000));
 	}

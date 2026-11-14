@@ -131,7 +131,13 @@ local function web(request)
     f:close()
 
     local system = utils.getenv("SystemRoot") or [[C:\Windows]]
-    local status = tonumber((utils.exec(string.format('%s\\System32\\curl.exe -K "%s"', system, config)) or ""):match("(%d%d%d)%s*$")) or 0
+    local output, exit = utils.exec(string.format('%s\\System32\\curl.exe -K "%s"', system, config))
+    local status = tonumber((output or ""):match("(%d%d%d)%s*$")) or 0
+    if status == 0 then
+        -- No HTTP answer: say what curl did, so the cause shows in the log
+        logger:error(string.format("web: no answer from %s (curl exit %s, output %q)",
+            tostring(request.url):match("^https?://[^/]+") or "?", tostring(exit), tostring(output)))
+    end
     if fs.exists(config) then fs.remove(config) end
     if fs.exists(body_file) then fs.remove(body_file) end
 
@@ -161,7 +167,7 @@ local function xbox_online(title, key, lang)
     local data = type(body) == "table" and (type(body.content) == "table" and body.content or body) or nil
     if status ~= 200 or not data or type(data.achievements) ~= "table" then
         logger:error("achievements: OpenXBL answered " .. tostring(status))
-        return nil
+        return nil, status == 0
     end
     local items = {}
     for _, a in ipairs(data.achievements) do
@@ -364,7 +370,7 @@ function ugi_achievements(a_id, b_lang, c_extra)
 
     local gog = id:match("^gog:(%d+)$")
     local family = id:match("^xbox:([%w%._%-]+)!")
-    local items, source, signed_out
+    local items, source, signed_out, unreachable
     if gog then
         source = "gog"
         items = local_items(with_sqlite(GOG_SCRIPT):gsub("__ID__", gog):gsub("__LANG__", lang))
@@ -372,7 +378,7 @@ function ugi_achievements(a_id, b_lang, c_extra)
         source = "xbox"
         local title = tostring(value(extra.title) or ""):match("^%d+$")
         local key = tostring(value(extra.key) or "")
-        if title and key ~= "" then items = xbox_online(title, key, lang) end
+        if title and key ~= "" then items, unreachable = xbox_online(title, key, lang) end
         -- Without a key (or if OpenXBL fails): the Xbox app's cache
         if not items or #items == 0 then
             items = local_items(with_sqlite(XBOX_SCRIPT):gsub("__FAMILY__", function() return family end))
@@ -382,6 +388,7 @@ function ugi_achievements(a_id, b_lang, c_extra)
         local sandbox = tostring(value(extra.sandbox) or ""):match("^[%w%-_]+$")
         if sandbox then items, signed_out = epic_online(sandbox, lang:sub(1, 2)) end
     end
-    if not items or #items == 0 then return '{"items":[]}' end
-    return cjson.encode({ source = source, items = items, signed_out = signed_out or nil })
+    -- unreachable: OpenXBL gave no answer at all (the daily round then stops asking it)
+    if not items or #items == 0 then return unreachable and '{"items":[],"unreachable":true}' or '{"items":[]}' end
+    return cjson.encode({ source = source, items = items, signed_out = signed_out or nil, unreachable = unreachable or nil })
 end
