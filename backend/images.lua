@@ -163,4 +163,7 @@ function ugi_missing_images(a_appids)
     return require("json").encode(out)
 end
 
-return {}
+return {
+    -- Other modules' files sent to the frontend the same way as a download (frames.lua)
+    put_transfer = function(key, data) downloads[key] = data end,
+}

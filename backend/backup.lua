@@ -168,6 +168,8 @@ function ugi_backup_export(a_state, b_appids)
         -- so a half-made backup never shows up nor can be restored
         local partial = fs.join(paths.data_dir(), "backup_partial.zip")
         local icons = fs.join(paths.data_dir(), "icons")
+        -- The covers kept without their frame (frames.lua)
+        local frames = fs.join(paths.data_dir(), "frames")
         JOB_LEFTOVERS.backup = { dir, partial }
         start_job("backup", table.concat({
             "  $dir = " .. ps_quote(dir),
@@ -175,6 +177,7 @@ function ugi_backup_export(a_state, b_appids)
             "  New-Item -ItemType Directory -Path $grid -Force | Out-Null",
             "  foreach ($f in " .. ps_list(files) .. ") { Check-Stop; Copy-Item -LiteralPath $f -Destination $grid -Force }",
             "  if (Test-Path -LiteralPath " .. ps_quote(icons) .. ") { Copy-Item -LiteralPath " .. ps_quote(icons) .. " -Destination (Join-Path $dir 'icons') -Recurse -Force }",
+            "  if (Test-Path -LiteralPath " .. ps_quote(frames) .. ") { Copy-Item -LiteralPath " .. ps_quote(frames) .. " -Destination (Join-Path $dir 'frames') -Recurse -Force }",
             "  if (Test-Path -LiteralPath " .. ps_quote(partial) .. ") { Remove-Item -LiteralPath " .. ps_quote(partial) .. " -Force }",
             -- Windows' own zip writer: Compress-Archive is missing or broken on some PCs
             "  Add-Type -AssemblyName System.IO.Compression.FileSystem",
@@ -400,6 +403,14 @@ function ugi_backup_restore(a_appids, b_steam)
                 icons[appid] = fs.join(icons_dir, appid .. rest)
                 copy(entry.path, icons[appid])
             end
+        end
+
+        -- Covers kept without their frame, under the shortcut's new appid
+        local frames_dir = fs.join(paths.data_dir(), "frames")
+        if not fs.exists(frames_dir) then fs.create_directories(frames_dir) end
+        for _, entry in ipairs(fs.exists(fs.join(dir, "frames")) and fs.list(fs.join(dir, "frames")) or {}) do
+            local old, rest = string.match(entry.is_file and entry.name or "", "^(%d+)(_%d+%.%w+)$")
+            if old then copy(entry.path, fs.join(frames_dir, tostring(map[old] or old) .. rest)) end
         end
 
         start_job("restore", table.concat({

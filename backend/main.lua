@@ -8,6 +8,7 @@ require("info") -- registers the ugi_http_get / ugi_epic_namespace / ugi_info_* 
 require("backup") -- registers the ugi_backup_* / ugi_cleanup / ugi_custom_* / ugi_open_folder / ugi_shortcuts / ugi_pick_game calls
 require("achievements") -- registers the ugi_achievements call
 require("update") -- registers the ugi_update_check / ugi_update_install calls
+require("frames") -- registers the ugi_frame_* calls
 
 -- Frontend calls. Arguments arrive by name; JSON strings keep complex data intact.
 

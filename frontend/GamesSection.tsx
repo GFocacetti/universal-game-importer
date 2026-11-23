@@ -15,6 +15,7 @@ import { ImagesProgress, watchImages } from 'imagesProgress';
 import { backdrop } from 'backdrop';
 import { bigPicture } from 'location';
 import { steamCopy } from 'steamCopies';
+import { useGameFrame } from 'FrameWindow';
 
 type Row = ImportedEntry & { id: string };
 
@@ -310,6 +311,11 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 		setMissingNow((await missingFor([row.appid]))[String(row.appid)] ?? []);
 	};
 	const g = useGallery(row.appid, refresh);
+	// The game's own cover frame (it goes over its launcher's)
+	const frame = useGameFrame(row.appid, row.name, () => {
+		g.reload();
+		refresh();
+	});
 	const [overlay, setOverlay] = useState(row.overlay !== false);
 	const changeOverlay = async (on: boolean) => {
 		const state = await loadState();
@@ -366,6 +372,7 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 							<div className="ugi-mosaic">
 								<div className="ugi-imgs">{MOSAIC.map(tile)}</div>
 								<p className="ugi-muted">{missingNow.length ? t('detail.missing', { n: missingNow.length }) : t('detail.complete')}</p>
+								{frame.button}
 							</div>
 							<GalleryPicker g={g} top={<GalleryOptions g={g} />} />
 						</div>
@@ -374,6 +381,7 @@ function Detail({ row, missing, onClose, onRemoved, onImages }: { row: Row; miss
 						</footer>
 					</>
 				)}
+				{frame.window}
 				{tab === 'profile' && <ProfileTab row={row} onImages={() => { g.reload(); refresh(); }} />}
 				{tab === 'launch' && <LaunchTab row={row} overlay={overlay} />}
 				{tab === 'steam' && (

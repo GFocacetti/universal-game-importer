@@ -10,6 +10,14 @@ It includes or is derived from the following third-party works, used under their
 - License: MIT — full text in `LICENSES/MIT-steam-easygrid.txt`
 - Used for: `backend/icons.lua` (icon files for Steam apps, unchanged); the library right-click menu hook in `frontend/contextMenu.tsx`; the SteamGridDB approach (one request per backend call, chunked image transfer, default filters per image type).
 
+## Steam Commander
+
+- Source: https://github.com/Hetfield1985/Steam-Commander
+- Author: Hetfield1985
+- License: MIT — full text in `LICENSES/MIT-Steam-Commander.txt`
+- Used for: the cover frames in `frontend/frames.ts` and `backend/frames.lua` (a launcher badge or a SteamGridDB template with a transparent window laid over the vertical and horizontal covers, the originals kept underneath): the idea, the SteamGridDB games that hold each launcher's templates, the badge size and position, and the way the template's window is found.
+- Changes: rewritten in TypeScript (canvas) and Lua for a Millennium plugin; the templates are looked up through the SteamGridDB API with the user's key.
+
 ## Steam ROM Manager
 
 - Source: https://github.com/SteamGridDB/steam-rom-manager

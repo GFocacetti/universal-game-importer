@@ -11,6 +11,7 @@ import { UgiState } from 'types';
 import { bigPicture, libraryVisible } from 'location';
 import { watchGamepad } from 'gamepad';
 import { backdrop } from 'backdrop';
+import { useGameFrame } from 'FrameWindow';
 
 export const IMAGE_TYPES: { type: ImageType; kind: ImageKind; label: () => string }[] = [
 	{ type: 0, kind: 'grid', label: () => t('image.grid') },
@@ -229,6 +230,8 @@ export function GalleryActions({ g }: { g: GalleryModel }) {
 
 function Gallery({ appid, name, onClose }: { appid: number; name: string; onClose: () => void }) {
 	const g = useGallery(appid);
+	// The game's own cover frame (only for games UGI imported)
+	const frame = useGameFrame(appid, name, g.reload);
 
 	useEffect(() => {
 		// Leaving the library (e.g. to the store) would hide the gallery while it still catches clicks
@@ -261,6 +264,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 							<div className={`ugi-im ${current.kind}`} key={`${g.type}-${g.version}`}>
 								<SteamImage appid={appid} kind={current.kind} />
 							</div>
+							{frame.button}
 						</div>
 					</nav>
 					<GalleryPicker g={g} />
@@ -268,6 +272,7 @@ function Gallery({ appid, name, onClose }: { appid: number; name: string; onClos
 				<footer>
 					<GalleryActions g={g} />
 				</footer>
+				{frame.window}
 			</div>
 		</div>
 	);

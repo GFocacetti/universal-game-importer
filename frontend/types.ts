@@ -64,7 +64,13 @@ export type ImportedEntry = {
 	added?: number;
 	launch?: LaunchSettings;
 	profile?: GameProfile;
+	// The game's own frame on its covers (none: the one of its launcher)
+	frame?: FrameChoice;
 };
+
+// What goes over a game's covers: nothing, its launcher's icon in a corner, or a SteamGridDB template
+// with a transparent window (one for the vertical cover, one for the horizontal one)
+export type FrameChoice = { kind: 'none' } | { kind: 'badge'; icon?: string } | { kind: 'template'; v?: string; h?: string };
 
 // Chosen in the game's window when the name alone finds the wrong game: where its information
 // comes from (a Steam store page or a RAWG game) and which SteamGridDB game its images come from
@@ -120,7 +126,7 @@ export type UgiSettings = {
 	grid_zoom_pc?: number;
 	grid_zoom_bp?: number;
 	// Per launcher: turned off, or a custom folder
-	launchers?: Record<string, { enabled?: boolean; path?: string }>;
+	launchers?: Record<string, { enabled?: boolean; path?: string; frame?: FrameChoice }>;
 	// Gallery filters per image type ("0".. "4")
 	filters?: Record<string, { style?: string; dimension?: string; webp?: boolean; nsfw?: string; humor?: string }>;
 };

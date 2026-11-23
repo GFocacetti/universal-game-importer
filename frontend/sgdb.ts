@@ -2,6 +2,7 @@ import { callable } from '@steambrew/client';
 import { importedKeyFor, unquote } from 'backend';
 import { isShortcut, simplifyName } from 'steamApps';
 import { UgiState } from 'types';
+import { applyCover, COVER_TYPES, forgetOriginal } from 'frames';
 
 // Steam image types used by SetCustomArtworkForApp
 const IMAGE_TYPES = [0, 1, 2, 3, 4] as const;
@@ -164,6 +165,8 @@ export async function applyImage(appid: number, type: ImageType, url: string): P
 		}
 		const data = await fetchBase64(url);
 		if (!data) return false;
+		// Covers: with the game's frame over them, when it has one
+		if (type === 0 || type === 3) return applyCover(appid, type, data, extOf(url));
 		// Not awaited: Steam may never settle these promises (Easy SteamGrid doesn't await them either)
 		SteamClient.Apps.ClearCustomArtworkForApp(appid, type);
 		SteamClient.Apps.SetCustomArtworkForApp(appid, data, extOf(url), type);
@@ -268,6 +271,7 @@ export async function resetImage(appid: number, type: ImageType): Promise<void> 
 		return;
 	}
 	SteamClient.Apps.ClearCustomArtworkForApp(appid, type);
+	forgetOriginal(appid, type);
 }
 
 // Back to Steam's original artwork (custom grid, hero, logo, wide grid and Steam game icons)
@@ -275,6 +279,7 @@ export async function resetImages(appids: number[], progress: Progress, flag: St
 	for (let i = 0; i < appids.length && !flag.stop; i++) {
 		progress(i, appids.length);
 		for (const type of [0, 1, 2, 3] as ImageType[]) SteamClient.Apps.ClearCustomArtworkForApp(appids[i]!, type);
+		for (const type of COVER_TYPES) await forgetOriginal(appids[i]!, type);
 		if (!isShortcut(appids[i]!)) await iconReset({ a_appid: appids[i]! });
 	}
 	progress(appids.length, appids.length);

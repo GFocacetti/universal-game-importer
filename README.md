@@ -31,6 +31,8 @@ No more grey boxes: UGI picks a cover, a wide cover, a background, a logo and an
 
 ![Picture gallery from SteamGridDB](docs/screenshots/gallery.png)
 
+Want to see at a glance where a game comes from? Give a launcher's covers a frame: its icon in a corner, or one of the community's templates from SteamGridDB laid over the vertical and horizontal covers (an Epic Games Store box, a GOG band…). Choose it once per launcher in Launchers, or for a single game in its window. The covers underneath are kept, so the frame can be changed or taken away at any time.
+
 ### A real store page for every game
 
 Open a non-Steam game in your library and you'll find what a store page would show you: trailers and screenshots, summary and description, reviews, release date, developer and publisher, system requirements, languages, age rating and Metacritic score, with links to the game's own store. Everything is fetched when the game is imported and kept ready, so the page opens instantly.

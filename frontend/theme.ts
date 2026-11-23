@@ -280,4 +280,20 @@ div.ugi-launcher-warn { margin-top: 4px; font-size: 13px; }
 .ugi-toast-text { padding: 12px 14px; font-size: 13px; line-height: 1.4; }
 .ugi-toast-text strong { display: block; color: var(--ugi-head); font-size: 14px; margin-bottom: 2px; }
 .ugi-toast-text span { color: var(--ugi-muted); }
+/* Cover frames (FrameWindow.tsx) */
+.ugi-frame-body { flex: 1; overflow: auto; min-height: 0; }
+.ugi-frame-body > p { margin: 0; padding: 14px 16px; }
+.ugi-frame-head { margin: 16px 16px 0; font-size: 14px; font-weight: 600; color: var(--ugi-head); }
+.ugi-frame-thumbs { flex: none; overflow: visible; }
+.ugi-thumb.on { border-color: var(--ugi-primary); }
+.ugi-frame-tpl { background: repeating-conic-gradient(#4a4f57 0 25%, #2f333a 0 50%) 0 0 / 16px 16px; }
+.ugi-thumbs.grid .ugi-frame-tpl { object-fit: contain; }
+.ugi-frame-off { display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; font-size: 13px; color: var(--ugi-muted); box-sizing: border-box; }
+.ugi-thumbs.grid .ugi-frame-off { aspect-ratio: 2/3; }
+.ugi-thumbs.wide .ugi-frame-off { aspect-ratio: 920/430; }
+.ugi-frame-source { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ugi-muted); }
+.ugi-frame-btn { width: 100%; margin-bottom: 10px; }
+.ugi-frame-launcher { padding: 5px 12px; font-size: 13px; }
+.ugi-current .ugi-frame-btn { margin: 8px 0 0; padding: 6px 8px; font-size: 12px; white-space: normal; }
+.ugi-frame-note { margin: 0; padding: 12px 16px 0; font-size: 13px; line-height: 1.45; }
 `;

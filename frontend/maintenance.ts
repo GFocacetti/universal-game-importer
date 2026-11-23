@@ -4,6 +4,7 @@ import { removeCollections, syncCollections } from 'collections';
 import { setLanguage } from 'i18n';
 import { recreateShortcut, shortcutExists, SteamShortcut, steamShortcuts, unquotePath, withOverlay } from 'importer';
 import { resetImages } from 'sgdb';
+import { COVER_TYPES, forgetOriginal } from 'frames';
 import { isSteamApp } from 'steamApps';
 import { UgiState } from 'types';
 
@@ -148,6 +149,7 @@ export async function restoreBackup(backup: BackupState, step: Step): Promise<{ 
 			for (const copy of matches) {
 				if (copy === kept) continue;
 				for (const type of [0, 1, 2, 3]) SteamClient.Apps.ClearCustomArtworkForApp(copy.appid, type);
+				for (const type of COVER_TYPES) await forgetOriginal(copy.appid, type);
 				SteamClient.Apps.RemoveShortcut(copy.appid);
 			}
 			const appid = kept ? kept.appid : await recreateShortcut(id, entry);
@@ -195,6 +197,7 @@ export async function removeEverything(step: Step): Promise<{ games: number; app
 		if (!shortcutExists(entry.appid)) continue;
 		// The custom artwork files would stay behind in Steam's grid folder
 		for (const type of [0, 1, 2, 3]) SteamClient.Apps.ClearCustomArtworkForApp(entry.appid, type);
+		for (const type of COVER_TYPES) await forgetOriginal(entry.appid, type);
 		SteamClient.Apps.RemoveShortcut(entry.appid);
 		games++;
 	}

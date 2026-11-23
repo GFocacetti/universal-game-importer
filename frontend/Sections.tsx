@@ -7,6 +7,9 @@ import { isGameOrShortcut, LAUNCHER_NAMES, openUrl } from 'steamApps';
 import { CancelFlag, exportBackup } from 'maintenance';
 import { UgiState } from 'types';
 import { backdrop } from 'backdrop';
+import { FrameWindow, frameLabel } from 'FrameWindow';
+import { reframeAll } from 'frames';
+import { FrameChoice } from 'types';
 import { EPIC_LOGIN } from 'Guide';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
@@ -31,6 +34,8 @@ async function update(change: (s: UgiState) => void | Promise<void>, onChanged: 
 export function LaunchersSection({ state, onChanged }: { state: UgiState; onChanged: () => void }) {
 	const launchers = state.last_launchers ?? [];
 	const [paths, setPaths] = useState<Record<string, string>>({});
+	// The launcher whose cover frame is being chosen
+	const [framing, setFraming] = useState<string | null>(null);
 	if (!launchers.length) return <p className="ugi-muted">{t('launchers.empty')}</p>;
 
 	const setEnabled = (id: string, on: boolean) =>
@@ -41,6 +46,21 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 		update((s) => {
 			s.settings.launchers = { ...(s.settings.launchers ?? {}), [id]: { ...(s.settings.launchers?.[id] ?? {}), path: (paths[id] ?? '').trim() } };
 		}, onChanged);
+	// A launcher's frame goes on the covers of all its games at once, over the frames chosen for single
+	// games too: from then on they follow the launcher again
+	const saveFrame = async (id: string, choice: FrameChoice | undefined, progress: (done: number, total: number) => void) => {
+		const s = await loadState();
+		const cfg = { ...(s.settings.launchers?.[id] ?? {}) };
+		if (choice && choice.kind !== 'none') cfg.frame = choice;
+		else delete cfg.frame;
+		s.settings.launchers = { ...(s.settings.launchers ?? {}), [id]: cfg };
+		const games = Object.values(s.imported).filter((e) => e.launcher === id);
+		games.forEach((e) => delete e.frame);
+		await saveState(s);
+		const appids = games.map((e) => e.appid);
+		await reframeAll(s, appids, progress);
+		onChanged();
+	};
 	const setCollection = (id: string, what: 'collection' | 'shelf', on: boolean) =>
 		update(async (s) => {
 			const info = (s.collections[id] ??= {});
@@ -101,6 +121,7 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 						<div className="ugi-opts">
 							<label><input type="checkbox" checked={hasCollection} onChange={(e) => setCollection(l.id, 'collection', e.target.checked)} /> {t('launchers.collection')}</label>
 							<label><input type="checkbox" checked={hasShelf} onChange={(e) => setCollection(l.id, 'shelf', e.target.checked)} /> {t('launchers.shelf')}</label>
+							<button className="ugi-btn secondary ugi-frame-launcher" onClick={() => setFraming(l.id)}>{t('frame.title')}: {frameLabel(cfg.frame ?? { kind: 'none' })}</button>
 							{l.supports_path && (
 								<label>
 									{t('launchers.path')}
@@ -119,6 +140,15 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 			})}
 			</div>
 			<p className="ugi-muted">{t('launchers.hint')}</p>
+			{framing && (
+				<FrameWindow
+					title={LAUNCHER_NAMES[framing] ?? framing}
+					launcher={framing}
+					value={state.settings.launchers?.[framing]?.frame}
+					onSave={(choice, progress) => saveFrame(framing, choice, progress)}
+					onClose={() => setFraming(null)}
+				/>
+			)}
 		</>
 	);
 }
