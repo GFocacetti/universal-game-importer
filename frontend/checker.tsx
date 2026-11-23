@@ -10,6 +10,7 @@ import { setPendingReview } from 'pending';
 import { libraryVisible, waitForLibrary } from 'location';
 import { runScan } from 'scanner';
 import { launcherName } from 'steamApps';
+import { checkCollectionFrames } from 'frames';
 
 const INTERVAL_MS = { daily: 864e5, weekly: 7 * 864e5, monthly: 30 * 864e5 } as const;
 // Wait a little after Steam starts, so the check doesn't slow down loading
@@ -51,6 +52,8 @@ function showReview(plan: SyncPlan) {
 
 // Periodic check: runs a while after startup when due. Uninstalled or changed games are handled
 // right away; new games are only announced (imported after the user confirms).
+const COLLECTION_FRAMES_MS = 10 * 60 * 1000;
+
 export async function startPeriodicCheck() {
 	await new Promise((r) => setTimeout(r, STARTUP_DELAY_MS));
 	// Puts back in their collections the games Steam left out (e.g. a game added again right after
@@ -64,6 +67,11 @@ export async function startPeriodicCheck() {
 	} catch (err) {
 		console.error('[UGI] collection sync failed', err);
 	}
+	// Collections with a cover frame: the games that entered them get it, now and every few minutes
+	// while Steam is open (Steam's dynamic collections change by themselves)
+	const frames = () => checkCollectionFrames().catch((err) => console.error('[UGI] collection frames failed', err));
+	await frames();
+	setInterval(frames, COLLECTION_FRAMES_MS);
 	const state = await loadState();
 	const interval = state.settings.check_interval ?? 'weekly';
 	if (!state.onboarded || interval === 'off') return;

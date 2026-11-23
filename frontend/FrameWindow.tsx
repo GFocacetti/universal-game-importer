@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { importedKeyFor, loadState, saveState } from 'backend';
 import { t } from 'i18n';
 import { backdrop } from 'backdrop';
-import { CoverType, FRAME_SOURCES, hasBadge, iconsFor, reframe, Template, templateSource, templatesFor } from 'frames';
+import { collectionFrameInfo, CoverType, FrameGroup, FRAME_SOURCES, hasBadge, iconsFor, reframe, Template, templateSource, templatesFor } from 'frames';
 import { LAUNCHER_NAMES } from 'steamApps';
 import { FrameChoice, UgiState } from 'types';
 
@@ -16,7 +16,15 @@ export function frameLabel(choice: FrameChoice | undefined): string {
 	return choice.kind === 'badge' ? t('frame.badge') : choice.kind === 'template' ? t('frame.template') : t('frame.none');
 }
 
-const sourceName = (id: string) => (id === 'steam' ? 'Steam' : (LAUNCHER_NAMES[id] ?? id));
+const sourceName = (id: string) => FRAME_SOURCES[id]?.name ?? LAUNCHER_NAMES[id] ?? id;
+
+// The template sources by group, as the list shows them: launchers by name, consoles newest first
+const GROUPS: FrameGroup[] = ['launcher', 'nintendo', 'playstation', 'xbox', 'sega', 'atari', 'other'];
+const groupName = (g: FrameGroup) => (g === 'launcher' ? t('nav.launchers') : g === 'other' ? t('frame.otherPlatforms') : { nintendo: 'Nintendo', playstation: 'PlayStation', xbox: 'Xbox', sega: 'Sega', atari: 'Atari' }[g]);
+const sourcesOf = (g: FrameGroup) => {
+	const ids = Object.keys(FRAME_SOURCES).filter((id) => FRAME_SOURCES[id]!.group === g);
+	return g === 'launcher' ? ids.sort((a, b) => sourceName(a).localeCompare(sourceName(b))) : ids;
+};
 
 // Pictures to choose from (templates or icons), loaded from SteamGridDB. none: the label of a first tile that chooses nothing
 function Choices({ load, kind, title, chosen, none, onChoose }: { load: { key: string; get: (s: UgiState) => Promise<Template[]> }; kind: string; title?: string; chosen?: string; none?: string; onChoose: (url?: string) => void }) {
@@ -56,21 +64,24 @@ function Choices({ load, kind, title, chosen, none, onChoose }: { load: { key: s
 
 /**
  * title: what the frame is for (a launcher's or a game's name). launcher: the game's or the
- * launcher's id (none for games added by hand). inherit: the game follows its launcher (shown only
- * for a game). onSave: puts the frame on the covers; progress(done, total) while it works.
+ * launcher's id (none for games added by hand). inherit: what a game follows without a frame of its
+ * own (its collection's or its launcher's; shown only for a game). source: where the templates are looked
+ * for at first. onSave: puts the frame on the covers; progress(done, total) while it works.
  */
 export function FrameWindow({
 	title,
 	launcher,
 	value,
 	inherit,
+	source: firstSource,
 	onSave,
 	onClose,
 }: {
 	title: string;
 	launcher?: string;
 	value: FrameChoice | undefined;
-	inherit?: { launcher: string; current: FrameChoice | undefined };
+	inherit?: { name: string; current?: FrameChoice; collection?: boolean };
+	source?: string;
 	onSave: (choice: FrameChoice | undefined, progress: (done: number, total: number) => void) => Promise<void>;
 	onClose: () => void;
 }) {
@@ -78,12 +89,12 @@ export function FrameWindow({
 	const [v, setV] = useState(value?.kind === 'template' ? value.v : undefined);
 	const [h, setH] = useState(value?.kind === 'template' ? value.h : undefined);
 	const [icon, setIcon] = useState(value?.kind === 'badge' ? value.icon : undefined);
-	const [source, setSource] = useState(templateSource(launcher));
+	const [source, setSource] = useState(firstSource ?? templateSource(launcher));
 	const [status, setStatus] = useState('');
 	const [busy, setBusy] = useState(false);
 
 	const modes: Mode[] = [...(inherit ? (['inherit'] as Mode[]) : []), 'none', ...(hasBadge(launcher) ? (['badge'] as Mode[]) : []), 'template'];
-	const label = (m: Mode) => (m === 'inherit' ? t('frame.inherit') : frameLabel({ kind: m } as FrameChoice));
+	const label = (m: Mode) => (m === 'inherit' ? (inherit?.collection ? t('frame.inheritCollectionShort') : t('frame.inherit')) : frameLabel({ kind: m } as FrameChoice));
 
 	const save = async () => {
 		const choice: FrameChoice | undefined = mode === 'inherit' ? undefined : mode === 'template' ? { kind: 'template', v, h } : mode === 'badge' ? { kind: 'badge', icon } : { kind: mode };
@@ -115,8 +126,12 @@ export function FrameWindow({
 						<label className="ugi-frame-source">
 							{t('frame.from')}
 							<select value={source} onChange={(e) => setSource(e.target.value)}>
-								{Object.keys(FRAME_SOURCES).sort((a, b) => sourceName(a).localeCompare(sourceName(b))).map((id) => (
-									<option key={id} value={id}>{sourceName(id)}</option>
+								{GROUPS.map((g) => (
+									<optgroup key={g} label={groupName(g)}>
+										{sourcesOf(g).map((id) => (
+											<option key={id} value={id}>{sourceName(id)}</option>
+										))}
+									</optgroup>
 								))}
 							</select>
 						</label>
@@ -125,9 +140,15 @@ export function FrameWindow({
 				<div className="ugi-frame-body">
 					{/* The launcher has a frame: the one chosen here is for this game only */}
 					{mode !== 'inherit' && inherit?.current && inherit.current.kind !== 'none' && (
-						<p className="ugi-launcher-warn ugi-frame-note">⚠ {t('frame.gameOnly', { launcher: sourceName(inherit.launcher), frame: frameLabel(inherit.current) })}</p>
+						<p className="ugi-launcher-warn ugi-frame-note">⚠ {inherit.collection ? t('frame.gameOnlyCollection', { collection: inherit.name, frame: frameLabel(inherit.current) }) : t('frame.gameOnly', { launcher: sourceName(inherit.name), frame: frameLabel(inherit.current) })}</p>
 					)}
-					{mode === 'inherit' && inherit && <p className="ugi-muted">{t('frame.inheritHint', { launcher: sourceName(inherit.launcher), frame: frameLabel(inherit.current ?? { kind: 'none' }) })}</p>}
+					{mode === 'inherit' && inherit && (
+						<p className="ugi-muted">
+							{inherit.collection
+								? t('frame.inheritCollection', { collection: inherit.name, frame: frameLabel(inherit.current ?? { kind: 'none' }) })
+								: t('frame.inheritHint', { launcher: sourceName(inherit.name), frame: frameLabel(inherit.current ?? { kind: 'none' }) })}
+						</p>
+					)}
 					{mode === 'none' && <p className="ugi-muted">{t('frame.noneHint')}</p>}
 					{mode === 'badge' && launcher && (
 						<>
@@ -168,13 +189,21 @@ export function FrameWindow({
  * covers were drawn again.
  */
 export function useGameFrame(appid: number, name: string, onChanged?: () => void): { button: React.ReactNode; window: React.ReactNode } {
-	const [info, setInfo] = useState<{ key: string; launcher: string; own?: FrameChoice; launcherFrame?: FrameChoice } | null>(null);
+	// own: the game's frame; inherited: what it follows without one (its collection's, else its launcher's)
+	const [info, setInfo] = useState<{ key: string; launcher: string; own?: FrameChoice; inherited?: { name: string; current?: FrameChoice; collection?: boolean } } | null>(null);
 	const [open, setOpen] = useState(false);
 	const read = () =>
 		loadState().then((s) => {
 			const key = importedKeyFor(s, appid);
 			const entry = key ? s.imported[key] : undefined;
-			setInfo(key && entry ? { key, launcher: entry.launcher, own: entry.frame, launcherFrame: s.settings.launchers?.[entry.launcher]?.frame } : null);
+			if (!key || !entry) return setInfo(null);
+			const collection = collectionFrameInfo(s, appid);
+			const inherited = collection
+				? { name: collection.name, current: collection.frame, collection: true }
+				: entry.launcher === 'manual'
+					? undefined
+					: { name: entry.launcher, current: s.settings.launchers?.[entry.launcher]?.frame };
+			setInfo({ key, launcher: entry.launcher, own: entry.frame, inherited });
 		});
 	useEffect(() => {
 		read();
@@ -191,10 +220,15 @@ export function useGameFrame(appid: number, name: string, onChanged?: () => void
 		await saveState(s);
 		progress(0, 1);
 		await reframe(s, appid);
+		await saveState(s);
 		await read();
 		onChanged?.();
 	};
-	const label = info.own || manual ? frameLabel(info.own ?? { kind: 'none' }) : `${t('frame.inherit')} (${frameLabel(info.launcherFrame ?? { kind: 'none' })})`;
+	const inherited = info.inherited;
+	const label =
+		info.own || !inherited
+			? frameLabel(info.own ?? { kind: 'none' })
+			: `${inherited.collection ? t('frame.inheritCollectionShort') : t('frame.inherit')} (${frameLabel(inherited.current ?? { kind: 'none' })})`;
 	return {
 		button: (
 			<button className="ugi-btn secondary ugi-frame-btn" onClick={() => setOpen(true)}>
@@ -206,7 +240,7 @@ export function useGameFrame(appid: number, name: string, onChanged?: () => void
 				title={name}
 				launcher={manual ? undefined : info.launcher}
 				value={info.own}
-				inherit={manual ? undefined : { launcher: info.launcher, current: info.launcherFrame }}
+				inherit={inherited}
 				onSave={save}
 				onClose={() => setOpen(false)}
 			/>

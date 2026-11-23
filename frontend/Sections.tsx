@@ -59,6 +59,7 @@ export function LaunchersSection({ state, onChanged }: { state: UgiState; onChan
 		await saveState(s);
 		const appids = games.map((e) => e.appid);
 		await reframeAll(s, appids, progress);
+		await saveState(s);
 		onChanged();
 	};
 	const setCollection = (id: string, what: 'collection' | 'shelf', on: boolean) =>

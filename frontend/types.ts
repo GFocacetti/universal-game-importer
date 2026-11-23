@@ -98,6 +98,10 @@ export type UgiState = {
 	last_launchers?: LauncherStatus[];
 	// First-install setup completed
 	onboarded?: boolean;
+	// Cover frames of Steam collections (id -> frame, when applied: the latest wins), and the frame
+	// last drawn on each game's covers (appid -> frames.ts frameSig)
+	collection_frames?: Record<string, { frame: FrameChoice; applied: number }>;
+	framed?: Record<string, string>;
 };
 
 export type UgiSettings = {

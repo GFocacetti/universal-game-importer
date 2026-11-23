@@ -6,6 +6,7 @@ import { themeStyle, UGI_CSS } from 'theme';
 import { UgiState } from 'types';
 import GamesSection from 'GamesSection';
 import { ImagesSection, LaunchersSection, SettingsSection } from 'Sections';
+import { CollectionsSection } from 'CollectionsSection';
 import ReviewDialog from 'ReviewDialog';
 import { runScan } from 'scanner';
 import { addManualGame, SyncPlan } from 'importer';
@@ -24,11 +25,12 @@ import { GuideSteps } from 'Guide';
 // windows opened over it (--ugi-bars), between them
 const BIG_PICTURE_BARS = { paddingTop: 40, paddingBottom: 40, boxSizing: 'border-box', '--ugi-bars': '40px' } as React.CSSProperties;
 
-type Section = 'games' | 'launchers' | 'images' | 'settings' | 'uninstall';
+type Section = 'games' | 'launchers' | 'collections' | 'images' | 'settings' | 'uninstall';
 
 const SECTIONS: { id: Section; label: () => string }[] = [
 	{ id: 'games', label: () => t('nav.games') },
 	{ id: 'launchers', label: () => t('nav.launchers') },
+	{ id: 'collections', label: () => t('nav.collections') },
 	{ id: 'images', label: () => t('nav.images') },
 	{ id: 'settings', label: () => t('nav.settings') },
 	{ id: 'uninstall', label: () => t('nav.uninstall') },
@@ -183,6 +185,7 @@ export default function UgiPage() {
 				<div className="ugi-content">
 					{state && section === 'games' && <GamesSection state={state} onChanged={reload} />}
 					{state && section === 'launchers' && <LaunchersSection state={state} onChanged={reload} />}
+					{state && section === 'collections' && <CollectionsSection state={state} onChanged={reload} />}
 					{state && section === 'images' && <ImagesSection state={state} onChanged={reload} />}
 					{state && section === 'uninstall' && <UninstallSection onChanged={reload} />}
 					{state && section === 'settings' && (
