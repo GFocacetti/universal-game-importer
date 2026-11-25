@@ -13,6 +13,7 @@ import { gamepadDocument, gamepadWindow, mainWindowPath } from 'location';
 import { mainDocument } from 'overlay';
 import { GamepadMode, Group, Pressable, Row, useGamepad } from 'Pressable';
 import { imageUrls, isShortcut, openUrl } from 'steamApps';
+import { hasSteamClass, steamSelector } from 'steamClasses';
 import { steamCopy } from 'steamCopies';
 
 declare const appStore: { GetAppOverviewByAppID(appid: number): { display_name?: string } | undefined };
@@ -618,7 +619,7 @@ function shortcutNotice(doc: Document, name: string): HTMLElement | null {
 // Steam's two columns: the one holding the box, and the right one (notes, screenshots) next to it
 function columns(notice: HTMLElement): { left: HTMLElement; right: HTMLElement } | null {
 	for (let el: HTMLElement | null = notice; el?.parentElement; el = el.parentElement) {
-		const found = Array.from(el.parentElement.children).find((sibling) => sibling !== el && sibling.classList.contains('RightColumn'));
+		const found = Array.from(el.parentElement.children).find((sibling) => sibling !== el && hasSteamClass(sibling, 'RightColumn'));
 		if (found) return { left: el, right: found as HTMLElement };
 	}
 	return null;
@@ -626,8 +627,8 @@ function columns(notice: HTMLElement): { left: HTMLElement; right: HTMLElement }
 
 // A Steam game's page: its two columns, the left one (activity) and the right one (achievements, notes)
 function gameColumns(doc: Document): { left: HTMLElement; right: HTMLElement } | null {
-	const right = Array.from(doc.querySelectorAll<HTMLElement>('.RightColumn')).find((el) => el.getClientRects().length);
-	const left = right && Array.from(right.parentElement?.children ?? []).find((el) => el.classList.contains('LeftColumn'));
+	const right = Array.from(doc.querySelectorAll<HTMLElement>(steamSelector('RightColumn'))).find((el) => el.getClientRects().length);
+	const left = right && Array.from(right.parentElement?.children ?? []).find((el) => hasSteamClass(el, 'LeftColumn'));
 	return right && left ? { left: left as HTMLElement, right } : null;
 }
 
@@ -930,9 +931,12 @@ function tickBigPicture() {
 	const doc = gamepadDocument();
 	// Steam's notice and the portrait beside it, in one box; on Steam's own games, its short summary
 	// (details, features, portrait), which UGI's blocks include
+	// "AppGameInfoContainer" until the 2026-11-18 client, "GameInfoContainer" since
+	const container =
+		doc?.querySelector<HTMLElement>(steamSelector('AppGameInfoContainer')) ?? doc?.querySelector<HTMLElement>(steamSelector('GameInfoContainer'));
 	const box = isShortcut(appid)
-		? doc?.querySelector<HTMLElement>('.AppGameInfoContainer .Shortcut')?.parentElement
-		: doc?.querySelector<HTMLElement>('.AppGameInfoContainer')?.firstElementChild as HTMLElement | null | undefined;
+		? container?.querySelector<HTMLElement>(steamSelector('Shortcut'))?.parentElement
+		: container?.firstElementChild as HTMLElement | null | undefined;
 	unmountBig();
 	if (!doc || !box) return;
 
